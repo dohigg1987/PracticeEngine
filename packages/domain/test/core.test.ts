@@ -1,0 +1,11 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { moneyFromDecimal } from "../src/money.js";
+import { assertBalanced, mapTrialBalance } from "../src/trial-balance.js";
+import { appendAuditEvent, verifyAuditChain } from "../src/audit.js";
+const accounts=[{id:"a1000",code:"1000",name:"Bank"},{id:"a4000",code:"4000",name:"Turnover"}];
+const balanced=[{sourceAccount:accounts[0],debit:moneyFromDecimal("1000.00"),credit:0n},{sourceAccount:accounts[1],debit:0n,credit:moneyFromDecimal("1000.00")}];
+test("balanced TB passes",()=>assert.doesNotThrow(()=>assertBalanced(balanced)));
+test("unbalanced TB fails",()=>assert.throws(()=>assertBalanced([balanced[0]]),/TB_NOT_BALANCED/));
+test("canonical mapping preserves provenance",()=>{const result=mapTrialBalance(balanced,[{sourceAccountId:"a1000",canonicalCode:"ASSET.CASH"},{sourceAccountId:"a4000",canonicalCode:"REV.TURNOVER"}],[{code:"ASSET.CASH",name:"Cash",reportLine:"BS.CASH",normalBalance:"DEBIT"},{code:"REV.TURNOVER",name:"Turnover",reportLine:"PL.REVENUE",normalBalance:"CREDIT"}]);assert.equal(result.length,2);assert.deepEqual(result.find(x=>x.canonicalCode==="ASSET.CASH")?.sourceAccountIds,["a1000"]);});
+test("audit chain detects tampering",()=>{const first=appendAuditEvent({eventId:"e1",occurredAt:"2026-08-17T20:00:00Z",actorId:"u1",tenantId:"t1",eventType:"IMPORT_COMMITTED",objectType:"Import",objectId:"i1",correlationId:"c1"},null);const second=appendAuditEvent({eventId:"e2",occurredAt:"2026-08-17T20:01:00Z",actorId:"u1",tenantId:"t1",eventType:"TB_VERSION_CREATED",objectType:"TrialBalance",objectId:"tb1",correlationId:"c1"},first);assert.equal(verifyAuditChain([first,second]),true);assert.equal(verifyAuditChain([first,{...second,eventType:"TAMPERED"}]),false);});

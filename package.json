@@ -1,0 +1,13 @@
+{
+  "name": "uk-accounts-platform",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "build:core": "tsc -p tsconfig.core.json",
+    "test:core": "npm run build:core && node --test dist/packages/domain/test/*.test.js",
+    "demo": "npm run build:core && node dist/scripts/demo.js"
+  },
+  "engines": {"node": ">=22"}
+}

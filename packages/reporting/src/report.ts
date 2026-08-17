@@ -1,0 +1,3 @@
+import type { CanonicalBalance, ReportLine } from "../../domain/src/types.js";
+export interface ReportLineDefinition { code:string; caption:string; canonicalCodes:string[] }
+export function buildReport(balances:CanonicalBalance[],definitions:ReportLineDefinition[]):ReportLine[]{const balanceByCode=new Map(balances.map(b=>[b.canonicalCode,b]));return definitions.map(d=>{let balance=0n;const sources=new Set<string>();for(const code of d.canonicalCodes){const c=balanceByCode.get(code);if(!c)continue;balance+=c.balance;c.sourceAccountIds.forEach(id=>sources.add(id));}return{code:d.code,caption:d.caption,balance,canonicalCodes:d.canonicalCodes,sourceAccountIds:[...sources]};});}

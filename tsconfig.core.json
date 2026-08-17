@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "outDir": "dist",
+    "rootDir": "."
+  },
+  "include": [
+    "packages/domain/src/**/*.ts",
+    "packages/domain/test/**/*.ts",
+    "packages/rules/src/**/*.ts",
+    "packages/reporting/src/**/*.ts",
+    "scripts/**/*.ts",
+    "types/**/*.d.ts"
+  ]
+}
