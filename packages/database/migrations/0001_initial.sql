@@ -12,6 +12,6 @@ CREATE TABLE trial_balance(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),tenant_
 CREATE TABLE trial_balance_line(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),trial_balance_id uuid NOT NULL REFERENCES trial_balance(id),tenant_id uuid NOT NULL REFERENCES tenant(id),source_account_id uuid NOT NULL REFERENCES source_account(id),canonical_account_id uuid REFERENCES canonical_account(id),dimensions jsonb NOT NULL DEFAULT '{}'::jsonb,debit numeric(30,2) NOT NULL DEFAULT 0,credit numeric(30,2) NOT NULL DEFAULT 0,CHECK(debit>=0 AND credit>=0));
 CREATE TABLE audit_event(event_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),occurred_at_utc timestamptz NOT NULL,recorded_at_utc timestamptz NOT NULL DEFAULT now(),tenant_id uuid NOT NULL REFERENCES tenant(id),organisation_id uuid,engagement_id uuid,actor_type text NOT NULL,actor_id text NOT NULL,event_type text NOT NULL,object_type text NOT NULL,object_id text NOT NULL,version_before integer,version_after integer,previous_hash text,new_hash text,reason text,correlation_id text NOT NULL,causation_id text,metadata jsonb NOT NULL DEFAULT '{}'::jsonb,event_hash text NOT NULL,ledger_integrity_reference text);
 CREATE INDEX audit_event_engagement_time_idx ON audit_event(tenant_id,engagement_id,occurred_at_utc,event_id);
-CREATE OR REPLACE FUNCTION prevent_audit_event_mutation() RETURNS trigger AS $$ BEGIN RAISE EXCEPTION 'audit_event is append-only'; END; $$ LANGUAGE plpgsql;
-CREATE TRIGGER audit_event_no_update BEFORE UPDATE OR DELETE ON audit_event FOR EACH ROW EXECUTE FUNCTION prevent_audit_event_mutation();
+CREATE RULE audit_event_no_update AS ON UPDATE TO audit_event DO INSTEAD NOTHING;
+CREATE RULE audit_event_no_delete AS ON DELETE TO audit_event DO INSTEAD NOTHING;
 COMMIT;
