@@ -1,0 +1,3 @@
+interface Env { HYPERDRIVE:{connectionString:string}; ARTEFACTS:R2Bucket; }
+function json(data:unknown,status=200):Response{return Response.json(data,{status,headers:{"cache-control":"no-store"}});}
+export default {async fetch(request:Request,env:Env):Promise<Response>{const url=new URL(request.url);if(url.pathname==="/health")return json({status:"ok",service:"uk-accounts-api"});if(url.pathname==="/v1/capabilities")return json({accountingCore:"vertical-slice-1",database:"neon-postgres-via-hyperdrive",artefacts:"r2",modules:["trial-balance","canonical-mapping","audit-ledger","rules","report-provenance"]});return json({error:{code:"NOT_FOUND",message:"Route not found"}},404);}};

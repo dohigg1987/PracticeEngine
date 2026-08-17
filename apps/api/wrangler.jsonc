@@ -1,0 +1,1 @@
+{"$schema":"node_modules/wrangler/config-schema.json","name":"uk-accounts-api-dev","main":"src/index.ts","compatibility_date":"2026-08-01","compatibility_flags":["nodejs_compat"],"observability":{"enabled":true},"r2_buckets":[{"binding":"ARTEFACTS","bucket_name":"uk-accounts-dev-artefacts"}],"hyperdrive":[{"binding":"HYPERDRIVE","id":"REPLACE_WITH_DEV_HYPERDRIVE_ID"}]}

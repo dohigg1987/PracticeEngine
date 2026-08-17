@@ -1,0 +1,1 @@
+{"name":"@uk-accounts/web","private":true,"type":"module","scripts":{"dev":"vite","build":"vite build"},"dependencies":{"@vitejs/plugin-react":"latest","vite":"latest","typescript":"^5.8.0","react":"latest","react-dom":"latest"},"devDependencies":{}}
