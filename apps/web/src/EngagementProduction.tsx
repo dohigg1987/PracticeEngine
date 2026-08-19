@@ -52,6 +52,7 @@ import {
   scopeDisclosureChecklist,
   unresolvedDisclosurePlaceholders,
 } from "./disclosureScope";
+import { ConfirmAction, ConfirmDialog } from "./ConfirmAction";
 
 export type ProductionView =
   | "working-papers"
@@ -672,9 +673,7 @@ function WorkingPaperEditor({
                       {when(version.created_at)} · {version.created_by}
                     </small>
                   </div>
-                  <code title={version.content_hash}>
-                    {version.content_hash.slice(0, 12)}…
-                  </code>
+                  <span>Integrity recorded</span>
                 </li>
               ))}
           </ol>
@@ -986,7 +985,9 @@ export function accountsReleaseChecks(version: AccountsVersion) {
         version.content_hash &&
         Object.keys(version.content_manifest || {}).length,
       ),
-      evidence: version.content_hash || "No content hash",
+      evidence: version.content_hash
+        ? "Manifest integrity verified"
+        : "Manifest integrity unavailable",
     },
     {
       label: "Prepared sign-off",
@@ -1101,8 +1102,8 @@ function AccountsReviewDetail({
           <b>Compared with version {previous.version}</b>
           <span>
             {previous.content_hash === version.content_hash
-              ? "Content hash is unchanged."
-              : "Content hash changed — re-review and fresh sign-offs are required."}
+              ? "Content is unchanged."
+              : "Content changed — re-review and fresh sign-offs are required."}
           </span>
           <span>
             {Object.keys(version.content_manifest || {}).length -
@@ -1460,22 +1461,18 @@ function AccountsVersions({
                     <dd>{item.framework_pack_id}</dd>
                   </div>
                   <div>
-                    <dt>Trial balance</dt>
-                    <dd className="mono">{item.trial_balance_id}</dd>
+                    <dt>Source snapshot</dt>
+                    <dd>{item.trial_balance_id ? "Pinned" : "Not pinned"}</dd>
                   </div>
                   <div>
-                    <dt>Content hash</dt>
-                    <dd className="mono">{item.content_hash}</dd>
+                    <dt>Content integrity</dt>
+                    <dd>{item.content_hash ? "Verified" : "Unavailable"}</dd>
                   </div>
                   <div>
                     <dt>Manifest entries</dt>
                     <dd>{Object.keys(item.content_manifest || {}).length}</dd>
                   </div>
                 </dl>
-                <details>
-                  <summary>Manifest provenance</summary>
-                  <pre>{JSON.stringify(item.content_manifest, null, 2)}</pre>
-                </details>
                 <AccountsReviewDetail
                   version={item}
                   previous={items[index + 1]}
@@ -2181,13 +2178,6 @@ function FilingEvidence({
     item: FilingAttempt,
     status: "SUBMITTED" | "FAILED" | "WITHDRAWN",
   ) {
-    const prompt =
-      status === "SUBMITTED"
-        ? "Confirm that this payload was submitted through the regulator’s external portal. Ledgerly will record manual submission evidence only; it will not contact the regulator."
-        : status === "FAILED"
-          ? "Record this filing attempt as failed? This terminal status cannot be reversed."
-          : "Withdraw this filing attempt? This terminal status cannot be reversed.";
-    if (!window.confirm(prompt)) return;
     setBusy(item.id);
     setActionError("");
     try {
@@ -2319,11 +2309,6 @@ function FilingEvidence({
                         <span className="filing-value">
                           {item.accounts_version ?? item.accounts_version_id}
                         </span>
-                        {item.payload_hash && (
-                          <span className="mono" title={item.payload_hash}>
-                            Payload {item.payload_hash.slice(0, 12)}…
-                          </span>
-                        )}
                         <span>
                           {item.responded_at
                             ? "Response evidence recorded"
@@ -2365,33 +2350,33 @@ function FilingEvidence({
                       {filingActions(item.status).length > 0 ? (
                         <div className="filing-actions">
                           {item.status === "PREPARED" && (
-                            <Button
-                              type="button"
+                            <ConfirmAction
+                              label="Record submission"
+                              title="Record external submission?"
+                              body="Confirm that this payload was submitted through the regulator's external portal. Ledgerly records evidence only and does not contact the regulator."
+                              confirmLabel="Record submission"
                               appearance="primary"
-                              size="small"
                               disabled={busy === item.id}
-                              onClick={() => transition(item, "SUBMITTED")}
-                            >
-                              Record submission
-                            </Button>
+                              onConfirm={() => transition(item, "SUBMITTED")}
+                            />
                           )}
-                          <Button
-                            type="button"
-                            size="small"
+                          <ConfirmAction
+                            label="Mark failed"
+                            title="Mark filing attempt as failed?"
+                            body="This is a terminal filing status and cannot be reversed."
+                            confirmLabel="Mark failed"
                             disabled={busy === item.id}
-                            onClick={() => transition(item, "FAILED")}
-                          >
-                            Mark failed
-                          </Button>
-                          <Button
-                            type="button"
+                            onConfirm={() => transition(item, "FAILED")}
+                          />
+                          <ConfirmAction
+                            label="Withdraw"
+                            title="Withdraw filing attempt?"
+                            body="This is a terminal filing status and cannot be reversed."
+                            confirmLabel="Withdraw"
                             appearance="subtle"
-                            size="small"
                             disabled={busy === item.id}
-                            onClick={() => transition(item, "WITHDRAWN")}
-                          >
-                            Withdraw
-                          </Button>
+                            onConfirm={() => transition(item, "WITHDRAWN")}
+                          />
                         </div>
                       ) : (
                         <span className="filing-locked">No further action</span>
@@ -2452,6 +2437,7 @@ function FilingDecisionForm({
   const [reference, setReference] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
   async function record(event: React.FormEvent) {
     event.preventDefault();
@@ -2460,10 +2446,11 @@ function FilingDecisionForm({
       setError(validation);
       return;
     }
-    const confirmed = window.confirm(
-      `Record this externally received regulator response as ${pretty(status)}? The evidence file will be retained and this terminal decision cannot be reversed. Ledgerly will not contact the regulator.`,
-    );
-    if (!confirmed || !file) return;
+    setConfirmOpen(true);
+  }
+
+  async function confirmRecord() {
+    if (!file) return;
     setBusy(true);
     setError("");
     try {
@@ -2478,6 +2465,7 @@ function FilingDecisionForm({
       setFile(null);
       setReference("");
       if (inputRef.current) inputRef.current.value = "";
+      setConfirmOpen(false);
       await onRecorded();
     } catch (e) {
       setError(filingError(e));
@@ -2486,6 +2474,7 @@ function FilingDecisionForm({
     }
   }
   return (
+    <>
     <form className="decision-form" onSubmit={record}>
       <fieldset disabled={busy}>
         <legend>Record externally received regulator decision</legend>
@@ -2551,5 +2540,15 @@ function FilingDecisionForm({
         </MessageBar>
       )}
     </form>
+    <ConfirmDialog
+      open={confirmOpen}
+      title={`Record ${pretty(status)} decision?`}
+      body="This records an externally received regulator response. The evidence file will be retained, the decision is terminal, and Ledgerly will not contact the regulator."
+      confirmLabel="Record decision"
+      busy={busy}
+      onCancel={() => setConfirmOpen(false)}
+      onConfirm={confirmRecord}
+    />
+    </>
   );
 }

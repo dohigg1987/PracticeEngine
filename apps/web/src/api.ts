@@ -83,6 +83,7 @@ export type Dashboard = {
   reconciliations?: StatusCounts;
   tasks?: StatusCounts;
   reviewPoints?: StatusCounts;
+  filingAttempts?: StatusCounts;
   progress?: { completedTasks: number; totalTasks: number; percent: number };
   blockingItems?: number;
 };
