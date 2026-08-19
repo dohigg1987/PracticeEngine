@@ -393,9 +393,13 @@ export default function ClientPermanentFile({
                   <TableCell>{label(officer.officerType)}</TableCell>
                   <TableCell>{date(officer.appointedOn)}</TableCell>
                   <TableCell>
-                    {officer.resignedOn
-                      ? `Resigned ${date(officer.resignedOn)}`
-                      : "Current"}
+                    <Badge
+                      appearance={officer.resignedOn ? "outline" : "tint"}
+                      color={officer.resignedOn ? "subtle" : "success"}
+                    >
+                      {officer.resignedOn ? "Resigned" : "Current"}
+                    </Badge>
+                    {officer.resignedOn ? <small>{date(officer.resignedOn)}</small> : null}
                   </TableCell>
                   <TableCell><Button size="small" appearance="subtle" icon={<EditRegular />} onClick={() => editOfficer(officer)}>Edit</Button></TableCell>
                 </TableRow>
@@ -467,7 +471,10 @@ export default function ClientPermanentFile({
                     {adviser.contactQualifications ? `, ${adviser.contactQualifications}` : ""}
                     <small>{adviser.email || adviser.telephone}</small>
                   </TableCell>
-                  <TableCell>{label(adviser.status)}{adviser.professionalBody ? <small>{adviser.professionalBody} · {label(adviser.reportStyle)}</small> : null}</TableCell>
+                  <TableCell>
+                    <Badge {...statusBadgeProps(adviser.status)}>{label(adviser.status)}</Badge>
+                    {adviser.professionalBody ? <small>{adviser.professionalBody} · {label(adviser.reportStyle)}</small> : null}
+                  </TableCell>
                   <TableCell><Button size="small" appearance="subtle" icon={<EditRegular />} onClick={() => editAdviser(adviser)}>Edit</Button></TableCell>
                 </TableRow>
               ))}
