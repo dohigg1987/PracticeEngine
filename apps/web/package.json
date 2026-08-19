@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:production": "npm run verify:ui && node scripts/security-headers.mjs && vite build",
+    "build:production": "npm run typecheck && npm run test:ui-quality && node scripts/security-headers.mjs && npm run test:headers && vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:ui-quality": "node --test scripts/ui-quality-guard.test.mjs scripts/forced-colors.test.mjs && node scripts/ui-quality-guard.mjs",
