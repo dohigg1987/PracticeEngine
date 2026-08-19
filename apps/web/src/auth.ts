@@ -11,6 +11,8 @@ export const authTransportUrl = import.meta.env.DEV
 export const authClient = !demoMode && authUrl ? createAuthClient(authTransportUrl) : null;
 
 export function authFailureMessage(error: unknown, development = import.meta.env.DEV): string {
+  const actionable = authActionErrorMessage(error);
+  if (actionable) return actionable;
   if (error instanceof DOMException && error.name === "AbortError") return "The authentication request timed out. Check your connection and try again.";
   if (error instanceof TypeError) return development
     ? "The authentication request could not reach Neon Auth. Confirm VITE_NEON_AUTH_URL is set, restart Vite, and retry through the local /neon-auth proxy."
@@ -20,6 +22,38 @@ export function authFailureMessage(error: unknown, development = import.meta.env
     if (code === "RATE_LIMITED" || code === "TOO_MANY_REQUESTS") return "Too many authentication attempts. Wait briefly and try again.";
   }
   return "Authentication could not be completed. Try again; if the problem continues, contact your administrator.";
+}
+
+export function authActionErrorMessage(error: unknown): string {
+  if (!error || typeof error !== "object") return "";
+  const code = "code" in error && typeof error.code === "string"
+    ? error.code.toUpperCase()
+    : "";
+  const status = "status" in error && typeof error.status === "number"
+    ? error.status
+    : 0;
+  const message = error instanceof Error ? error.message : "";
+
+  if (code === "INVALID_EMAIL_OR_PASSWORD" || status === 401) {
+    return "The email address or password is incorrect.";
+  }
+  if (
+    code === "USER_ALREADY_EXISTS" ||
+    code === "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL" ||
+    /already exists|already registered/i.test(message)
+  ) {
+    return "An account already exists for this email address. Sign in instead.";
+  }
+  if (code === "EMAIL_NOT_VERIFIED" || /verify your email|email.*not verified/i.test(message)) {
+    return "Verify your email address, then sign in again.";
+  }
+  if (code === "RATE_LIMITED" || code === "TOO_MANY_REQUESTS" || status === 429) {
+    return "Too many authentication attempts. Wait briefly and try again.";
+  }
+  if (status >= 400 && status < 500 && message && !/origin/i.test(message)) {
+    return message.slice(0, 240);
+  }
+  return "";
 }
 
 export function authFailureDiagnostic(error: unknown): Record<string, string> {
