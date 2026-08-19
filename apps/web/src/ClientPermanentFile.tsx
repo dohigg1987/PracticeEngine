@@ -28,6 +28,7 @@ import {
   PermanentFileAdviser,
   PermanentFileOfficer,
 } from "./api";
+import { formatDate } from "./displayFormat";
 import { personDisplayName, statutoryLabel } from "./format";
 import { statusBadgeProps } from "./statusBadge";
 
@@ -48,12 +49,7 @@ type Props = {
 };
 
 const label = statutoryLabel;
-const date = (value?: string | null) =>
-  value
-    ? new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(
-        new Date(value),
-      )
-    : "—";
+const date = (value?: string | null) => formatDate(value, "Not recorded");
 const address = (value?: PermanentFileAddress | null) =>
   value
     ? [
@@ -254,7 +250,7 @@ export default function ClientPermanentFile({
           Clients
         </Button>
         <div>
-          <h1>{organisation.legalName}</h1>
+          <h2>{organisation.legalName}</h2>
           <p>
             {label(organisation.legalForm)} · {label(organisation.jurisdiction)}
           </p>

@@ -1,5 +1,31 @@
+const professionalLabels: Record<string, string> = {
+  ACCA: "ACCA",
+  ACIE: "ACIE",
+  AAT: "AAT",
+  CAI: "Chartered Accountants Ireland",
+  CCEW: "Charity Commission for England and Wales",
+  CCNI: "Charity Commission for Northern Ireland",
+  COMPANIES_HOUSE: "Companies House",
+  CSV: "CSV upload",
+  DFE: "Department for Education",
+  FREEAGENT: "FreeAgent",
+  HMRC: "HM Revenue & Customs",
+  ICAEW: "ICAEW",
+  ICAS: "ICAS",
+  LIMITED_LIABILITY_PARTNERSHIP: "Limited liability partnership",
+  OSCR: "Scottish Charity Regulator (OSCR)",
+  PRIVATE_LIMITED_COMPANY: "Private limited company",
+  PUBLIC_LIMITED_COMPANY: "Public limited company",
+  QUICKBOOKS: "QuickBooks Online",
+  SAGE: "Sage",
+  XLSX: "Excel upload",
+  XERO: "Xero",
+};
+
 export function statutoryLabel(value?: string | null): string {
   if (!value) return "—";
+  const exact = professionalLabels[value.toUpperCase()];
+  if (exact) return exact;
   return value
     .toLowerCase()
     .replaceAll("_", " ")

@@ -39,6 +39,7 @@ import EngagementProduction, {
   validateRegulatorEvidence,
 } from "./EngagementProduction";
 import { AppErrorFallback } from "./ErrorBoundary";
+import { RoutePanelFallback } from "./RoutePanelBoundary";
 
 describe("accessible recovery and asynchronous states", () => {
   it("announces a top-level failure and exposes a named recovery action", () => {
@@ -46,6 +47,14 @@ describe("accessible recovery and asynchronous states", () => {
     expect(html).toContain('role="alert"');
     expect(html).toContain('aria-labelledby="fatal-error-title"');
     expect(html).toContain("Reload workspace");
+  });
+
+  it("contains a routed panel failure with an in-place retry", () => {
+    const html = renderToStaticMarkup(<RoutePanelFallback onRetry={() => {}} />);
+    expect(html).toContain('aria-label="Panel recovery"');
+    expect(html).toContain("This section could not be displayed");
+    expect(html).toContain("Try again");
+    expect(html).not.toContain("Reload workspace");
   });
 
   it("announces a lazy engagement section while its API data loads", () => {

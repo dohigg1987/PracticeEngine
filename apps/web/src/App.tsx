@@ -96,7 +96,15 @@ import {
   WorkingPaper,
 } from "./api";
 import { statutoryLabel } from "./format";
+import {
+  actorDisplayLabel,
+  formatDate,
+  formatDateTime,
+  formatPeriodYear,
+  mappingSummaryLabel,
+} from "./displayFormat";
 import { statusBadgeProps } from "./statusBadge";
+import { RoutePanelBoundary } from "./RoutePanelBoundary";
 import {
   authClient,
   authConfigured,
@@ -1029,7 +1037,7 @@ function AccountsWorkspace({
     })),
     ...engagements.map((item) => ({
       id: `engagement-${item.id}`,
-      label: `${item.legal_name} · ${new Date(item.period_end).getFullYear()}`,
+      label: `${item.legal_name} · ${formatPeriodYear(item.period_end)}`,
       description: `Engagement · ${title(item.framework)}`,
       keywords: `${item.period_start} ${item.period_end} ${item.sector_profile}`,
       category: "Engagements" as const,
@@ -1258,7 +1266,7 @@ function AccountsWorkspace({
                   {engagements.map((item) => (
                     <option key={item.id} value={item.id}>
                       {item.legal_name} —{" "}
-                      {new Date(item.period_end).getFullYear()}
+                      {formatPeriodYear(item.period_end)}
                     </option>
                   ))}
                 </select>
@@ -1565,19 +1573,21 @@ function AccountsWorkspace({
               }}
             />
           ) : ["integrations", "inbox", "settings"].includes(workspacePage) ? (
-            <Suspense fallback={<Skeleton />}>
-              <CommercialWorkspace
-                view={workspacePage as "integrations" | "inbox" | "settings"}
-                context={context}
-                engagementId={selectedId}
-                engagements={engagements}
-                onOpenSource={(engagementId) => {
-                  setSelectedId(engagementId);
-                  setView("data");
-                  setWorkspacePage("engagement");
-                }}
-              />
-            </Suspense>
+            <RoutePanelBoundary resetKey={`${workspacePage}:${selectedId}`}>
+              <Suspense fallback={<Skeleton />}>
+                <CommercialWorkspace
+                  view={workspacePage as "integrations" | "inbox" | "settings"}
+                  context={context}
+                  engagementId={selectedId}
+                  engagements={engagements}
+                  onOpenSource={(engagementId) => {
+                    setSelectedId(engagementId);
+                    setView("data");
+                    setWorkspacePage("engagement");
+                  }}
+                />
+              </Suspense>
+            </RoutePanelBoundary>
           ) : loading ? (
             <Skeleton />
           ) : error ? (
@@ -1634,7 +1644,7 @@ function AccountsWorkspace({
                   <small>
                     Year ended{" "}
                     {engagement &&
-                      fullDate.format(new Date(engagement.period_end))}{" "}
+                      formatDate(engagement.period_end, "Date unavailable")}{" "}
                     · {title(engagement?.framework || "")} · Version {engagement?.version}
                   </small>
                 </div>
@@ -1729,6 +1739,7 @@ function AccountsWorkspace({
                   </button>
                 </div>
               )}
+              <RoutePanelBoundary resetKey={`${selectedId}:${view}`}>
               {view === "portal" ? (
                 <Suspense fallback={<Skeleton />}>
                   <CommercialWorkspace
@@ -1817,6 +1828,7 @@ function AccountsWorkspace({
                   onRefresh={loadDetail}
                 />
               )}
+              </RoutePanelBoundary>
             </>
           )}
         </main>
@@ -2432,7 +2444,7 @@ function ClientsView({
                   className="client-engagement-link"
                   onClick={() => onOpenEngagement(engagement.id)}
                 >
-                  {fullDate.format(new Date(engagement.period_end))}
+                  {formatDate(engagement.period_end, "Date unavailable")}
                 </FluentLink>
               ))}
               {!clientEngagements.length && (
@@ -4571,8 +4583,8 @@ function MappingView({
           heading="Account mapping"
           body="Connect each source account to the reporting taxonomy."
         >
-          <span className={`summary ${unmapped ? "pending" : "complete"}`}>
-            {unmapped ? `${unmapped} to review` : "All mapped"}
+          <span className={`summary ${unmapped || !lines.length ? "pending" : "complete"}`}>
+            {mappingSummaryLabel(lines.length, unmapped)}
           </span>
         </PanelHead>
         {taxonomyError && (
@@ -5354,7 +5366,7 @@ function AccountsView({
                   <p className="page-period">
                     For the year ended{" "}
                     {engagement &&
-                      fullDate.format(new Date(engagement.period_end))}
+                      formatDate(engagement.period_end, "Date unavailable")}
                   </p>
                 </>
               ) : null}
@@ -5362,7 +5374,7 @@ function AccountsView({
                 <div className="accounts-cover-page">
                   <p className="accounts-cover-entity">{engagement?.legal_name}</p>
                   <h2>Annual report and financial statements</h2>
-                  <p>For the year ended {engagement && fullDate.format(new Date(engagement.period_end))}</p>
+                  <p>For the year ended {engagement && formatDate(engagement.period_end, "Date unavailable")}</p>
                   {permanentFile?.organisation.companyRegistrationNumber && <p>Company number {permanentFile.organisation.companyRegistrationNumber}</p>}
                   {permanentFile?.organisation.charityRegistrationNumber && <p>Charity number {permanentFile.organisation.charityRegistrationNumber}</p>}
                   <strong>Unaudited draft</strong>
@@ -5403,7 +5415,7 @@ function AccountsView({
                       <h3>Responsibilities and basis of report</h3>
                       <p>
                         I report to the trustees on my examination of the accounts for the year ended{" "}
-                        {engagement && fullDate.format(new Date(engagement.period_end))}. The examination
+                        {engagement && formatDate(engagement.period_end, "Date unavailable")}. The examination
                         is carried out in accordance with the applicable statutory directions for
                         independent examination.
                       </p>
@@ -5975,17 +5987,14 @@ function HistoryView({
                 <header>
                   <b>{title(event.event_type)}</b>
                   <time dateTime={event.occurred_at_utc}>
-                    {dateTime.format(new Date(event.occurred_at_utc))}
+                    {formatDateTime(event.occurred_at_utc)}
                   </time>
                 </header>
                 <p>
                   {event.reason ||
-                    `${title(event.object_type)} ${event.object_id}`}
+                    `${title(event.object_type)} activity recorded`}
                 </p>
-                <small>
-                  Actor {event.actor_id} · Ref{" "}
-                  {event.correlation_id.slice(0, 8)}
-                </small>
+                <small>Recorded by {actorDisplayLabel(event.actor_id)}</small>
               </div>
             </li>
           ))}

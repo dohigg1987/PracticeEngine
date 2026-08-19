@@ -51,6 +51,7 @@ import {
   WorkingPaperVersion,
 } from "./api";
 import { statutoryLabel } from "./format";
+import { normalizeDisplayText } from "./displayFormat";
 import {
   disclosureAnswerField,
   disclosureAnswerText,
@@ -230,8 +231,19 @@ function WorkingPapers({ context, engagementId }: EngagementProps) {
         api.workingPapers(context, engagementId),
         api.workingPaperLibrary(context, engagementId),
       ]);
-      setItems(data.items);
-      setLibraryItems(library.items);
+      setItems(
+        data.items.map((item) => ({
+          ...item,
+          title: normalizeDisplayText(item.title),
+        })),
+      );
+      setLibraryItems(
+        library.items.map((item) => ({
+          ...item,
+          title: normalizeDisplayText(item.title),
+          objective: normalizeDisplayText(item.objective),
+        })),
+      );
       setSelected((current) =>
         data.items.some((item) => item.id === current)
           ? current
@@ -565,7 +577,15 @@ function WorkingPaperLibraryPanel({
   });
   const load = useCallback(async () => {
     setLoading(true); setError("");
-    try { setItems((await api.workingPaperLibrary(context, engagementId)).items); }
+    try {
+      setItems(
+        (await api.workingPaperLibrary(context, engagementId)).items.map((item) => ({
+          ...item,
+          title: normalizeDisplayText(item.title),
+          objective: normalizeDisplayText(item.objective),
+        })),
+      );
+    }
     catch (e) { setError(errorText(e)); }
     finally { setLoading(false); }
   }, [context, engagementId]);

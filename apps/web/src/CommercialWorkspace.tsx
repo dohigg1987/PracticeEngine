@@ -32,7 +32,9 @@ import {
   TenantSettings,
 } from "./api";
 import { ConfirmAction } from "./ConfirmAction";
+import { formatDate, formatDateTime } from "./displayFormat";
 import { statutoryLabel } from "./format";
+import { RoutePanelBoundary } from "./RoutePanelBoundary";
 import { statusBadgeProps } from "./statusBadge";
 
 export type CommercialView = "portal" | "integrations" | "inbox" | "settings";
@@ -44,19 +46,8 @@ type Props = {
   onOpenSource?: (engagementId: string) => void;
 };
 const readable = statutoryLabel;
-const when = (value?: string | null) =>
-  value
-    ? new Intl.DateTimeFormat("en-GB", {
-        dateStyle: "medium",
-        timeStyle: "short",
-      }).format(new Date(value))
-    : "—";
-const periodDate = (value: string) =>
-  new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(`${value}T00:00:00Z`));
+const when = (value?: string | null) => formatDateTime(value, "Not recorded");
+const periodDate = (value?: string | null) => formatDate(value, "Date unavailable");
 const errorText = (error: unknown) =>
   error instanceof Error
     ? error.message
@@ -69,7 +60,7 @@ function PageHead({
   return (
     <header className="commercial-head">
       <div>
-        <h1>{title}</h1>
+        <h2>{title}</h2>
         <p>{body}</p>
       </div>
       {children}
@@ -102,7 +93,12 @@ export default function CommercialWorkspace(props: Props) {
     return (
       <PortalWorkspace {...props} engagementId={props.engagementId || ""} />
     );
-  if (props.view === "integrations") return <ImportCentre {...props} />;
+  if (props.view === "integrations")
+    return (
+      <RoutePanelBoundary resetKey={`${props.context.tenantId}:${props.engagementId || "all"}`}>
+        <ImportCentre {...props} />
+      </RoutePanelBoundary>
+    );
   if (props.view === "inbox") return <Inbox {...props} />;
   return <WorkspaceSettings {...props} />;
 }
@@ -824,7 +820,7 @@ function ImportCentre({ context, engagements, onOpenSource }: Props) {
                       <b>{item.displayName}</b>
                       <small>Updated {when(item.updatedAt)}</small>
                     </TableCell>
-                    <TableCell>{item.connectorCode}</TableCell>
+                    <TableCell>{readable(item.connectorCode)}</TableCell>
                     <TableCell>
                       <Badge {...statusBadgeProps(item.status)}>
                         {readable(item.status)}
@@ -1152,7 +1148,7 @@ function WorkspaceSettings({ context, engagements }: Props) {
               <option value="">Entire tenant</option>
               {engagements.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {item.legal_name} · {item.period_end}
+                  {item.legal_name} · {periodDate(item.period_end)}
                 </option>
               ))}
             </Select>
