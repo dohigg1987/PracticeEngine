@@ -136,6 +136,7 @@ import {
   reviewApprovalStageState,
   taskProgress,
 } from "./workflowCorrectness";
+import { invitationStatus } from "./invitationState";
 import {
   permittedSectorProfiles,
   permittedFrameworks,
@@ -2050,6 +2051,7 @@ function TeamView({
   const [hours, setHours] = useState(72);
   const [oneTimeLink, setOneTimeLink] = useState("");
   const [copyState, setCopyState] = useState("");
+  const [invitationClock, setInvitationClock] = useState(() => Date.now());
   const [memberRoles, setMemberRoles] = useState<
     Record<string, "OWNER" | "ADMIN" | "MEMBER">
   >({});
@@ -2075,6 +2077,13 @@ function TeamView({
   useEffect(() => {
     if (currentRole !== "OWNER") setRole("MEMBER");
   }, [currentRole]);
+  useEffect(() => {
+    const timer = window.setInterval(
+      () => setInvitationClock(Date.now()),
+      30_000,
+    );
+    return () => window.clearInterval(timer);
+  }, []);
   async function create(event: React.FormEvent) {
     event.preventDefault();
     if (!Number.isInteger(hours) || hours < 1 || hours > 168) {
@@ -2331,11 +2340,16 @@ function TeamView({
           </section>
         )}
         <div className="invitation-list">
-          <h3>Active invitations</h3>
+          <h3>Invitation links</h3>
           {!invitations.length ? (
             <p>No active invitation links.</p>
           ) : (
-            invitations.map((invitation) => (
+            invitations.map((invitation) => {
+              const status = invitationStatus(
+                invitation.expiresAt,
+                invitationClock,
+              );
+              return (
               <article key={invitation.id}>
                 <div>
                   <b>{title(invitation.role)}</b>
@@ -2343,17 +2357,22 @@ function TeamView({
                     Expires {dateTime.format(new Date(invitation.expiresAt))}
                   </small>
                 </div>
-                <Badge appearance="outline">Active</Badge>
-                <ConfirmAction
-                  label="Revoke"
-                  title="Revoke invitation?"
-                  body={`The ${title(invitation.role)} invitation link will stop working immediately.`}
-                  confirmLabel="Revoke invitation"
-                  disabled={busy === invitation.id}
-                  onConfirm={() => revoke(invitation)}
-                />
+                <Badge appearance="outline" {...statusBadgeProps(status)}>
+                  {title(status)}
+                </Badge>
+                {status === "ACTIVE" && (
+                  <ConfirmAction
+                    label="Revoke"
+                    title="Revoke invitation?"
+                    body={`The ${title(invitation.role)} invitation link will stop working immediately.`}
+                    confirmLabel="Revoke invitation"
+                    disabled={busy === invitation.id}
+                    onConfirm={() => revoke(invitation)}
+                  />
+                )}
               </article>
-            ))
+              );
+            })
           )}
         </div>
       </section>
