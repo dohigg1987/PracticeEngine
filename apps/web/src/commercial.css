@@ -173,7 +173,7 @@
 }
 .inbox-list article {
   display: grid;
-  grid-template-columns: 4px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
   align-items: start;
   padding: 10px 12px;
@@ -194,37 +194,35 @@
 .inbox-list article small {
   color: var(--colorNeutralForeground3);
 }
-.notification-marker {
-  align-self: stretch;
-  background: var(--colorBrandBackground);
-}
-.notification-marker.success {
-  background: var(--colorStatusSuccessBackground3);
-}
-.notification-marker.warning {
-  background: var(--colorStatusWarningBackground3);
-}
-.notification-marker.error {
-  background: var(--colorStatusDangerBackground3);
-}
 .commercial-empty {
-  margin: 0;
-  padding: 24px 12px;
+  display: grid;
+  gap: 2px;
+  padding: 20px 12px;
   color: var(--colorNeutralForeground3);
   text-align: center;
 }
+.commercial-empty b {
+  color: var(--colorNeutralForeground1);
+  font-weight: var(--fontWeightSemibold);
+}
+.delivery-status {
+  margin-top: 16px;
+  border: 1px solid var(--colorNeutralStroke2);
+}
+.delivery-status-heading {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+}
+.delivery-status-heading small {
+  color: var(--colorNeutralForeground3);
+  font-weight: var(--fontWeightRegular);
+}
 .delivery-status table {
-  min-width: 680px;
+  min-width: 640px;
 }
 .delivery-status td:nth-child(1) { width: 32%; }
-.delivery-status td:nth-child(2) { width: 160px; }
-.delivery-capability-status {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 132px;
-  min-height: 24px;
-}
+.delivery-status td:nth-child(2) { width: 1%; white-space: nowrap; }
 .danger-zone {
   border-color: var(--colorNeutralStroke1);
 }
