@@ -4200,6 +4200,25 @@ function AuthScreen({
     }
   }
 
+  async function signInWithGoogle() {
+    if (!authClient) return;
+    setBusy(true);
+    setError("");
+    setConfirmation("");
+    try {
+      const result = await authClient.signIn.social({
+        provider: "google",
+        callbackURL: window.location.origin,
+      });
+      if (result.error) setError(authFailureMessage(result.error));
+    } catch (e) {
+      console.error("Google authentication flow failed", authFailureDiagnostic(e));
+      setError(authFailureMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function switchMode(next: AuthMode) {
     setMode(next);
     setError("");
@@ -4298,6 +4317,16 @@ function AuthScreen({
                     : "Update password"}
           </button>
         </form>
+        {(mode === "sign-in" || mode === "sign-up") && (
+          <button
+            type="button"
+            className="auth-submit"
+            disabled={busy}
+            onClick={signInWithGoogle}
+          >
+            Continue with Google
+          </button>
+        )}
         {mode === "sign-in" && (
           <div className="auth-switch">
             <button type="button" onClick={() => switchMode("reset-request")}>
