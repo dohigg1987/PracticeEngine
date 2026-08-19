@@ -26,6 +26,23 @@ describe("Neon Auth session boundary", () => {
     expect(authFailureMessage(new TypeError("failed"), false)).not.toContain("VITE_NEON_AUTH_URL");
   });
 
+  it("surfaces actionable Neon Auth failures instead of an administrator error", async () => {
+    const { authFailureMessage } = await import("./auth");
+    expect(authFailureMessage(Object.assign(new Error("Invalid email or password"), {
+      code: "INVALID_EMAIL_OR_PASSWORD",
+      status: 401,
+    }), false)).toBe("The email address or password is incorrect.");
+    expect(authFailureMessage({
+      code: "invalid_credentials",
+      status: "401",
+      message: "Invalid email or password",
+    }, false)).toBe("The email address or password is incorrect.");
+    expect(authFailureMessage(Object.assign(new Error("User already exists"), {
+      code: "USER_ALREADY_EXISTS",
+      status: 422,
+    }), false)).toBe("An account already exists for this email address. Sign in instead.");
+  });
+
   it("turns an expired or missing token into an authentication-required error", async () => {
     mocks.token.mockResolvedValue({ data: null, error: { message: "expired" } });
     const { AuthRequiredError, freshAuthToken } = await import("./auth");

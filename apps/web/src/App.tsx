@@ -4107,14 +4107,25 @@ function AuthScreen({
   message: string;
   onAuthenticated: () => Promise<void>;
 }) {
-  const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-in");
+  type AuthMode = "sign-in" | "sign-up" | "reset-request" | "reset-password";
+  const initialResetToken = typeof window === "undefined"
+    ? ""
+    : new URLSearchParams(window.location.search).get("token") ?? "";
+  const [mode, setMode] = useState<AuthMode>(initialResetToken ? "reset-password" : "sign-in");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordConfirmation, setPasswordConfirmation] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [confirmation, setConfirmation] = useState(message);
-  const heading = mode === "sign-in" ? "Welcome back" : "Create your account";
+  const heading = mode === "sign-in"
+    ? "Welcome back"
+    : mode === "sign-up"
+      ? "Create your account"
+      : mode === "reset-request"
+        ? "Reset your password"
+        : "Choose a new password";
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -4123,6 +4134,38 @@ function AuthScreen({
     setError("");
     setConfirmation("");
     try {
+      if (mode === "reset-request") {
+        const result = await authClient.requestPasswordReset({
+          email: email.trim(),
+          redirectTo: window.location.origin,
+        });
+        if (result.error) {
+          setError(authFailureMessage(result.error));
+          return;
+        }
+        setConfirmation("If an account exists for this email address, a password-reset email has been sent.");
+        return;
+      }
+      if (mode === "reset-password") {
+        if (password !== passwordConfirmation) {
+          setError("The passwords do not match.");
+          return;
+        }
+        const result = await authClient.resetPassword({
+          newPassword: password,
+          token: initialResetToken,
+        });
+        if (result.error) {
+          setError(authFailureMessage(result.error));
+          return;
+        }
+        window.history.replaceState({}, "", window.location.pathname);
+        setConfirmation("Your password has been updated. Sign in with the new password.");
+        setMode("sign-in");
+        setPassword("");
+        setPasswordConfirmation("");
+        return;
+      }
       const result =
         mode === "sign-up"
           ? await authClient.signUp.email({
@@ -4157,11 +4200,12 @@ function AuthScreen({
     }
   }
 
-  function switchMode(next: "sign-in" | "sign-up") {
+  function switchMode(next: AuthMode) {
     setMode(next);
     setError("");
     setConfirmation("");
     setPassword("");
+    setPasswordConfirmation("");
   }
 
   return (
@@ -4172,7 +4216,11 @@ function AuthScreen({
         <p>
           {mode === "sign-in"
             ? "Sign in to continue to your accounts workspace."
-            : "Use your work email to create a secure Ledgerly account."}
+            : mode === "sign-up"
+              ? "Use your work email to create a secure Ledgerly account."
+              : mode === "reset-request"
+                ? "Enter your account email and we will send a secure reset link."
+                : "Enter and confirm your new password."}
         </p>
         {confirmation && (
           <div className="auth-message" role="status">
@@ -4196,19 +4244,22 @@ function AuthScreen({
               />
             </label>
           )}
-          <label>
-            Email address
-            <input
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              autoComplete="email"
-              inputMode="email"
-              required
-            />
-          </label>
-          <label>
-            Password
+          {mode !== "reset-password" && (
+            <label>
+              Email address
+              <input
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                autoComplete="email"
+                inputMode="email"
+                required
+              />
+            </label>
+          )}
+          {mode !== "reset-request" && (
+            <label>
+              {mode === "reset-password" ? "New password" : "Password"}
             <input
               type="password"
               value={password}
@@ -4220,28 +4271,49 @@ function AuthScreen({
               required
             />
             <small>At least 8 characters</small>
-          </label>
+            </label>
+          )}
+          {mode === "reset-password" && (
+            <label>
+              Confirm new password
+              <input
+                type="password"
+                value={passwordConfirmation}
+                onChange={(event) => setPasswordConfirmation(event.target.value)}
+                autoComplete="new-password"
+                minLength={8}
+                required
+              />
+            </label>
+          )}
           <button className="primary auth-submit" disabled={busy}>
             {busy
               ? "Please wait…"
               : mode === "sign-in"
                 ? "Sign in"
-                : "Create account"}
+                : mode === "sign-up"
+                  ? "Create account"
+                  : mode === "reset-request"
+                    ? "Send reset link"
+                    : "Update password"}
           </button>
         </form>
+        {mode === "sign-in" && (
+          <div className="auth-switch">
+            <button type="button" onClick={() => switchMode("reset-request")}>
+              Forgot your password?
+            </button>
+          </div>
+        )}
         <div className="auth-switch">
           <span>
-            {mode === "sign-in"
-              ? "New to Ledgerly?"
-              : "Already have an account?"}
+            {mode === "sign-in" ? "New to Ledgerly?" : "Return to sign in"}
           </span>
           <button
             type="button"
-            onClick={() =>
-              switchMode(mode === "sign-in" ? "sign-up" : "sign-in")
-            }
+            onClick={() => switchMode(mode === "sign-in" ? "sign-up" : "sign-in")}
           >
-            {mode === "sign-in" ? "Create an account" : "Sign in instead"}
+            {mode === "sign-in" ? "Create an account" : "Sign in"}
           </button>
         </div>
       </div>
