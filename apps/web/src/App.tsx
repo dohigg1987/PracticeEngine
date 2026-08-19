@@ -1622,7 +1622,7 @@ function AccountsWorkspace({
             <>
               <section className="page-head">
                 <div>
-                  <Breadcrumb aria-label="Current engagement">
+                  <Breadcrumb className="page-breadcrumb" aria-label="Current engagement">
                     <BreadcrumbItem>
                       <BreadcrumbButton
                         onClick={() => setWorkspacePage("clients")}
@@ -2100,7 +2100,7 @@ function TeamView({
     <>
       <section className="page-head client-head">
         <div>
-          <Breadcrumb aria-label="Team location">
+          <Breadcrumb className="page-breadcrumb" aria-label="Team location">
             <BreadcrumbItem>
               <BreadcrumbButton onClick={onOpenWorkspace}>Workspace</BreadcrumbButton>
             </BreadcrumbItem>
@@ -2535,7 +2535,7 @@ function ClientsView({
     <>
       <section className="page-head client-head">
         <div className="client-heading-copy">
-          <Breadcrumb aria-label="Clients location">
+          <Breadcrumb className="page-breadcrumb" aria-label="Clients location">
             <BreadcrumbItem>
               <BreadcrumbButton onClick={onOpenWorkspace}>Workspace</BreadcrumbButton>
             </BreadcrumbItem>
