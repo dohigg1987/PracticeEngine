@@ -379,10 +379,8 @@
   border-top: 1px solid var(--colorNeutralStroke1);
   padding-top: 17px;
 }
-.version-history summary,
-.accounts-version-list details summary {
-  cursor: pointer;
-  font-weight: 700;
+.version-history-trigger {
+  font-weight: var(--fontWeightSemibold);
 }
 .version-history ol {
   list-style: none;
