@@ -49,6 +49,7 @@ import {
   teamInvitationExpiryHours,
   teamInvitationRole,
   teamInvitationToken,
+  trialBalanceReadiness,
   workspaceName,
   workspaceOnboardingDatabaseError,
 } from "./core.js";
@@ -5385,10 +5386,15 @@ async function report(
         from latest join trial_balance_line tbl on tbl.trial_balance_id=latest.id join source_account sa on sa.id=tbl.source_account_id
         join canonical_account ca on ca.id=tbl.canonical_account_id join canonical_report_line rl on rl.id=ca.report_line_id
         group by rl.id,rl.line_code,rl.caption,rl.statement_code,rl.display_order order by rl.statement_code,rl.display_order`;
+      const readiness = trialBalanceReadiness(
+        Number(summaries[0]!.account_count),
+        Number(summaries[0]!.unmapped_count),
+        summaries[0]!.debit_total as string | number,
+        summaries[0]!.credit_total as string | number,
+      );
       return json({
         trialBalance: summaries[0],
-        balanced: summaries[0]!.debit_total === summaries[0]!.credit_total,
-        fullyMapped: summaries[0]!.unmapped_count === 0,
+        ...readiness,
         lines,
       });
     });

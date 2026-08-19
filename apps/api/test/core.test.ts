@@ -14,9 +14,25 @@ import {
   teamInvitationExpiryHours,
   teamInvitationRole,
   teamInvitationToken,
+  trialBalanceReadiness,
   workspaceName,
   workspaceOnboardingDatabaseError,
 } from "../src/core.ts";
+
+test("does not report an empty trial balance as balanced or fully mapped", () => {
+  assert.deepEqual(trialBalanceReadiness(0, 0, "0", "0"), {
+    balanced: false,
+    fullyMapped: false,
+  });
+  assert.deepEqual(trialBalanceReadiness(2, 0, "125.00", "125.00"), {
+    balanced: true,
+    fullyMapped: true,
+  });
+  assert.deepEqual(trialBalanceReadiness(2, 1, "125.00", "125.00"), {
+    balanced: true,
+    fullyMapped: false,
+  });
+});
 
 test("rejects incompatible reporting framework, sector and entity combinations", () => {
   assert.equal(reportingRegimeError("FRS_105", "NONE", "Private limited company"), null);
