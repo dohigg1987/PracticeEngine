@@ -29,12 +29,19 @@ export function authActionErrorMessage(error: unknown): string {
   const code = "code" in error && typeof error.code === "string"
     ? error.code.toUpperCase()
     : "";
-  const status = "status" in error && typeof error.status === "number"
-    ? error.status
-    : 0;
-  const message = error instanceof Error ? error.message : "";
+  const rawStatus = "status" in error ? error.status : 0;
+  const status = typeof rawStatus === "number"
+    ? rawStatus
+    : typeof rawStatus === "string" && /^\d{3}$/.test(rawStatus)
+      ? Number(rawStatus)
+      : 0;
+  const message = error instanceof Error
+    ? error.message
+    : "message" in error && typeof error.message === "string"
+      ? error.message
+      : "";
 
-  if (code === "INVALID_EMAIL_OR_PASSWORD" || status === 401) {
+  if (code === "INVALID_EMAIL_OR_PASSWORD" || code === "INVALID_CREDENTIALS" || status === 401) {
     return "The email address or password is incorrect.";
   }
   if (

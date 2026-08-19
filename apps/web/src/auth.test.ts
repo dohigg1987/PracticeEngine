@@ -32,6 +32,11 @@ describe("Neon Auth session boundary", () => {
       code: "INVALID_EMAIL_OR_PASSWORD",
       status: 401,
     }), false)).toBe("The email address or password is incorrect.");
+    expect(authFailureMessage({
+      code: "invalid_credentials",
+      status: "401",
+      message: "Invalid email or password",
+    }, false)).toBe("The email address or password is incorrect.");
     expect(authFailureMessage(Object.assign(new Error("User already exists"), {
       code: "USER_ALREADY_EXISTS",
       status: 422,
