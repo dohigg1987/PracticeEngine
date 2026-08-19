@@ -7,6 +7,10 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const productionConfigPath = path.join(root, "apps", "api", "wrangler.production.jsonc");
 const pagesProject = "ledgerly-accounts";
 const releaseBranch = "main";
+const currentProductionWebOrigin = "https://ledgerly-accounts.pages.dev";
+const currentWorkersDevApiOrigin = "https://uk-accounts-api-production.dennis-ohiggins.workers.dev";
+const currentNeonAuthUrl =
+  "https://ep-wispy-thunder-zatp3scz.neonauth.c-2.eu-west-2.aws.neon.tech/neondb/auth";
 
 export function exactHttpsOrigin(value, name) {
   if (typeof value !== "string" || !value.trim()) return `${name} is required`;
@@ -71,6 +75,30 @@ export function productionConfigErrors(config) {
   return errors;
 }
 
+export function webReleaseConfigErrors(config) {
+  const errors = [];
+  if (config.name !== "uk-accounts-api-production") errors.push("Production Worker name is invalid");
+  if (config.preview_urls !== false) errors.push("preview_urls must be false");
+  if (config.vars?.WEB_ORIGIN !== currentProductionWebOrigin)
+    errors.push(`WEB_ORIGIN must be ${currentProductionWebOrigin}`);
+  if (config.vars?.NEON_AUTH_URL !== currentNeonAuthUrl)
+    errors.push("NEON_AUTH_URL must match the provisioned production auth service");
+  if (/[<>]|PLACEHOLDER|REPLACE|\.example\b/i.test(JSON.stringify(config)))
+    errors.push("Production config contains an unresolved placeholder");
+
+  if (config.workers_dev !== true || config.routes?.length)
+    errors.push("Web-only release must use the audited production workers.dev endpoint until API custom-domain promotion");
+  return errors;
+}
+
+export function expectedWebApiOrigin(config) {
+  if (config.workers_dev === true && !config.routes?.length) return currentWorkersDevApiOrigin;
+  const route = config.routes?.[0];
+  if (config.workers_dev === false && config.routes?.length === 1 && route?.custom_domain === true)
+    return `https://${route.pattern}`;
+  return undefined;
+}
+
 export function webEnvironmentErrors(environment, config) {
   const errors = [];
   for (const name of ["WEB_ORIGIN", "VITE_API_URL"]) {
@@ -81,11 +109,9 @@ export function webEnvironmentErrors(environment, config) {
   if (authUrlError) errors.push(authUrlError);
   if (environment.WEB_ORIGIN !== config.vars?.WEB_ORIGIN)
     errors.push("WEB_ORIGIN must match the API CORS origin");
-  const expectedApiOrigin = config.routes?.[0]?.pattern
-    ? `https://${config.routes[0].pattern}`
-    : undefined;
+  const expectedApiOrigin = expectedWebApiOrigin(config);
   if (environment.VITE_API_URL !== expectedApiOrigin)
-    errors.push("VITE_API_URL must match the production Worker custom domain");
+    errors.push("VITE_API_URL must match the configured production Worker origin");
   if (environment.VITE_NEON_AUTH_URL !== config.vars?.NEON_AUTH_URL)
     errors.push("VITE_NEON_AUTH_URL must match the API Neon Auth URL");
   if (environment.VITE_DEMO_MODE !== "false") errors.push("VITE_DEMO_MODE must be exactly false");
@@ -99,9 +125,9 @@ function git(...args) {
   return execFileSync(executable, args, { cwd: root, encoding: "utf8" }).trim();
 }
 
-function runNode(modulePath, args) {
+function runNode(modulePath, args, cwd = root) {
   const result = spawnSync(process.execPath, [modulePath, ...args], {
-    cwd: root,
+    cwd,
     env: process.env,
     stdio: "inherit",
   });
@@ -126,8 +152,19 @@ function fail(errors) {
   process.exit(1);
 }
 
-function wrangler(args) {
-  runNode(path.join(root, "node_modules", "wrangler", "bin", "wrangler.js"), args);
+function wrangler(args, cwd = root) {
+  runNode(path.join(root, "node_modules", "wrangler", "bin", "wrangler.js"), args, cwd);
+}
+
+export function pagesDeploymentInvocation(sha) {
+  return {
+    cwd: path.join(root, "apps", "web"),
+    args: [
+      "pages", "deploy", "dist", "--project-name", pagesProject,
+      "--branch", releaseBranch, "--commit-hash", sha,
+      "--commit-message", `production release ${sha}`, "--commit-dirty=false",
+    ],
+  };
 }
 
 function main() {
@@ -145,7 +182,7 @@ function main() {
   const config = JSON.parse(readFileSync(productionConfigPath, "utf8"));
   const errors = [
     ...releaseContextErrors({ status, branch, sha, originSha }),
-    ...productionConfigErrors(config),
+    ...(target === "api" ? productionConfigErrors(config) : webReleaseConfigErrors(config)),
     ...(target === "web" ? webEnvironmentErrors(process.env, config) : []),
   ];
   fail(errors);
@@ -168,11 +205,8 @@ function main() {
   fail(releaseContextErrors({
     status: git("status", "--porcelain=v1", "--untracked-files=normal"), branch, sha, originSha,
   }));
-  wrangler([
-    "pages", "deploy", "apps/web/dist", "--project-name", pagesProject,
-    "--branch", releaseBranch, "--commit-hash", sha,
-    "--commit-message", `production release ${sha}`, "--commit-dirty=false",
-  ]);
+  const deployment = pagesDeploymentInvocation(sha);
+  wrangler(deployment.args, deployment.cwd);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
