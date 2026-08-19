@@ -3,6 +3,13 @@
 /* Compact accounting registers */
 .operations-panel > .panel-head { padding: 12px 16px; }
 .operations-panel > .panel-head small { display: block; margin-top: 2px; }
+.app-shell .reconciliation-header-action {
+  width: auto;
+  flex: 0 0 auto;
+  align-self: center;
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}
 .operation-form { padding: 14px 16px; background: var(--colorNeutralBackground2); border-bottom: 1px solid var(--colorNeutralStroke1); }
 .operation-form-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; grid-column: 1 / -1; margin-bottom: 2px; }
 .operation-form-heading h3 { margin: 0; font-size: var(--fontSizeBase400); line-height: var(--lineHeightBase400); font-weight: 600; }
@@ -48,6 +55,7 @@
   .reconciliation-form button { justify-self: start; }
 }
 @media (max-width: 700px) {
+  .app-shell .reconciliation-header-action { align-self: flex-start; }
   .journal-editor .editor-grid, .reconciliation-form { grid-template-columns: 1fr; }
   .operation-form-heading { display: block; }
   .operation-form-heading > span { display: block; margin-top: 4px; }
