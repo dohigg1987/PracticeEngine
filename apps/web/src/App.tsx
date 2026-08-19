@@ -1193,15 +1193,17 @@ function AccountsWorkspace({
                       onMouseEnter={() => setActiveSearchIndex(index)}
                       onClick={() => openSearchResult(index)}
                     >
-                      <span className="global-search-icon">
-                        <WorkspaceSearchIcon category={result.category} />
-                      </span>
-                      <span className="global-search-copy">
-                        <b>{result.label}</b>
-                        <small>{result.description}</small>
-                      </span>
-                      <span className="global-search-enter" aria-hidden="true">
-                        Enter
+                      <span className="global-search-result-layout">
+                        <span className="global-search-icon">
+                          <WorkspaceSearchIcon category={result.category} />
+                        </span>
+                        <span className="global-search-copy">
+                          <b>{result.label}</b>
+                          <small>{result.description}</small>
+                        </span>
+                        <kbd className="global-search-enter" aria-hidden="true">
+                          Enter
+                        </kbd>
                       </span>
                     </FluentButton>
                   </React.Fragment>
