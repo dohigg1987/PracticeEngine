@@ -81,6 +81,7 @@ import {
   Engagement,
   FilingAttempt,
   Journal,
+  JournalStatus,
   JournalLine,
   onUnauthorized,
   Organisation,
@@ -95,6 +96,7 @@ import {
   TeamMember,
   TrialBalanceLine,
   WorkflowTask,
+  WorkflowTaskStatus,
   WorkingPaper,
 } from "./api";
 import { statutoryLabel } from "./format";
@@ -125,6 +127,15 @@ import {
   reportBalanceLabel,
   submissionStageState,
 } from "./workflowState";
+import {
+  adjustmentsStageState,
+  isMappedTrialBalanceLine,
+  isOpenWorkflowTask,
+  isOutstandingReconciliation,
+  mappingPopulation,
+  reviewApprovalStageState,
+  taskProgress,
+} from "./workflowCorrectness";
 import {
   permittedSectorProfiles,
   permittedFrameworks,
@@ -506,6 +517,9 @@ function AccountsWorkspace({
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [report, setReport] = useState<ReportLine[]>([]);
   const [reportBalanced, setReportBalanced] = useState<boolean | null>(null);
+  const [accountsVersions, setAccountsVersions] = useState<AccountsVersion[]>(
+    [],
+  );
   const [view, setView] = useState<View>(demoMode ? "accounts" : "overview");
   const [openProductionNavStage, setOpenProductionNavStage] =
     useState<ProductionNavStage | null>(
@@ -550,6 +564,8 @@ function AccountsWorkspace({
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const operationsSelectionRef = useRef(selectedId);
   operationsSelectionRef.current = selectedId;
+  const detailSelectionRef = useRef(selectedId);
+  detailSelectionRef.current = selectedId;
   useEffect(() => {
     const focusSearch = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
@@ -666,19 +682,24 @@ function AccountsWorkspace({
       setEvents([]);
       setReport([]);
       setReportBalanced(null);
+      setAccountsVersions([]);
       setReportError("");
       setHistoryError("");
+      setDetailLoading(false);
       return;
     }
+    const requestEngagementId = selectedId;
     setDetailLoading(true);
     setDetailError("");
     setReportError("");
     setHistoryError("");
-    const [tb, history, reportData] = await Promise.allSettled([
+    const [tb, history, reportData, versionData] = await Promise.allSettled([
       api.trialBalance(context, selectedId),
       api.history(context, selectedId),
       api.report(context, selectedId),
+      api.accountsVersions(context, selectedId),
     ]);
+    if (detailSelectionRef.current !== requestEngagementId) return;
     if (tb.status === "fulfilled") setLines(tb.value.items);
     else {
       setLines([]);
@@ -708,6 +729,9 @@ function AccountsWorkspace({
           reportData.reason?.message || "Could not load the draft accounts.",
         );
     }
+    if (versionData.status === "fulfilled")
+      setAccountsVersions(versionData.value.items);
+    else setAccountsVersions([]);
     setDetailLoading(false);
   }, [context, selectedId]);
   const loadOperations = useCallback(async () => {
@@ -798,8 +822,7 @@ function AccountsWorkspace({
   }, [loadOperations]);
   useDialogFocus(modalRef, Boolean(importFile), closeImport, importing);
 
-  const mapped = lines.filter((line) => line.canonical_code).length,
-    unmapped = lines.length - mapped,
+  const { mapped, unmapped } = mappingPopulation(lines),
     debit = lines.reduce((n, line) => n + Number(line.debit || 0), 0),
     credit = lines.reduce((n, line) => n + Number(line.credit || 0), 0);
   const options = useMemo(
@@ -913,16 +936,14 @@ function AccountsWorkspace({
       id: "reconciliations",
       label: "Reconciliations",
       count:
-        reconciliations.filter(
-          (item) => !["REVIEWED", "APPROVED", "COMPLETE"].includes(item.status),
-        ).length || undefined,
+        reconciliations.filter(isOutstandingReconciliation).length ||
+        undefined,
     },
     {
       id: "tasks",
       label: "Tasks",
       count:
-        tasks.filter((item) => !["DONE", "COMPLETE"].includes(item.status))
-          .length || undefined,
+        tasks.filter(isOpenWorkflowTask).length || undefined,
     },
     {
       id: "review",
@@ -986,13 +1007,7 @@ function AccountsWorkspace({
       label: "Adjustments",
       target: "journals",
       views: ["journals", "reconciliations"],
-      state: reconciliations.some(
-        (item) => !["REVIEWED", "RECONCILED"].includes(item.status),
-      )
-        ? "attention"
-        : journals.length || reconciliations.length
-          ? "ready"
-          : "pending",
+      state: adjustmentsStageState(journals, reconciliations),
     },
     {
       label: "Accounts builder",
@@ -1009,11 +1024,10 @@ function AccountsWorkspace({
       label: "Review / approval",
       target: "versions",
       views: ["tasks", "review", "versions", "history"],
-      state: reviewPoints.some(isOutstandingReviewPoint)
-        ? "attention"
-        : dashboard.progress?.percent === 100
-          ? "ready"
-          : "pending",
+      state: reviewApprovalStageState(
+        reviewPoints.some(isOutstandingReviewPoint),
+        accountsVersions,
+      ),
     },
     {
       label: "Submission",
@@ -3220,6 +3234,7 @@ function Overview({
   tasks: WorkflowTask[];
   reviewPoints: ReviewPoint[];
 }) {
+  const taskStats = taskProgress(tasks);
   const cards = [
     {
       label: "Journals",
@@ -3233,11 +3248,8 @@ function Overview({
     },
     {
       label: "Open tasks",
-      value:
-        (dashboard.tasks?.total ?? tasks.length) -
-        (dashboard.tasks?.byStatus?.COMPLETE ??
-          tasks.filter((item) => item.status === "COMPLETE").length),
-      note: `${dashboard.progress?.percent ?? 0}% complete`,
+      value: taskStats.openTasks,
+      note: `${taskStats.percent}% complete`,
     },
     {
       label: "Review points",
@@ -3263,7 +3275,7 @@ function Overview({
           body="Live operational readiness across this engagement."
         >
           <Badge appearance="outline" color="warning" size="small">
-            {dashboard.progress?.percent ?? 0}% complete
+            {taskStats.percent}% complete
           </Badge>
         </PanelHead>
         <div className="readiness">
@@ -3271,11 +3283,11 @@ function Overview({
             className="readiness-ring"
             style={
               {
-                "--progress": `${dashboard.progress?.percent ?? 0}%`,
+                "--progress": `${taskStats.percent}%`,
               } as React.CSSProperties
             }
           >
-            <b>{dashboard.progress?.percent ?? 0}%</b>
+            <b>{taskStats.percent}%</b>
           </div>
           <div>
             <h3>Workflow readiness</h3>
@@ -3286,13 +3298,12 @@ function Overview({
               <div>
                 <dt>Completed tasks</dt>
                 <dd>
-                  {dashboard.progress?.completedTasks ??
-                    tasks.filter((item) => item.status === "COMPLETE").length}
+                  {taskStats.completedTasks}
                 </dd>
               </div>
               <div>
                 <dt>Total tasks</dt>
-                <dd>{dashboard.progress?.totalTasks ?? tasks.length}</dd>
+                <dd>{taskStats.totalTasks}</dd>
               </div>
             </dl>
           </div>
@@ -3344,7 +3355,7 @@ function JournalsView({
       setBusy(false);
     }
   }
-  async function transition(item: Journal, status: string) {
+  async function transition(item: Journal, status: JournalStatus) {
     setBusy(true);
     setError("");
     try {
@@ -3356,7 +3367,7 @@ function JournalsView({
       setBusy(false);
     }
   }
-  const next: Record<string, string> = {
+  const next: Partial<Record<JournalStatus, JournalStatus>> = {
     DRAFT: "PREPARED",
     PREPARED: "APPROVED",
     APPROVED: "POSTED",
@@ -3596,7 +3607,7 @@ function JournalsView({
                           size="small"
                           type="button"
                           disabled={busy}
-                          onClick={() => transition(item, next[item.status])}
+                          onClick={() => transition(item, next[item.status]!)}
                         >
                           {next[item.status] === "PREPARED"
                             ? "Mark prepared"
@@ -3918,7 +3929,7 @@ function TasksView({
       setBusy(false);
     }
   }
-  async function move(item: WorkflowTask, status: string) {
+  async function move(item: WorkflowTask, status: WorkflowTaskStatus) {
     setBusy(true);
     try {
       await api.updateWorkflowTask(context, engagementId, item.id, { status });
@@ -3929,7 +3940,13 @@ function TasksView({
       setBusy(false);
     }
   }
-  const columns = ["OPEN", "IN_PROGRESS", "BLOCKED", "COMPLETE"];
+  const columns: WorkflowTaskStatus[] = [
+    "OPEN",
+    "IN_PROGRESS",
+    "BLOCKED",
+    "COMPLETE",
+  ];
+  const statusOptions: WorkflowTaskStatus[] = [...columns, "CANCELLED"];
   return (
     <>
       <section className="panel task-create">
@@ -4002,9 +4019,11 @@ function TasksView({
                     aria-label={`Status for ${item.title}`}
                     value={item.status}
                     disabled={busy}
-                    onChange={(e) => move(item, e.target.value)}
+                    onChange={(e) =>
+                      move(item, e.target.value as WorkflowTaskStatus)
+                    }
                   >
-                    {columns.concat("CANCELLED").map((value) => (
+                    {statusOptions.map((value) => (
                       <option key={value}>{value}</option>
                     ))}
                   </select>
@@ -4560,9 +4579,11 @@ function DataView({
                     </td>
                     <td>
                       <span
-                        className={`tag ${line.canonical_code ? "ok" : "warning"}`}
+                        className={`tag ${isMappedTrialBalanceLine(line) ? "ok" : "warning"}`}
                       >
-                        {line.canonical_code ? "Mapped" : "Needs mapping"}
+                        {isMappedTrialBalanceLine(line)
+                          ? "Mapped"
+                          : "Needs mapping"}
                       </span>
                     </td>
                   </tr>
