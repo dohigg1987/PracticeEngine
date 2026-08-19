@@ -12,6 +12,15 @@ type Requirement = {
   assessment?: boolean;
 };
 
+export type ScopedDisclosure = Omit<Disclosure, "status"> & {
+  /**
+   * Requirements inferred by the scoping engine are not disclosure records.
+   * Keep their lifecycle distinct until the user deliberately saves them.
+   */
+  record_state: "SAVED" | "NOT_RECORDED";
+  status: Disclosure["status"] | "NOT_RECORDED";
+};
+
 const money = new Intl.NumberFormat("en-GB", {
   style: "currency",
   currency: "GBP",
@@ -130,15 +139,16 @@ export function scopeDisclosureChecklist(input: {
     const rendered = Boolean(rule.rendered);
     return {
       ...(saved || {
-        id: `scope:${rule.code}`,
+        id: `requirement:${rule.code}`,
         disclosure_code: rule.code,
         applicability: rule.applicability,
-        status: "OPEN" as const,
+        status: "NOT_RECORDED" as const,
         current_version: 0,
         answer: {
           [disclosureAnswerField(rule.code)]: baselineDisclosureWording(rule.code),
         },
       }),
+      record_state: saved ? "SAVED" as const : "NOT_RECORDED" as const,
       title: rule.title,
       requirement_source: rule.source,
       trigger_summary: rule.trigger,
@@ -151,7 +161,7 @@ export function scopeDisclosureChecklist(input: {
           : "NOT_RENDERED" as const,
       scope_group: rule.group,
       applicability: saved?.applicability === "UNASSESSED" ? rule.applicability : saved?.applicability || rule.applicability,
-    } satisfies Disclosure;
+    } satisfies ScopedDisclosure;
   });
   return { items, tier, grossIncome, periodLabel: `${input.periodStart} to ${input.periodEnd}` };
 }

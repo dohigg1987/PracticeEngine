@@ -56,6 +56,7 @@ import {
   disclosureAnswerField,
   disclosureAnswerText,
   scopeDisclosureChecklist,
+  type ScopedDisclosure,
   unresolvedDisclosurePlaceholders,
 } from "./disclosureScope";
 import { ConfirmAction, ConfirmDialog } from "./ConfirmAction";
@@ -1430,7 +1431,7 @@ function Disclosures({
     load();
   }, [load]);
   async function save(
-    item: Disclosure,
+    item: ScopedDisclosure,
     applicability: string,
     status: string,
     answer: string,
@@ -1445,14 +1446,14 @@ function Disclosures({
         [answerField]: answer,
         explanation,
       };
-      if (item.id.startsWith("scope:")) {
+      if (item.record_state === "NOT_RECORDED") {
         const created = await api.createDisclosure(context, engagementId, {
           disclosureCode: item.disclosure_code,
           applicability: applicability as Disclosure["applicability"],
           ruleVersion: "2026.1",
           answer: nextAnswer,
         });
-        if (status !== "OPEN")
+        if (status !== "OPEN" && status !== "NOT_RECORDED")
           await api.updateDisclosure(context, engagementId, created.item.id, {
             status,
           });
@@ -1545,7 +1546,7 @@ function DisclosureRow({
   busy,
   save,
 }: {
-  item: Disclosure;
+  item: ScopedDisclosure;
   busy: boolean;
   save: (
     applicability: string,
@@ -1621,6 +1622,11 @@ function DisclosureRow({
             value={status}
             onChange={(e) => setStatus(e.target.value as Disclosure["status"])}
           >
+            {status === "NOT_RECORDED" && (
+              <option value="NOT_RECORDED" disabled>
+                Not recorded
+              </option>
+            )}
             {["OPEN", "COMPLETE", "REVIEWED"].map((value) => (
               <option key={value} value={value}>
                 {pretty(value)}
