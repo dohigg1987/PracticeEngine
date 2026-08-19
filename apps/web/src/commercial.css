@@ -222,7 +222,7 @@
   min-width: 640px;
 }
 .delivery-status td:nth-child(1) { width: 32%; }
-.delivery-status td:nth-child(2) { width: 1%; white-space: nowrap; }
+.delivery-status td:nth-child(2) { width: 180px; white-space: nowrap; }
 .danger-zone {
   border-color: var(--colorNeutralStroke1);
 }
