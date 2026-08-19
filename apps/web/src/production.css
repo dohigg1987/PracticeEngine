@@ -13,7 +13,7 @@
 }
 .production-panel > .panel-head p:last-child {
   margin: 0;
-  color: var(--muted);
+  color: var(--colorNeutralForeground2);
 }
 .working-paper-head-actions {
   display: flex;
@@ -81,11 +81,11 @@
 .production-empty {
   text-align: center;
   padding: 32px 20px;
-  color: var(--muted);
+  color: var(--colorNeutralForeground2);
 }
 .production-empty h3 {
   margin: 0;
-  color: var(--ink);
+  color: var(--colorNeutralForeground1);
 }
 .production-empty p {
   max-width: 520px;
@@ -97,7 +97,7 @@
   gap: 12px;
   padding: 14px 16px;
   margin: 0;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--colorNeutralStroke1);
   background: var(--colorNeutralBackground2);
 }
 .production-form label,
@@ -107,7 +107,7 @@
   gap: 7px;
   font-size: 12px;
   font-weight: 700;
-  color: var(--muted);
+  color: var(--colorNeutralForeground2);
 }
 .production-form .wide {
   grid-column: 1/-1;
@@ -132,13 +132,13 @@
 .production-split {
   display: grid;
   grid-template-columns: minmax(230px, 32%) 1fr;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--colorNeutralStroke1);
   min-height: 410px;
 }
 .production-list {
   padding: 8px;
-  border-right: 1px solid var(--border);
-  background: var(--soft);
+  border-right: 1px solid var(--colorNeutralStroke1);
+  background: var(--colorNeutralBackground2);
 }
 .working-paper-group + .working-paper-group {
   margin-top: 10px;
@@ -167,27 +167,27 @@
   width: 100%;
   padding: 9px 10px;
   border: 0;
-  border-radius: 2px;
+  border-radius: var(--borderRadiusSmall);
   background: transparent;
   text-align: left;
   color: inherit;
 }
 .production-list button:hover,
 .production-list button.active {
-  background: white;
-  box-shadow: inset 3px 0 var(--colorBrandStroke1);
+  background: var(--colorSubtleBackgroundHover);
+  color: var(--colorBrandForeground1);
 }
 .production-list button span {
   display: grid;
   gap: 3px;
 }
 .production-list button span b {
-  color: var(--accent);
+  color: var(--colorBrandForeground1);
 }
 .production-list button small {
   grid-column: 1/-1;
   margin-top: 7px;
-  color: var(--muted);
+  color: var(--colorNeutralForeground2);
 }
 .production-list .tag {
   align-self: start;
@@ -376,7 +376,7 @@
 }
 .version-history {
   margin-top: 18px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--colorNeutralStroke1);
   padding-top: 17px;
 }
 .version-history summary,
@@ -394,14 +394,14 @@
   justify-content: space-between;
   gap: 12px;
   padding: 10px 0;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--colorNeutralStroke1);
 }
 .version-history li div {
   display: grid;
   gap: 3px;
 }
 .version-history code {
-  color: var(--muted);
+  color: var(--colorNeutralForeground2);
 }
 .disclosure-list,
 .accounts-version-list {
@@ -424,13 +424,13 @@
   overflow-wrap: anywhere;
 }
 .disclosure-row {
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--colorNeutralStroke1);
   padding: 14px 16px;
 }
 .disclosure-row header small {
   display: block;
   margin-top: 5px;
-  color: var(--muted);
+  color: var(--colorNeutralForeground2);
 }
 .disclosure-row-status,
 .disclosure-scope-summary {
@@ -468,9 +468,9 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1px;
   margin: 12px 0;
-  background: var(--border);
-  border: 1px solid var(--border);
-  border-radius: 2px;
+  background: var(--colorNeutralStroke1);
+  border: 1px solid var(--colorNeutralStroke1);
+  border-radius: var(--borderRadiusSmall);
   overflow: hidden;
 }
 .accounts-version-list dl div {
@@ -479,10 +479,9 @@
   background: var(--colorNeutralBackground1);
 }
 .accounts-version-list dt {
-  color: var(--muted);
+  color: var(--colorNeutralForeground2);
   font-size: 12px;
   font-weight: 700;
-  text-transform: uppercase;
 }
 .accounts-version-list dd {
   margin: 4px 0 0;
@@ -492,10 +491,10 @@
   max-height: 280px;
   overflow: auto;
   padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: 2px;
+  border: 1px solid var(--colorNeutralStroke1);
+  border-radius: var(--borderRadiusSmall);
   background: var(--colorNeutralBackground2);
-  color: var(--ink);
+  color: var(--colorNeutralForeground1);
   font-size: 12px;
 }
 .accounts-version-list footer {
@@ -506,7 +505,7 @@
 }
 .comparative-readiness {
   margin-top: 16px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--colorNeutralStroke1);
   background: var(--colorNeutralBackground1);
 }
 .comparative-readiness > header {
@@ -515,7 +514,7 @@
   justify-content: space-between;
   gap: 16px;
   padding: 12px 14px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--colorNeutralStroke1);
 }
 .comparative-readiness h4,
 .comparative-readiness h5 {
@@ -523,24 +522,24 @@
 }
 .comparative-readiness header p {
   margin: 3px 0 0;
-  color: var(--muted);
+  color: var(--colorNeutralForeground2);
 }
 .comparative-readiness > dl {
   display: grid;
   grid-template-columns: 1fr 1fr;
   margin: 0;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--colorNeutralStroke1);
 }
 .comparative-readiness > dl > div {
   padding: 10px 14px;
 }
 .comparative-readiness > dl > div + div {
-  border-left: 1px solid var(--border);
+  border-left: 1px solid var(--colorNeutralStroke1);
 }
 .comparative-readiness > dl small {
   display: block;
   margin-top: 3px;
-  color: var(--muted);
+  color: var(--colorNeutralForeground2);
   overflow-wrap: anywhere;
 }
 .comparative-statement {
@@ -566,7 +565,7 @@
   }
   .comparative-readiness > dl > div + div {
     border-left: 0;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--colorNeutralStroke1);
   }
 }
 .signoff-list {
@@ -580,12 +579,12 @@
   justify-content: space-between;
   gap: 16px;
   padding: 9px 12px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--colorNeutralStroke1);
   border-radius: 0;
   background: transparent;
 }
 .signoff-list span {
-  color: var(--muted);
+  color: var(--colorNeutralForeground2);
 }
 .accounts-review {
   margin: 18px 0;
@@ -663,7 +662,7 @@
   min-width: 0;
 }
 .release-checks small {
-  color: var(--muted);
+  color: var(--colorNeutralForeground2);
   text-align: right;
   overflow-wrap: anywhere;
 }
@@ -687,7 +686,7 @@
   background: var(--colorNeutralBackground2);
 }
 .version-comparison span {
-  color: var(--muted);
+  color: var(--colorNeutralForeground2);
 }
 .evidence-note {
   display: flex;
@@ -698,7 +697,7 @@
   border-block: 1px solid var(--colorBrandStroke2);
   border-radius: 0;
   background: var(--colorNeutralBackground2);
-  color: var(--ink);
+  color: var(--colorNeutralForeground1);
 }
 .evidence-note b {
   white-space: nowrap;
@@ -759,7 +758,7 @@
   }
   .production-list {
     border-right: 0;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--colorNeutralStroke1);
   }
   .accounts-version-list dl {
     grid-template-columns: 1fr;
@@ -854,7 +853,7 @@
   gap: 7px;
   font-size: 12px;
   font-weight: 700;
-  color: var(--muted);
+  color: var(--colorNeutralForeground2);
 }
 .workspace-create button {
   justify-self: start;
@@ -868,7 +867,7 @@
   display: grid;
   gap: 5px;
   min-width: 240px;
-  color: var(--muted);
+  color: var(--colorNeutralForeground2);
   font-size: 12px;
   font-weight: 700;
 }
@@ -882,14 +881,14 @@
   margin: 0 0 12px;
   padding: 10px 12px;
   border: 1px solid var(--colorStatusWarningBorder1);
-  border-radius: 2px;
-  background: var(--colorNeutralBackground2);
+  border-radius: var(--borderRadiusSmall);
+  background: var(--colorStatusWarningBackground1);
   color: var(--colorStatusWarningForeground1);
 }
 .pack-warning.certified {
-  border-color: var(--border);
-  background: var(--colorNeutralBackground2);
-  color: var(--ink);
+  border-color: var(--colorStatusSuccessBorder1);
+  background: var(--colorStatusSuccessBackground1);
+  color: var(--colorStatusSuccessForeground1);
 }
 .pack-warning span {
   color: inherit;
@@ -901,8 +900,8 @@
   gap: 12px;
   margin: 12px 0;
   padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 2px;
+  border: 1px solid var(--colorNeutralStroke1);
+  border-radius: var(--borderRadiusSmall);
   background: var(--colorNeutralBackground2);
   font-size: 12px;
 }
@@ -912,12 +911,12 @@
   min-width: 0;
 }
 .artefact-control span {
-  color: var(--muted);
+  color: var(--colorNeutralForeground2);
   overflow-wrap: anywhere;
 }
 .artefact-control.error {
   border-color: var(--colorStatusDangerBorder1);
-  background: var(--colorNeutralBackground2);
+  background: var(--colorStatusDangerBackground1);
 }
 .artefact-actions {
   display: flex;
@@ -926,22 +925,22 @@
 .artefact-error {
   grid-column: 1/-1;
   margin: 0;
-  color: var(--danger);
+  color: var(--colorStatusDangerForeground1);
   font-size: 12px;
 }
 .filing-prepare {
   margin: 0;
   padding: 16px 20px 18px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--colorNeutralStroke1);
   background: var(--colorNeutralBackground1);
 }
 .filing-panel {
-  border-color: var(--border) !important;
+  border-color: var(--colorNeutralStroke1) !important;
   background: var(--colorNeutralBackground1);
 }
 .filing-panel > .panel-head {
   border-left: 0;
-  border-bottom-color: var(--border);
+  border-bottom-color: var(--colorNeutralStroke1);
   background: var(--colorNeutralBackground1);
 }
 .filing-panel > .filing-message {
@@ -960,7 +959,7 @@
 .filing-prepare legend {
   grid-column: 1 / -1;
   margin: 0 0 4px;
-  color: var(--ink);
+  color: var(--colorNeutralForeground1);
   font-size: 15px;
   font-weight: 600;
 }
@@ -980,12 +979,12 @@
   font-size: 15px;
 }
 .filing-register > header p {
-  color: var(--muted);
+  color: var(--colorNeutralForeground2);
   font-size: 13px;
 }
 .filing-table-wrap {
   overflow-x: auto;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--colorNeutralStroke1);
 }
 .filing-table-wrap table {
   min-width: 840px;
@@ -1004,12 +1003,12 @@
 }
 .filing-attempt span,
 .filing-locked {
-  color: var(--muted);
+  color: var(--colorNeutralForeground2);
   font-size: 12px;
   overflow-wrap: anywhere;
 }
 .filing-value {
-  color: var(--ink) !important;
+  color: var(--colorNeutralForeground1) !important;
 }
 .filing-dates {
   display: grid;
@@ -1022,7 +1021,7 @@
   gap: 8px;
 }
 .filing-dates dt {
-  color: var(--muted);
+  color: var(--colorNeutralForeground2);
 }
 .filing-dates dd {
   margin: 0;
@@ -1038,7 +1037,7 @@
 }
 .decision-form {
   padding: 16px 20px 18px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--colorNeutralStroke1);
   background: var(--colorNeutralBackground2);
 }
 .decision-form fieldset {
@@ -1054,7 +1053,7 @@
 .decision-form legend {
   grid-column: 1/-1;
   margin-bottom: 4px;
-  color: var(--ink);
+  color: var(--colorNeutralForeground1);
   font-size: 15px;
   font-weight: 600;
 }
@@ -1073,14 +1072,14 @@
 }
 .decision-file-picker span {
   overflow: hidden;
-  color: var(--ink);
+  color: var(--colorNeutralForeground1);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .decision-file-hint {
   display: block;
   min-width: 0;
-  color: var(--muted);
+  color: var(--colorNeutralForeground2);
   font-size: 12px;
   line-height: 1.35;
   overflow-wrap: anywhere;
@@ -1094,7 +1093,7 @@
   align-items: center;
   gap: 10px;
   margin-top: 12px;
-  color: var(--muted);
+  color: var(--colorNeutralForeground2);
   font-size: 12px;
 }
 .upload-progress progress {
@@ -1133,8 +1132,8 @@ td {
 .fatal-error section {
   width: min(560px, 100%);
   padding: 36px;
-  border: 1px solid var(--border);
-  border-radius: var(--borderRadiusXLarge);
+  border: 1px solid var(--colorNeutralStroke1);
+  border-radius: var(--borderRadiusMedium);
   background: var(--colorNeutralBackground1);
   text-align: center;
   box-shadow: var(--shadow16);
@@ -1147,7 +1146,7 @@ td {
   margin: 0 auto 18px;
   border-radius: 50%;
   background: var(--colorStatusDangerBackground1);
-  color: var(--danger);
+  color: var(--colorStatusDangerForeground1);
   font-weight: 800;
 }
 .fatal-error h1 {
@@ -1157,7 +1156,7 @@ td {
 .fatal-error section > p:not(.eyebrow) {
   margin: 0 auto 22px;
   max-width: 430px;
-  color: var(--muted);
+  color: var(--colorNeutralForeground2);
   line-height: 1.6;
 }
 @media (max-width: 900px) {
