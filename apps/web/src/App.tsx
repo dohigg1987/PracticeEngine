@@ -1265,7 +1265,7 @@ function AccountsWorkspace({
               workspacePage === "engagement" ? view : workspacePage
             }
           >
-            <NavDrawerBody>
+            <NavDrawerBody className="workspace-nav-body">
               <p className="eyebrow">
                 {selectedMembership?.name || "Accounts workspace"}
               </p>
@@ -1274,6 +1274,7 @@ function AccountsWorkspace({
                 <Select
                   id="engagement"
                   aria-label="Engagement"
+                  size="small"
                   value={selectedId}
                   onChange={(e) => {
                     setSelectedId(e.target.value);
