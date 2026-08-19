@@ -99,7 +99,6 @@ GRANT SELECT ON TABLE
 TO accounts_app;
 
 GRANT INSERT ON TABLE
-  organisation,
   engagement,
   engagement_member,
   import_batch,
@@ -134,6 +133,9 @@ GRANT INSERT ON TABLE
   tenant_export_request,
   accounts_version_comparative
 TO accounts_app;
+
+GRANT INSERT(id,tenant_id,legal_name,legal_form,jurisdiction)
+  ON organisation TO accounts_app;
 
 GRANT INSERT ON TABLE
   tenant_working_paper_override,
@@ -248,6 +250,8 @@ GRANT EXECUTE ON FUNCTION
   accounts_comparative_is_valid(uuid,uuid,uuid)
 TO accounts_app;
 GRANT EXECUTE ON FUNCTION organisation_actor_can_manage(uuid,uuid)
+  TO accounts_app;
+GRANT EXECUTE ON FUNCTION archive_authenticated_organisation(uuid,text)
   TO accounts_app;
 
 COMMIT;

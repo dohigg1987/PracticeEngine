@@ -487,10 +487,16 @@ async function listOrganisations(
   const sql = db(env);
   try {
     return await withTenantTransaction(sql, ctx, async (tx) => {
-      await tenantRole(tx, ctx);
+      const role = await tenantRole(tx, ctx),
+        rawIncludeArchived = new URL(request.url).searchParams.get("includeArchived");
+      if (rawIncludeArchived !== null && rawIncludeArchived !== "true" && rawIncludeArchived !== "false")
+        throw new ApiError(400, "VALIDATION_ERROR", "includeArchived must be true or false");
+      const includeArchived = rawIncludeArchived === "true";
+      if (includeArchived && role !== "OWNER" && role !== "ADMIN")
+        throw new ApiError(403, "FORBIDDEN", "Only workspace owners and administrators can view archived clients");
       const items =
-        await tx`select id,legal_name,legal_form,jurisdiction,created_at
-        from organisation where tenant_id=${ctx.tenantId} order by legal_name,id`;
+        await tx`select id,legal_name,legal_form,jurisdiction,lifecycle_status,archive_reason,archived_at,version,created_at,updated_at
+        from organisation where tenant_id=${ctx.tenantId} and (${includeArchived} or lifecycle_status='ACTIVE') order by lifecycle_status,legal_name,id`;
       return json({ items });
     });
   } finally {
@@ -521,7 +527,7 @@ async function createOrganisation(
       const inserted =
         await tx`insert into organisation(id,tenant_id,legal_name,legal_form,jurisdiction)
         values(${organisationId},${ctx.tenantId},${legalName},${legalForm},${jurisdiction})
-        returning id,legal_name,legal_form,jurisdiction,created_at`;
+        returning id,legal_name,legal_form,jurisdiction,lifecycle_status,archive_reason,archived_at,version,created_at,updated_at`;
       await appendScopedEvents(
         tx,
         ctx,
@@ -534,6 +540,45 @@ async function createOrganisation(
       return inserted[0]!;
     });
     return json({ item }, 201);
+  } finally {
+    await sql.end();
+  }
+}
+
+async function archiveOrganisation(
+  request: Request,
+  env: Env,
+  actorId: string,
+  organisationId: string,
+): Promise<Response> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(organisationId))
+    throw new ApiError(404, "NOT_FOUND", "Organisation not found");
+  const ctx = context(request, actorId),
+    body = await jsonBody(request),
+    reason = boundedRequiredString(body, "reason", 1000),
+    sql = db(env);
+  try {
+    const result = await withTenantTransaction(sql, ctx, async (tx) => {
+      const role = await tenantRole(tx, ctx);
+      if (role !== "OWNER" && role !== "ADMIN")
+        throw new ApiError(403, "FORBIDDEN", "Only workspace owners and administrators can archive clients");
+      const rows = await tx`select * from archive_authenticated_organisation(${organisationId}::uuid,${reason}::text)`;
+      if (!rows.length) throw new ApiError(404, "NOT_FOUND", "Organisation not found");
+      const changed = Boolean(rows[0]!.changed);
+      if (changed)
+        await appendScopedEvents(
+          tx,
+          ctx,
+          { organisationId, engagementId: null },
+          "ORGANISATION_ARCHIVED",
+          "ORGANISATION",
+          organisationId,
+          { reason, fromStatus: "ACTIVE", toStatus: "ARCHIVED" },
+        );
+      const { changed: _databaseChanged, ...item } = rows[0]!;
+      return { item, changed };
+    });
+    return json(result);
   } finally {
     await sql.end();
   }
@@ -992,9 +1037,11 @@ async function createEngagement(
           "Only tenant owners and administrators can create engagements",
         );
       const organisations =
-        await tx`select id,legal_form from organisation where id=${organisationId} and tenant_id=${ctx.tenantId}`;
+        await tx`select id,legal_form,lifecycle_status from organisation where id=${organisationId} and tenant_id=${ctx.tenantId}`;
       if (!organisations.length)
         throw new ApiError(404, "NOT_FOUND", "Organisation not found");
+      if (String(organisations[0]!.lifecycle_status) === "ARCHIVED")
+        throw new ApiError(409, "ORGANISATION_ARCHIVED", "Archived clients cannot be used for new accounts periods");
       const regimeError = reportingRegimeError(
         framework,
         sectorProfile,
@@ -5510,6 +5557,9 @@ export default {
       const teamMemberRemoveRoute = url.pathname.match(
         /^\/v1\/team\/members\/([^/]+)\/remove$/,
       );
+      const organisationArchiveRoute = url.pathname.match(
+        /^\/v1\/organisations\/([^/]+)\/archive$/,
+      );
       const actorId = url.pathname.startsWith("/v1/")
         ? await authenticateRequest(
             request,
@@ -5536,6 +5586,7 @@ export default {
             "team-invitations",
             "self-service-onboarding",
             "organisations",
+            "organisation-lifecycle",
             "organisation-permanent-file",
             "engagements",
             "csv-import",
@@ -5609,6 +5660,13 @@ export default {
         url.pathname === "/v1/organisations"
       )
         response = await createOrganisation(request, env, actorId);
+      else if (request.method === "POST" && organisationArchiveRoute)
+        response = await archiveOrganisation(
+          request,
+          env,
+          actorId,
+          organisationArchiveRoute[1]!,
+        );
       else if (request.method === "GET" && url.pathname === "/v1/engagements")
         response = await listEngagements(request, env, actorId);
       else if (request.method === "POST" && url.pathname === "/v1/engagements")
