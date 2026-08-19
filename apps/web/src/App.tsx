@@ -4067,13 +4067,14 @@ function ReviewPointsView({
   return (
     <section className="panel">
       <PanelHead
-        eyebrow="Review"
+        eyebrow="Engagement review"
         heading="Review points"
         body="Raise, respond to and clear review queries."
       />
       <form className="review-create" onSubmit={create}>
-        <Field label="Review question" required>
+        <Field className="review-question-field" label="Review question" required>
           <Textarea
+            rows={3}
             value={form.question}
             onChange={(e) => setForm({ ...form, question: e.target.value })}
             required
@@ -4084,11 +4085,11 @@ function ReviewPointsView({
             value={form.severity}
             onChange={(e) => setForm({ ...form, severity: e.target.value })}
           >
-            <option>NORMAL</option>
-            <option>BLOCKING</option>
+            <option value="NORMAL">Normal</option>
+            <option value="BLOCKING">Blocking</option>
           </Select>
         </Field>
-        <FluentButton appearance="primary" type="submit" disabled={busy}>
+        <FluentButton className="review-create-action" appearance="primary" type="submit" disabled={busy}>
           Raise point
         </FluentButton>
       </form>
@@ -4110,7 +4111,7 @@ function ReviewPointsView({
                 color={item.severity === "BLOCKING" ? "danger" : "informative"}
                 appearance="outline"
               >
-                {item.severity || "NORMAL"}
+                {title(item.severity || "NORMAL")}
               </Badge>
               <div>
                 <h3>{item.question || "Review point"}</h3>

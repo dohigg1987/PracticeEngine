@@ -62,7 +62,6 @@
   .balance-control { align-items: stretch; }
   .balance-control > span { text-align: right; }
 }
-
 /* Task board */
 .task-create .compact-form {
   grid-template-columns: minmax(240px, 1fr) minmax(160px, 220px) auto auto;
@@ -142,3 +141,5 @@
     justify-self: start;
   }
 }
+/* Keep review-point creation compact and aligned with Fluent field metrics. */
+.review-create{grid-template-columns:minmax(0,1fr) 160px max-content;align-items:start;max-width:960px}.review-create textarea{min-height:72px;margin-top:0}.review-create-action{margin-top:24px}@media(max-width:900px){.review-create{grid-template-columns:minmax(0,1fr) 150px}.review-create-action{grid-column:1/-1;justify-self:start;margin-top:0}}@media(max-width:620px){.review-create{grid-template-columns:1fr}}
