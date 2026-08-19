@@ -37,18 +37,13 @@ textarea {
 }
 .global-search-box {
   width: 100%;
-  min-height: 44px;
-  border-color: #c7c7c7;
+  min-height: 40px;
+  border-color: var(--colorNeutralStroke1);
   background: var(--colorNeutralBackground1);
-  box-shadow: 0 1px 2px #0000000f;
 }
 .global-search-box input {
-  min-height: 40px;
+  min-height: 36px;
   font-size: var(--fontSizeBase300);
-}
-.global-search:focus-within .global-search-box {
-  border-color: var(--colorBrandStroke1);
-  box-shadow: 0 0 0 1px var(--colorBrandStroke1);
 }
 .global-search-results {
   position: absolute;
