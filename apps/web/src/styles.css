@@ -402,8 +402,9 @@ tfoot td {
 }
 .mapping-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 246px;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
   gap: 16px;
+  align-items: start;
 }
 .summary {
   padding: 5px 9px;
@@ -433,46 +434,49 @@ tfoot td {
   background: #fffbf5;
   color: #865716;
 }
-.guidance {
-  background: #eaf4f2;
-  border: 1px solid #cfe2df;
-  border-radius: var(--borderRadiusXLarge);
-  padding: 20px;
-  height: max-content;
+.mapping-control {
+  min-width: 0;
 }
-.guidance > i {
-  display: grid;
-  place-items: center;
-  width: 25px;
-  height: 25px;
-  background: #d2e8e4;
-  color: #197069;
-  border-radius: 50%;
-  font-weight: 700;
+.mapping-control-card {
+  gap: 12px;
+  padding: 16px;
 }
-.guidance h3 {
-  font-size: 12px;
-  margin: 13px 0 7px;
-}
-.guidance p,
-.guidance small {
-  font-size: 12px;
-  line-height: 1.55;
-  color: #5d7073;
-}
-.guidance dl {
-  border-block: 1px solid #cddfdd;
-  padding: 8px 0;
-  margin: 16px 0;
-}
-.guidance dl div {
+.mapping-control-heading,
+.mapping-control-metric {
   display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  padding: 5px;
+  align-items: center;
 }
-.guidance dd {
-  font-weight: 700;
+.mapping-control-heading {
+  gap: 8px;
+}
+.mapping-control-heading svg {
+  flex: 0 0 auto;
+  color: var(--colorBrandForeground1);
+  font-size: 20px;
+}
+.mapping-control-heading h3 {
+  margin: 0;
+}
+.mapping-control-copy {
+  color: var(--colorNeutralForeground2);
+  line-height: var(--lineHeightBase300);
+}
+.mapping-control-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.mapping-control-metric {
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 10px;
+  background: var(--colorNeutralBackground2);
+  border-radius: var(--borderRadiusMedium);
+}
+.mapping-control-history {
+  color: var(--colorNeutralForeground3);
+  line-height: var(--lineHeightBase200);
 }
 .report {
   max-width: 960px;
@@ -825,8 +829,8 @@ tfoot td {
   .mapping-layout {
     grid-template-columns: 1fr;
   }
-  .guidance {
-    display: none;
+  .mapping-control-card {
+    padding: 14px 16px;
   }
 }
 @media (max-width: 620px) {
