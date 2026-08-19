@@ -1,5 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Accordion,
+  AccordionHeader,
+  AccordionItem,
+  AccordionPanel,
   Badge,
   Button,
   Field,
@@ -952,9 +956,6 @@ function Inbox({ context }: Props) {
         {items.length ? (
           items.map((item) => (
             <article key={item.id} aria-label={item.title}>
-              <span
-                className={`notification-marker ${item.severity.toLowerCase()}`}
-              />
               <div>
                 <header>
                   <b>{item.title}</b>
@@ -981,64 +982,55 @@ function Inbox({ context }: Props) {
             </article>
           ))
         ) : (
-          <p className="commercial-empty">{inboxEmptyMessage(filter)}</p>
+          <div className="commercial-empty" role="status">
+            <b>{inboxEmptyMessage(filter)}</b>
+            <span>New workspace notifications will appear here.</span>
+          </div>
         )}
       </div>
-      <section className="commercial-section delivery-status">
-        <header>
-          <div>
-            <h2>Delivery operations</h2>
-            <p>
-              Customer-facing delivery telemetry is not available from the
-              public API.
-            </p>
-          </div>
-        </header>
-        <Table size="small" aria-label="Notification delivery capabilities">
-          <TableBody>
-            <TableRow>
-              <TableCell>In-app inbox</TableCell>
-              <TableCell>
-                <Badge
-                  className="delivery-capability-status"
-                  {...statusBadgeProps("AVAILABLE")}
-                >
-                  Available
-                </Badge>
-              </TableCell>
-              <TableCell>
-                Stored workspace notifications and read status.
-              </TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell>Email publisher</TableCell>
-              <TableCell>
-                <Badge
-                  className="delivery-capability-status"
-                  {...statusBadgeProps("NOT_CONFIGURED")}
-                >
-                  Not configured
-                </Badge>
-              </TableCell>
-              <TableCell>
-                Scheduled worker and delivery retry visibility remain internal.
-              </TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell>Dead-letter queue</TableCell>
-              <TableCell>
-                <Badge
-                  className="delivery-capability-status"
-                  {...statusBadgeProps("RESTRICTED")}
-                >
-                  Restricted
-                </Badge>
-              </TableCell>
-              <TableCell>No public retry or DLQ action is exposed.</TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
-      </section>
+      <Accordion className="delivery-status" collapsible>
+        <AccordionItem value="delivery-capabilities">
+          <AccordionHeader>
+            <span className="delivery-status-heading">
+              <b>Delivery capabilities</b>
+              <small>Technical availability for workspace notifications.</small>
+            </span>
+          </AccordionHeader>
+          <AccordionPanel>
+            <Table size="small" aria-label="Notification delivery capabilities">
+              <TableBody>
+                <TableRow>
+                  <TableCell>In-app inbox</TableCell>
+                  <TableCell>
+                    <Badge {...statusBadgeProps("AVAILABLE")}>Available</Badge>
+                  </TableCell>
+                  <TableCell>
+                    Stored workspace notifications and read status.
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>Email publisher</TableCell>
+                  <TableCell>
+                    <Badge {...statusBadgeProps("NOT_CONFIGURED")}>
+                      Not configured
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    Scheduled worker and delivery retry visibility remain internal.
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>Dead-letter queue</TableCell>
+                  <TableCell>
+                    <Badge {...statusBadgeProps("RESTRICTED")}>Restricted</Badge>
+                  </TableCell>
+                  <TableCell>No public retry or DLQ action is exposed.</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </AccordionPanel>
+        </AccordionItem>
+      </Accordion>
     </section>
   );
 }
