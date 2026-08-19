@@ -2753,7 +2753,7 @@ function EngagementSetup({
     >
       <DialogSurface className="modal engagement-dialog">
         <DialogBody>
-          <DialogTitle id="engagement-title">
+          <DialogTitle>
             <p className="eyebrow">Engagement setup</p>
             Create accounts period
           </DialogTitle>

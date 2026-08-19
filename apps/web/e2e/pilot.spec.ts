@@ -53,12 +53,20 @@ test("engagement setup prevents incompatible framework, sector and client combin
 }) => {
   await page.getByRole("button", { name: "New engagement" }).click();
   const dialog = page.getByRole("dialog", { name: "Create accounts period" });
+  await expect(dialog).toBeVisible();
   const framework = dialog.getByLabel("Reporting framework");
   const sector = dialog.getByLabel("Sector profile");
   const client = dialog.getByLabel("Client");
 
-  await expect(framework.locator("option")).toHaveText(["FRS 102"]);
-  await expect(sector.locator("option")).toHaveText(["Charities SORP 2026"]);
+  await expect(
+    framework.getByRole("option", { name: "FRS 102", exact: true }),
+  ).toHaveCount(1);
+  await expect(
+    sector.getByRole("option", {
+      name: "Charities SORP 2026",
+      exact: true,
+    }),
+  ).toHaveCount(1);
   await expect(sector).toHaveValue("CHARITIES_SORP_2026");
   await expect(
     dialog.getByText("This client type requires this reporting profile."),
@@ -306,13 +314,15 @@ test("global search focuses from the command shortcut and opens a real section",
 test("sidebar follows the accounts-production stages and exposes one workflow group at a time", async ({
   page,
 }) => {
-  await expect(page.getByRole("heading", { name: "Practice" })).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Accounts production" }),
-  ).toBeVisible();
+    page.getByRole("button", { name: "Practice", exact: true }),
+  ).toHaveAttribute("aria-expanded", "true");
   await expect(
-    page.getByRole("heading", { name: "Administration" }),
-  ).toBeVisible();
+    page.getByRole("button", { name: "Accounts production", exact: true }),
+  ).toHaveAttribute("aria-expanded", "true");
+  await expect(
+    page.getByRole("button", { name: "Administration", exact: true }),
+  ).toHaveAttribute("aria-expanded", "false");
 
   const stageNames = [
     "Source data",

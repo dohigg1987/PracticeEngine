@@ -49,10 +49,12 @@ async function auditSurface(page: Page, testInfo: TestInfo, name: string) {
     const controls = [...document.querySelectorAll("button,input:not([type=hidden]),select,textarea")]
       .filter(visible)
       .map((element) => {
+        const checkboxTarget =
+          element instanceof HTMLInputElement && element.type === "checkbox"
+            ? element.closest("label,.fui-Checkbox,[role=checkbox]") || element.parentElement
+            : null;
         const hitTarget =
-          (element instanceof HTMLInputElement && element.type === "checkbox"
-            ? element.closest("label")
-            : element.closest(".fui-Input,.fui-SearchBox,.fui-Select,.fui-Textarea")) || element;
+          checkboxTarget || element.closest(".fui-Input,.fui-SearchBox,.fui-Select,.fui-Textarea") || element;
         const rect = hitTarget.getBoundingClientRect();
         return {
           label: element.getAttribute("aria-label") || element.textContent?.trim().slice(0, 80) || element.tagName,
