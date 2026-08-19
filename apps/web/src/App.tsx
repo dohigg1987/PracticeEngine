@@ -1678,9 +1678,22 @@ function AccountsWorkspace({
                     onClick={() => setView(stage.target)}
                   >
                     <span className="production-stage-tab-content">
-                      <span className="stage-number" aria-hidden="true">
+                      <Badge
+                        appearance="tint"
+                        color={
+                          stage.state === "ready"
+                            ? "success"
+                            : stage.state === "attention"
+                              ? "warning"
+                              : "subtle"
+                        }
+                        shape="circular"
+                        size="medium"
+                        className="production-stage-badge"
+                        aria-hidden="true"
+                      >
                         {index + 1}
-                      </span>
+                      </Badge>
                       <span>
                         <b>{stage.label}</b>
                         <small>

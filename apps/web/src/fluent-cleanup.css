@@ -491,32 +491,8 @@ textarea,
   color: var(--colorNeutralForeground3);
   font-size: 12px;
 }
-.stage-number {
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border: 1px solid #bdbdbd;
-  border-radius: var(--borderRadiusSmall);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.production-spine .stage-number,
-.production-spine .pending .stage-number {
-  border-color: #bdbdbd !important;
-  background: var(--colorNeutralBackground1) !important;
-  color: var(--colorNeutralForeground2) !important;
-}
-
 .production-spine [role="tab"].ready {
   background: #f3faf3;
-}
-
-.production-spine .ready .stage-number {
-  border-color: #107c10 !important;
-  background: var(--colorNeutralBackground1) !important;
-  color: #107c10 !important;
 }
 
 .production-spine .ready .stage-status {
@@ -525,12 +501,6 @@ textarea,
 
 .production-spine [role="tab"].attention {
   background: #fff8f0;
-}
-
-.production-spine .attention .stage-number {
-  border-color: #8a6d00 !important;
-  background: var(--colorNeutralBackground1) !important;
-  color: #715b00 !important;
 }
 
 .production-spine .attention .stage-status {
@@ -828,7 +798,6 @@ table thead {
 }
 .production-spine b { font-size: 13px; }
 .production-spine small { font-size: 12px; }
-.stage-number { width: 26px; height: 26px; font-size: 12px; }
 .production-spine [role="tab"].ready { background: var(--success-soft); }
 .production-spine [role="tab"].attention { background: var(--warning-soft); }
 .production-spine [role="tab"].active { background: var(--accent-soft); }
