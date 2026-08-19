@@ -1,6 +1,6 @@
 .team-section {
   margin: 0 0 24px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--colorNeutralStroke1);
   background: var(--colorNeutralBackground1);
 }
 .team-section-head {
@@ -9,14 +9,14 @@
   justify-content: space-between;
   min-height: 72px;
   padding: 14px 16px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--colorNeutralStroke1);
 }
 .team-section-head h2,
 .team-section-head p { margin: 0; }
 .team-section-head h2 { font-size: 18px; line-height: 24px; }
 .team-section-head p {
   margin-top: 2px;
-  color: var(--muted);
+  color: var(--colorNeutralForeground2);
   font-size: 14px;
   line-height: 20px;
 }
@@ -29,14 +29,14 @@
   align-items: center;
   gap: 13px;
   padding: 14px 20px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--colorNeutralStroke2);
 }
 .invitation-list article:last-child {
   border-bottom: 0;
 }
 .invitation-list small {
   display: block;
-  color: var(--muted);
+  color: var(--colorNeutralForeground2);
   font-size: 13px;
   overflow-wrap: anywhere;
 }
@@ -50,7 +50,7 @@
 .invite-form label {
   display: grid;
   gap: 6px;
-  color: var(--muted);
+  color: var(--colorNeutralForeground2);
   font-size: 14px;
   font-weight: 700;
 }
@@ -65,7 +65,7 @@
 }
 .delivery-note {
   margin: 4px 16px 16px;
-  color: var(--muted);
+  color: var(--colorNeutralForeground2);
   font-size: 13px;
   line-height: 18px;
 }
@@ -76,14 +76,14 @@
   gap: 12px;
   margin: 12px 22px 20px;
   padding: 15px;
-  border: 1px solid #a5d4c8;
-  border-radius: var(--borderRadiusXLarge);
-  background: #eef9f5;
+  border: 1px solid var(--colorStatusSuccessBorder1);
+  border-radius: var(--borderRadiusMedium);
+  background: var(--colorStatusSuccessBackground1);
 }
 .one-time-link > div:first-child {
   display: grid;
   gap: 4px;
-  color: #236458;
+  color: var(--colorStatusSuccessForeground1);
   font-size: 13px;
 }
 .one-time-link input {
@@ -99,10 +99,10 @@
 }
 .one-time-link > small {
   grid-column: 1/-1;
-  color: #236458;
+  color: var(--colorStatusSuccessForeground1);
 }
 .invitation-list {
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--colorNeutralStroke1);
 }
 .team-member-actions {
   display: flex;
@@ -118,7 +118,7 @@
 .invitation-list > p {
   margin: 0;
   padding: 0 16px 16px;
-  color: var(--muted);
+  color: var(--colorNeutralForeground2);
   font-size: 13px;
 }
 .invitation-list article {
