@@ -143,3 +143,5 @@
 }
 /* Keep review-point creation compact and aligned with Fluent field metrics. */
 .review-create{grid-template-columns:minmax(0,1fr) 160px max-content;align-items:start;max-width:960px}.review-create textarea{min-height:72px;margin-top:0}.review-create-action{margin-top:24px}@media(max-width:900px){.review-create{grid-template-columns:minmax(0,1fr) 150px}.review-create-action{grid-column:1/-1;justify-self:start;margin-top:0}}@media(max-width:620px){.review-create{grid-template-columns:1fr}}
+/* Review-point composer: one clear question row with a compact action row. */
+.review-create{grid-template-columns:160px max-content;max-width:920px;padding:20px 22px 18px;background:var(--colorNeutralBackground1);border-bottom:1px solid var(--colorNeutralStroke2)}.review-question-field{grid-column:1/-1;width:100%;max-width:880px}.review-create textarea{min-height:88px}.review-severity-field{width:160px}.review-create-action{align-self:end;margin-top:0}.review-create+.empty{margin-top:0}@media(max-width:620px){.review-create{grid-template-columns:1fr}.review-question-field{grid-column:auto}.review-severity-field{width:100%}.review-create-action{justify-self:start}}

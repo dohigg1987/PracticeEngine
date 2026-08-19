@@ -4082,7 +4082,7 @@ function ReviewPointsView({
             required
           />
         </Field>
-        <Field label="Severity">
+        <Field className="review-severity-field" label="Severity">
           <Select
             value={form.severity}
             onChange={(e) => setForm({ ...form, severity: e.target.value })}
