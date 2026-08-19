@@ -16,6 +16,7 @@ import {
   Select,
   Skeleton,
   SkeletonItem,
+  Spinner,
   Tab,
   TabList,
   Table,
@@ -2545,18 +2546,24 @@ function AccountsHtmlArtefact({
 
   if (loading)
     return (
-      <div className="artefact-control" role="status" aria-live="polite">
-        Checking HTML output…
-      </div>
+      <Spinner
+        className="artefact-loading"
+        label="Checking HTML output…"
+        size="tiny"
+      />
     );
   if (!capabilities)
     return (
-      <div className="artefact-control error" role="alert">
-        <span>{error || "Output capabilities are unavailable."}</span>
-        <Button appearance="secondary" onClick={load}>
-          Retry
-        </Button>
-      </div>
+      <MessageBar className="artefact-feedback" intent="error">
+        <MessageBarBody>
+          {error || "Output capabilities are unavailable."}
+        </MessageBarBody>
+        <MessageBarActions>
+          <Button appearance="transparent" onClick={load}>
+            Retry
+          </Button>
+        </MessageBarActions>
+      </MessageBar>
     );
   const generated = capabilities.html.generated || Boolean(artefact);
   return (
@@ -2575,9 +2582,9 @@ function AccountsHtmlArtefact({
         </span>
       </div>
       {error && (
-        <p className="artefact-error" role="alert">
-          {error}
-        </p>
+        <MessageBar className="artefact-inline-feedback" intent="error">
+          <MessageBarBody>{error}</MessageBarBody>
+        </MessageBar>
       )}
       <div className="artefact-actions">
         {!generated ? (
@@ -2701,30 +2708,34 @@ export function AccountsPdfArtefact({
 
   if (loading)
     return (
-      <div className="artefact-control" role="status" aria-live="polite">
-        Checking PDF output…
-      </div>
+      <Spinner
+        className="artefact-loading"
+        label="Checking PDF output…"
+        size="tiny"
+      />
     );
   if (!capability)
     return (
-      <div className="artefact-control error" role="alert">
-        <span>{error || "PDF capability is unavailable."}</span>
-        <Button appearance="secondary" onClick={load}>
-          Retry
-        </Button>
-      </div>
+      <MessageBar className="artefact-feedback" intent="error">
+        <MessageBarBody>
+          {error || "PDF capability is unavailable."}
+        </MessageBarBody>
+        <MessageBarActions>
+          <Button appearance="transparent" onClick={load}>
+            Retry
+          </Button>
+        </MessageBarActions>
+      </MessageBar>
     );
   if (!capability.available)
     return (
-      <div className="artefact-control unavailable" role="note">
-        <div>
-          <b>PDF accounts</b>
-          <span>
-            {capability.message ||
-              "PDF generation is not available for this version."}
-          </span>
-        </div>
-      </div>
+      <MessageBar className="artefact-feedback" intent="warning">
+        <MessageBarBody>
+          <MessageBarTitle>PDF accounts</MessageBarTitle>
+          {capability.message ||
+            "PDF generation is not available for this version."}
+        </MessageBarBody>
+      </MessageBar>
     );
   const generated = capability.generated || Boolean(artefact);
   return (
@@ -2743,9 +2754,9 @@ export function AccountsPdfArtefact({
         </span>
       </div>
       {error && (
-        <p className="artefact-error" role="alert">
-          {error}
-        </p>
+        <MessageBar className="artefact-inline-feedback" intent="error">
+          <MessageBarBody>{error}</MessageBarBody>
+        </MessageBar>
       )}
       <div className="artefact-actions">
         {!generated ? (

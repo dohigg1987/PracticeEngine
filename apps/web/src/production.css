@@ -893,16 +893,21 @@
   color: var(--colorNeutralForeground2);
   overflow-wrap: anywhere;
 }
-.artefact-control.error {
-  border-color: var(--colorStatusDangerBorder1);
-  background: var(--colorStatusDangerBackground1);
+.artefact-loading,
+.artefact-feedback {
+  margin: 12px 0;
+}
+.artefact-loading {
+  justify-content: flex-start;
 }
 .artefact-actions {
   display: flex;
   gap: 7px;
 }
-.artefact-error {
+.artefact-inline-feedback {
   grid-column: 1/-1;
+}
+.artefact-error {
   margin: 0;
   color: var(--colorStatusDangerForeground1);
   font-size: 12px;
