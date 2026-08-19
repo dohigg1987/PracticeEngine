@@ -1084,6 +1084,7 @@ function AccountsWorkspace({
         </a>
         <div className="global-search">
           <SearchBox
+            className="global-search-box"
             ref={searchRef}
             size="small"
             contentBefore={<SearchRegular aria-hidden="true" />}
@@ -1265,6 +1266,7 @@ function AccountsWorkspace({
                 {practiceNavOpen ? (
                   <div id="practice-nav-items" className="workspace-nav-items">
                     <NavItem
+                      className="workspace-nav-item"
                       value="clients"
                       icon={<BuildingRegular />}
                       onClick={() => {
@@ -1278,6 +1280,7 @@ function AccountsWorkspace({
                       selectedMembership?.role_code || "",
                     ) && (
                       <NavItem
+                        className="workspace-nav-item"
                         value="team"
                         icon={<PeopleTeamRegular />}
                         onClick={() => {
@@ -1320,6 +1323,7 @@ function AccountsWorkspace({
                   >
                     <nav aria-label="Engagement sections">
                       <NavItem
+                        className="workspace-nav-item"
                         value="overview"
                         icon={<DocumentRegular />}
                         onClick={() => {
@@ -1365,6 +1369,7 @@ function AccountsWorkspace({
                               >
                                 {stage.id === "source" ? (
                                   <NavItem
+                                    className="workspace-nav-item"
                                     value="integrations"
                                     icon={<DocumentRegular />}
                                     onClick={() => {
@@ -1377,6 +1382,7 @@ function AccountsWorkspace({
                                 ) : null}
                                 {stageViews.map((item) => (
                                   <NavItem
+                                    className="workspace-nav-item"
                                     key={item.id}
                                     value={item.id}
                                     icon={<DocumentRegular />}
@@ -1443,6 +1449,7 @@ function AccountsWorkspace({
                     className="workspace-nav-items"
                   >
                     <NavItem
+                      className="workspace-nav-item"
                       value="inbox"
                       icon={<DocumentRegular />}
                       onClick={() => {
@@ -1456,6 +1463,7 @@ function AccountsWorkspace({
                       selectedMembership?.role_code || "",
                     ) && (
                       <NavItem
+                        className="workspace-nav-item"
                         value="settings"
                         icon={<DocumentRegular />}
                         onClick={() => {
@@ -1530,7 +1538,10 @@ function AccountsWorkspace({
             <TeamView
               context={context}
               currentRole={selectedMembership?.role_code || ""}
-              onOpenWorkspace={() => setWorkspacePage("clients")}
+              onOpenWorkspace={() => {
+                setView("overview");
+                setWorkspacePage("engagement");
+              }}
             />
           ) : ["integrations", "inbox", "settings"].includes(workspacePage) ? (
             <Suspense fallback={<Skeleton />}>
@@ -1638,20 +1649,22 @@ function AccountsWorkspace({
                     className={`${stage.views.includes(view) ? "active" : ""} ${stage.state}`}
                     onClick={() => setView(stage.target)}
                   >
-                    <span className="stage-number" aria-hidden="true">
-                      {index + 1}
-                    </span>
-                    <span>
-                      <b>{stage.label}</b>
-                      <small>
-                        <span className="stage-status">
-                          {stage.state === "ready"
-                            ? "Complete"
-                            : stage.state === "attention"
-                              ? "Action needed"
-                              : "Not started"}
-                        </span>
-                      </small>
+                    <span className="production-stage-tab-content">
+                      <span className="stage-number" aria-hidden="true">
+                        {index + 1}
+                      </span>
+                      <span>
+                        <b>{stage.label}</b>
+                        <small>
+                          <span className="stage-status">
+                            {stage.state === "ready"
+                              ? "Complete"
+                              : stage.state === "attention"
+                                ? "Action needed"
+                                : "Not started"}
+                          </span>
+                        </small>
+                      </span>
                     </span>
                   </Tab>
                 ))}
@@ -2569,6 +2582,7 @@ function ClientsView({
       ) : (
         <div className="table-wrap client-table">
           <DataGrid
+            className="client-data-grid"
             aria-label="Clients"
             items={items}
             columns={clientColumns}
@@ -2584,10 +2598,10 @@ function ClientsView({
               action: { minWidth: 155, defaultWidth: 180 },
             }}
           >
-            <DataGridHeader>
-              <DataGridRow>
+            <DataGridHeader className="client-data-grid-header">
+              <DataGridRow className="client-data-grid-row">
                 {({ renderHeaderCell }) => (
-                  <DataGridHeaderCell>
+                  <DataGridHeaderCell className="client-data-grid-header-cell">
                     {renderHeaderCell()}
                   </DataGridHeaderCell>
                 )}
@@ -2595,9 +2609,14 @@ function ClientsView({
             </DataGridHeader>
             <DataGridBody<Organisation>>
               {({ item, rowId }) => (
-                <DataGridRow<Organisation> key={rowId}>
+                <DataGridRow<Organisation>
+                  key={rowId}
+                  className="client-data-grid-row"
+                >
                   {({ renderCell }) => (
-                    <DataGridCell>{renderCell(item)}</DataGridCell>
+                    <DataGridCell className="client-data-grid-cell">
+                      {renderCell(item)}
+                    </DataGridCell>
                   )}
                 </DataGridRow>
               )}
@@ -5169,12 +5188,14 @@ function AccountsView({
         >
           <div className="builder-mobile-toolbar">
             <FluentButton
+              className="builder-mobile-trigger"
               appearance="secondary"
               onClick={() => setMobilePanel("outline")}
             >
               Document outline
             </FluentButton>
             <FluentButton
+              className="builder-mobile-trigger"
               appearance="secondary"
               onClick={() => setMobilePanel("inspector")}
             >
@@ -5732,7 +5753,11 @@ function AccountsView({
                     <dd>Balanced</dd>
                   </div>
                 </dl>
-                <Field label="Review note" size="small">
+                <Field
+                  className="accounts-inspector-field"
+                  label="Review note"
+                  size="small"
+                >
                   <Textarea
                     id="review-note"
                     resize="vertical"

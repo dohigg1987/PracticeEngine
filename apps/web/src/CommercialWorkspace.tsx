@@ -98,7 +98,7 @@ function LoadState({ label }: { label: string }) {
 }
 function Failure({ message, retry }: { message: string; retry: () => void }) {
   return (
-    <MessageBar intent="error">
+    <MessageBar className="commercial-message" intent="error">
       <MessageBarBody>{message}</MessageBarBody>
       <Button appearance="transparent" onClick={retry}>
         Retry
@@ -189,14 +189,14 @@ function PortalWorkspace({
       >
         <Button onClick={load}>Refresh</Button>
       </PageHead>
-      <MessageBar intent="info">
+      <MessageBar className="commercial-message" intent="info">
         <MessageBarBody>
           Portal invitations are one-time links. Files remain authenticated
           evidence; storage locations and invite secrets are never listed.
         </MessageBarBody>
       </MessageBar>
       {actionError && (
-        <MessageBar intent="error">
+        <MessageBar className="commercial-message" intent="error">
           <MessageBarBody>{actionError}</MessageBarBody>
         </MessageBar>
       )}
@@ -650,7 +650,7 @@ function ImportCentre({ context, engagements, onOpenSource }: Props) {
       </PageHead>
       {error && <Failure message={error} retry={load} />}
       {notice && (
-        <MessageBar intent="success">
+        <MessageBar className="commercial-message" intent="success">
           <MessageBarBody>{notice}</MessageBarBody>
         </MessageBar>
       )}
@@ -731,7 +731,11 @@ function ImportCentre({ context, engagements, onOpenSource }: Props) {
               {busy === "import" ? "Importing…" : "Import trial balance"}
             </Button>
             {preview.warnings?.map((warning) => (
-              <MessageBar key={warning} intent="warning">
+              <MessageBar
+                className="commercial-message"
+                key={warning}
+                intent="warning"
+              >
                 <MessageBarBody>{warning}</MessageBarBody>
               </MessageBar>
             ))}
@@ -776,7 +780,7 @@ function ImportCentre({ context, engagements, onOpenSource }: Props) {
           </Button>
         </form>
         {!organisationId && (
-          <MessageBar intent="warning">
+          <MessageBar className="commercial-message" intent="warning">
             <MessageBarBody>
               The selected engagement does not expose its organisation ID, so a
               saved CSV configuration cannot be created here.
@@ -864,7 +868,7 @@ function ImportCentre({ context, engagements, onOpenSource }: Props) {
             <p>Direct accounting-system connections are not enabled for this workspace.</p>
           </div>
         </header>
-        <MessageBar intent="info">
+        <MessageBar className="commercial-message" intent="info">
           <MessageBarBody>
             Use CSV import above. Xero, Sage and QuickBooks Online connections will only appear here when enabled by an administrator.
           </MessageBarBody>
@@ -1135,7 +1139,7 @@ function WorkspaceSettings({ context, engagements }: Props) {
           </Button>
         </div>
         {exportCapability?.generationAvailable === false && (
-          <MessageBar intent="warning">
+          <MessageBar className="commercial-message" intent="warning">
             <MessageBarBody>
               {exportCapability.message ||
                 "Export generation is not available in this environment."}
@@ -1188,7 +1192,7 @@ function WorkspaceSettings({ context, engagements }: Props) {
             </p>
           </div>
         </header>
-        <Field label="Business reason" required>
+        <Field className="danger-zone-reason" label="Business reason" required>
           <Textarea
             rows={3}
             value={reason}

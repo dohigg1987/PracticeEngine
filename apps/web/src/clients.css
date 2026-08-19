@@ -5,7 +5,7 @@
   text-align: left;
   border: 0;
   background: transparent;
-  border-radius: 7px;
+  border-radius: var(--borderRadiusLarge);
   padding: 10px 9px;
   color: #53656b;
   font-size: 12px;
@@ -22,7 +22,7 @@
 .client-nav em {
   font-style: normal;
   background: #dbe9e7;
-  border-radius: 99px;
+  border-radius: var(--borderRadiusCircular);
   padding: 2px 7px;
   font-size: 12px;
 }
@@ -61,7 +61,7 @@
   gap: 2px 8px;
   align-items: center;
 }
-.client-engagement-links .fui-Link {
+.client-engagement-link {
   height: auto;
   min-width: 0;
   min-height: 24px;
@@ -77,7 +77,7 @@
   color: #616161;
   font-size: 12px;
 }
-.client-name-button.fui-Link {
+.client-name-button {
   min-width: 0;
   min-height: 24px;
   height: auto;
@@ -88,27 +88,27 @@
   line-height: 20px;
   justify-content: flex-start;
 }
-.client-table .fui-DataGridCell,
-.client-table .fui-DataGridHeaderCell {
+.client-data-grid-cell,
+.client-data-grid-header-cell {
   font-size: 14px;
   line-height: 20px;
 }
-.client-table .fui-DataGrid {
+.client-data-grid {
   min-width: 760px;
 }
-.client-table .fui-DataGridHeaderCell {
+.client-data-grid-header-cell {
   color: var(--colorNeutralForeground2, #424242);
   font-weight: 600;
 }
-.client-table .fui-DataGridRow {
+.client-data-grid-row {
   min-height: 44px;
 }
-.client-table .fui-DataGridCell {
+.client-data-grid-cell {
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
 }
-.client-table .fui-DataGridCell > * {
+.client-data-grid-cell > * {
   min-width: 0;
 }
 .client-table .client-name-button,
@@ -235,7 +235,7 @@
   margin-top: 2px;
   color: var(--colorNeutralForeground3, #616161);
 }
-.permanent-file-link.fui-Link {
+.permanent-file-link {
   height: auto;
   min-width: 0;
   padding: 0;
@@ -267,7 +267,7 @@
   height: 40px;
   margin-top: 6px;
   border: 1px solid #cbd7d7;
-  border-radius: 5px;
+  border-radius: var(--borderRadiusMedium);
   background: #fff;
   padding: 0 10px;
   font-size: 12px;
