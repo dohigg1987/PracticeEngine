@@ -138,7 +138,11 @@ test("pilot production journey reaches accounts evidence and filing record", asy
   await expect(
     page.getByRole("heading", { name: "Regulator filing record" }),
   ).toBeVisible();
-  await expect(page.getByText("Manual evidence record.")).toBeVisible();
+  await expect(
+    page.getByText(
+      "Prepare manual filing payloads and retain evidence received from external portals. This page does not contact a regulator or retrieve a regulator decision.",
+    ),
+  ).toBeVisible();
   await expect(
     page.getByRole("table", { name: "Filing evidence attempts" }),
   ).toBeVisible();
