@@ -11,6 +11,7 @@ import "./production.css";
 import "./team.css";
 import "./commercial.css";
 import "./fluent-cleanup.css";
+import "./forced-colors.css";
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

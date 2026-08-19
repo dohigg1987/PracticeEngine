@@ -44,6 +44,7 @@ vi.mock("@fluentui/react-components", () => {
     Tab: Component,
     TabList: Component,
     Toolbar: Component,
+    Tooltip: Component,
     Tree: Component,
     TreeItem: Component,
     TreeItemLayout: Component,

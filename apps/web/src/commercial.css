@@ -157,6 +157,17 @@
 .import-preview span {
   color: #616161;
 }
+.action-precondition {
+  display: block;
+  grid-column: 1 / -1;
+  margin-top: 2px;
+  color: var(--colorNeutralForeground2, #424242);
+  font-size: 12px;
+  line-height: 16px;
+}
+.row-actions + .action-precondition {
+  margin-top: 4px;
+}
 .inbox-list {
   border-block: 1px solid #e0e0e0;
 }
