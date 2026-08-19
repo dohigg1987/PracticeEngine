@@ -418,17 +418,31 @@ textarea,
 }
 .account-menu-button {
   height: 48px;
-  padding: 4px 6px 4px 10px;
+  max-width: min(300px, 34vw);
+  padding: var(--spacingVerticalXS) var(--spacingHorizontalS);
+}
+.account-menu-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--spacingHorizontalS);
+  min-width: 0;
+  max-width: 100%;
 }
 .account-menu-copy {
   display: grid;
-  max-width: 240px;
+  min-width: 0;
+  max-width: 220px;
   text-align: right;
-  line-height: 16px;
+  line-height: var(--lineHeightBase200);
 }
 .account-menu-copy > span {
+  overflow: hidden;
   color: var(--colorNeutralForeground1);
+  font-size: var(--fontSizeBase300);
   font-weight: var(--fontWeightSemibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .account-menu-copy small {
   overflow: hidden;
@@ -438,17 +452,8 @@ textarea,
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.account-menu-button .avatar {
-  display: inline-grid;
-  width: 32px;
-  height: 32px;
+.account-menu-avatar {
   flex: 0 0 32px;
-  place-items: center;
-  border: 1px solid var(--colorNeutralStroke1);
-  background: var(--colorNeutralBackground3);
-  color: var(--colorNeutralForeground1);
-  font-size: var(--fontSizeBase200);
-  font-weight: var(--fontWeightSemibold);
 }
 @media (max-width: 620px) {
   .account-menu-copy {
@@ -456,7 +461,11 @@ textarea,
   }
   .account-menu-button {
     min-width: 40px;
+    max-width: 40px;
     padding-inline: 4px;
+  }
+  .account-menu-content {
+    gap: 0;
   }
 }
 .page-head {
