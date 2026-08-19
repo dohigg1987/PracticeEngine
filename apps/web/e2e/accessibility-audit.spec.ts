@@ -19,13 +19,51 @@ const surfaces: Surface[] = [
   { name: "Workspace settings", value: "settings", heading: "Workspace settings", group: "Administration" },
 ];
 
-// These rule IDs are pre-existing product debt found by the first real scan.
-// Axe still runs them and their complete node evidence is attached. New rule
-// categories fail immediately; product fixes should remove IDs from this set.
-const knownViolationIds = new Set([
-  "color-contrast",
-  "target-size",
-]);
+type KnownViolationNode = {
+  id: "color-contrast" | "target-size";
+  target: string[];
+};
+
+// Every remaining exception is tied to one observed node on one surface. This
+// is deliberately a multiset: a new node in an otherwise known rule category
+// still fails, and removing a product defect requires removing its entry here.
+const knownViolationNodes: Record<string, KnownViolationNode[]> = {
+  clients: [
+    {
+      id: "target-size",
+      target: [
+        ".___1vfrnh3_vmlck40.f1wfn5kd.f1g4hkjv:nth-child(1) > .fui-DataGridCell.fui-TableCell.client-data-grid-cell:nth-child(6)",
+      ],
+    },
+    {
+      id: "target-size",
+      target: [
+        ".___1vfrnh3_vmlck40.f1wfn5kd.f1g4hkjv:nth-child(2) > .fui-DataGridCell.fui-TableCell.client-data-grid-cell:nth-child(6)",
+      ],
+    },
+  ],
+  overview: [
+    { id: "color-contrast", target: [".page-head > div:nth-child(1) > small"] },
+    { id: "color-contrast", target: ["div:nth-child(1) > span"] },
+    { id: "color-contrast", target: [".metrics > div:nth-child(1) > small"] },
+    { id: "color-contrast", target: [".metrics > div:nth-child(2) > span"] },
+    { id: "color-contrast", target: [".metrics > div:nth-child(2) > small"] },
+    { id: "color-contrast", target: [".metrics > div:nth-child(3) > span"] },
+    { id: "color-contrast", target: ["div:nth-child(3) > small"] },
+    { id: "color-contrast", target: [".metrics > div:nth-child(4) > span"] },
+    { id: "color-contrast", target: ["div:nth-child(4) > small"] },
+  ],
+  journals: [
+    { id: "color-contrast", target: [".page-head > div:nth-child(1) > small"] },
+  ],
+  accounts: [
+    { id: "color-contrast", target: [".page-head > div:nth-child(1) > small"] },
+  ],
+  filing: [
+    { id: "color-contrast", target: ["div:nth-child(1) > small"] },
+  ],
+  settings: [],
+};
 
 test.describe.configure({ timeout: 60_000 });
 
@@ -62,9 +100,28 @@ async function scan(page: Page, testInfo: TestInfo, surface: Surface) {
     contentType: "application/json",
   });
   expect(result.passes.length, `axe must execute WCAG rules on ${surface.name}`).toBeGreaterThan(0);
+  const remainingKnownNodes = [...(knownViolationNodes[surface.value] ?? [])];
+  const unexpectedNodes = violations.flatMap((violation) =>
+    violation.nodes.flatMap((node) => {
+      const knownIndex = remainingKnownNodes.findIndex(
+        (known) =>
+          known.id === violation.id &&
+          JSON.stringify(known.target) === JSON.stringify(node.target),
+      );
+      if (knownIndex >= 0) {
+        remainingKnownNodes.splice(knownIndex, 1);
+        return [];
+      }
+      return [{ id: violation.id, target: node.target }];
+    }),
+  );
   expect(
-    violations.filter((violation) => !knownViolationIds.has(violation.id)),
-    `Unexpected WCAG A/AA axe violations on ${surface.name}`,
+    unexpectedNodes,
+    `Unexpected WCAG A/AA axe violation nodes on ${surface.name}`,
+  ).toEqual([]);
+  expect(
+    remainingKnownNodes,
+    `Known accessibility debt changed on ${surface.name}; remove fixed nodes or record the exact replacement`,
   ).toEqual([]);
 }
 
