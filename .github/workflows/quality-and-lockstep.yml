@@ -13,6 +13,9 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble
+      options: --user 1001
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -31,5 +34,4 @@ jobs:
       - run: npm run test:ui-quality --workspace apps/web
       - run: npm run test:headers --workspace apps/web
       - run: npm run build --workspace apps/web
-      - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e --workspace apps/web -- --project=chromium
