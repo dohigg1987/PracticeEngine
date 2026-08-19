@@ -1,28 +1,1594 @@
-export type Engagement = { id: string; legal_name: string; period_start: string; period_end: string; framework: string; sector_profile: string; status: string; version: number };
-export type TrialBalanceLine = { source_account_id: string; account_code: string; account_name: string; debit: string | number; credit: string | number; canonical_account_id: string | null; canonical_code: string | null; canonical_name: string | null; report_line: string | null };
-export type ReportLine = { code: string; caption: string; statement_code: string; display_order: number; balance: string | number; canonical_codes: string[]; source_account_ids: string[] };
-export type CanonicalAccount = { id: string; taxonomy_version: string; canonical_code: string; name: string; report_line: string; normal_balance: string };
-export type AuditEvent = { event_id: string; occurred_at_utc: string; actor_id: string; event_type: string; object_type: string; object_id: string; reason: string | null; correlation_id: string; metadata: Record<string, unknown> | null; event_hash: string };
-export type ApiContext = { tenantId: string; actorId: string };
-export class ApiError extends Error { constructor(public status: number, message: string, public code?: string) { super(message); } }
-const apiBase = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
+import { AuthRequiredError, freshAuthToken } from "./auth";
 
-async function request<T>(path: string, context: ApiContext, init?: RequestInit): Promise<T> {
+export type Engagement = {
+  id: string;
+  organisation_id: string;
+  legal_name: string;
+  period_start: string;
+  period_end: string;
+  framework: string;
+  sector_profile: string;
+  assurance_regime?:
+    | "NOT_ASSESSED"
+    | "NO_EXTERNAL_SCRUTINY"
+    | "INDEPENDENT_EXAMINATION"
+    | "STATUTORY_AUDIT";
+  status: string;
+  version: number;
+};
+export type TrialBalanceLine = {
+  source_account_id: string;
+  account_code: string;
+  account_name: string;
+  debit: string | number;
+  credit: string | number;
+  canonical_account_id: string | null;
+  canonical_code: string | null;
+  canonical_name: string | null;
+  report_line: string | null;
+};
+export type ReportLine = {
+  code: string;
+  caption: string;
+  statement_code: string;
+  display_order: number;
+  balance: string | number;
+  canonical_codes: string[];
+  source_account_ids: string[];
+  fund_balances?: {
+    unrestricted: string | number;
+    restricted: string | number;
+    endowment?: string | number;
+  };
+  comparative_balance?: string | number;
+};
+export type CanonicalAccount = {
+  id: string;
+  taxonomy_version: string;
+  canonical_code: string;
+  name: string;
+  report_line: string;
+  normal_balance: string;
+};
+export type TenantMembership = {
+  tenant_id: string;
+  name: string;
+  role_code: string;
+};
+export type TenantOnboarding = { code: string; message: string };
+export type TeamMember = {
+  id: string;
+  role: "OWNER" | "ADMIN" | "MEMBER";
+  createdAt: string;
+  isCurrentActor: boolean;
+};
+export type TeamInvitation = {
+  id: string;
+  role: "ADMIN" | "MEMBER";
+  status: "ACTIVE";
+  expiresAt: string;
+  createdAt: string;
+};
+export type Organisation = {
+  id: string;
+  legal_name: string;
+  legal_form: string;
+  jurisdiction: string;
+  created_at?: string;
+};
+export type StatusCounts = { total: number; byStatus: Record<string, number> };
+export type Dashboard = {
+  engagementId?: string;
+  journals?: StatusCounts;
+  reconciliations?: StatusCounts;
+  tasks?: StatusCounts;
+  reviewPoints?: StatusCounts;
+  progress?: { completedTasks: number; totalTasks: number; percent: number };
+  blockingItems?: number;
+};
+export type JournalLine = {
+  id?: string;
+  line_no?: number;
+  canonical_account_id?: string;
+  canonical_code?: string;
+  account_name?: string;
+  narrative?: string;
+  debit: string | number;
+  credit: string | number;
+};
+export type Journal = {
+  id: string;
+  journal_no?: number;
+  journal_type?: string;
+  description: string;
+  status: string;
+  version?: number;
+  prepared_by?: string | null;
+  approved_by?: string | null;
+  approved_at?: string | null;
+  lines?: JournalLine[];
+  created_at?: string;
+};
+export type Reconciliation = {
+  id: string;
+  reconciliation_type?: string;
+  title?: string;
+  status: string;
+  trial_balance_id?: string | null;
+  ledger_balance?: string | number;
+  supporting_balance?: string | number;
+  tolerance?: string | number;
+  updated_at?: string;
+};
+export type WorkflowTask = {
+  id: string;
+  task_type?: string;
+  title: string;
+  status: string;
+  blocking?: boolean;
+  assigned_to?: string | null;
+  due_at?: string | null;
+  dependency_type?: string | null;
+  dependency_id?: string | null;
+};
+export type ReviewPoint = {
+  id: string;
+  object_type?: string;
+  object_id?: string;
+  question?: string;
+  status: string;
+  severity?: string;
+  response?: string | null;
+  assigned_to?: string | null;
+  created_at?: string;
+};
+export type WorkingPaperVersion = {
+  id: string;
+  version: number;
+  content: Record<string, unknown>;
+  content_hash: string;
+  created_by: string;
+  created_at: string;
+};
+export type PermanentFileAddress = {
+  line1: string;
+  line2?: string | null;
+  locality?: string | null;
+  region?: string | null;
+  postalCode?: string | null;
+  countryCode: string;
+};
+export type PermanentFileOfficer = {
+  id: string;
+  officerType:
+    | "DIRECTOR"
+    | "TRUSTEE"
+    | "COMPANY_SECRETARY"
+    | "PARTNER"
+    | "DESIGNATED_MEMBER"
+    | "LLP_MEMBER"
+    | "OTHER";
+  displayName: string;
+  title?: string | null;
+  givenNames?: string | null;
+  middleNames?: string | null;
+  familyName?: string | null;
+  suffixHonours?: string | null;
+  appointedOn: string;
+  resignedOn?: string | null;
+  occupation?: string | null;
+  nationality?: string | null;
+  countryOfResidence?: string | null;
+  serviceAddress?: PermanentFileAddress | null;
+  email?: string | null;
+  telephone?: string | null;
+  updatedAt: string;
+};
+export type PermanentFileAdviser = {
+  id: string;
+  adviserType:
+    | "ACCOUNTANT"
+    | "AUDITOR"
+    | "INDEPENDENT_EXAMINER"
+    | "BANKER"
+    | "SOLICITOR"
+    | "TAX_ADVISER"
+    | "INSURER"
+    | "INVESTMENT_MANAGER"
+    | "OTHER";
+  firmName: string;
+  contactName?: string | null;
+  contactQualifications?: string | null;
+  professionalBody?: "ICAEW" | "ACCA" | "ICAS" | "CAI" | "AAT" | "ACIE" | "OTHER" | null;
+  reportStyle?: "GENERIC" | "ICAEW" | "ACCA" | "ICAS" | "CAI" | "CUSTOM_APPROVED";
+  email?: string | null;
+  telephone?: string | null;
+  address?: PermanentFileAddress | null;
+  reference?: string | null;
+  status: "ACTIVE" | "ENDED";
+  activeFrom: string;
+  activeTo?: string | null;
+  updatedAt: string;
+};
+export type OrganisationPermanentFile = {
+  organisation: {
+    id: string;
+    legalName: string;
+    legalForm: string;
+    officerNameStyle?: "FULL_NAME" | "TITLE_AND_SURNAME" | "INITIALS_AND_SURNAME" | "FULL_NAME_WITH_HONOURS";
+    jurisdiction: string;
+    tradingName?: string | null;
+    companyRegistrationNumber?: string | null;
+    charityRegistrationNumber?: string | null;
+    registeredOfficeAddress?: PermanentFileAddress | null;
+    accountingReferenceMonth?: number | null;
+    accountingReferenceDay?: number | null;
+    principalActivity?: string | null;
+    website?: string | null;
+    telephone?: string | null;
+    notes?: string | null;
+    createdAt: string;
+    updatedAt: string;
+  };
+  officers: PermanentFileOfficer[];
+  advisers: PermanentFileAdviser[];
+  engagements: {
+    id: string;
+    periodStart: string;
+    periodEnd: string;
+    framework: string;
+    sectorProfile?: string | null;
+    status: string;
+  }[];
+};
+export type WorkingPaper = {
+  id: string;
+  code: string;
+  title: string;
+  report_line_id?: string | null;
+  status:
+    | "NOT_STARTED"
+    | "IN_PROGRESS"
+    | "PREPARED"
+    | "REVIEWED"
+    | "SUPERSEDED";
+  current_version: number;
+  prepared_by?: string | null;
+  reviewed_by?: string | null;
+  template_code?: string | null;
+  template_version?: number | null;
+  template_scope?: "STANDARD" | "PRACTICE" | "CLIENT" | "ENGAGEMENT";
+  category_code?: WorkingPaperCategory;
+  objective?: string | null;
+  applicability?: "APPLICABLE" | "NOT_APPLICABLE";
+  not_applicable_reason?: string | null;
+  not_applicable_by?: string | null;
+  not_applicable_at?: string | null;
+  content?: Record<string, unknown>;
+  content_hash?: string;
+  version_created_by?: string;
+  version_created_at?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+export type WorkingPaperCategory =
+  | "ACCEPTANCE"
+  | "PLANNING"
+  | "RECORDS"
+  | "INCOME"
+  | "EXPENDITURE"
+  | "ASSETS"
+  | "LIABILITIES"
+  | "FUNDS"
+  | "REPORTING"
+  | "COMPLETION";
+export type WorkingPaperLibraryItem = {
+  templateCode: string;
+  templateVersion: number | null;
+  customTemplateId: string | null;
+  categoryCode: WorkingPaperCategory;
+  sequenceNo: number;
+  code: string;
+  title: string;
+  objective: string;
+  guidance: string;
+  defaultContent: Record<string, unknown>;
+  required: boolean;
+  disposition: "INCLUDE" | "EXCLUDE";
+  sourceScope: "STANDARD" | "PRACTICE" | "CLIENT";
+  overrideReason: string | null;
+  deployedWorkingPaperId: string | null;
+  deployedApplicability: string | null;
+};
+export type DisclosureVersion = {
+  id: string;
+  version: number;
+  answer: Record<string, unknown>;
+  content_hash: string;
+  created_by: string;
+  created_at: string;
+};
+export type Disclosure = {
+  id: string;
+  disclosure_code: string;
+  applicability:
+    | "UNASSESSED"
+    | "REQUIRED"
+    | "RECOMMENDED"
+    | "NOT_APPLICABLE"
+    | "PROHIBITED";
+  status: "OPEN" | "COMPLETE" | "REVIEWED" | "SUPERSEDED";
+  current_version: number;
+  rule_version?: string | null;
+  answer?: Record<string, unknown>;
+  versions?: DisclosureVersion[];
+  updated_at?: string;
+  title?: string;
+  requirement_source?: string;
+  trigger_summary?: string;
+  trigger_value?: string;
+  rendered_in_accounts?: boolean;
+  sync_status?: "IN_SYNC" | "BASELINE_WORDING" | "NOT_RENDERED" | "ASSESSMENT_REQUIRED";
+  scope_group?: string;
+};
+export type Signoff = {
+  id: string;
+  signoff_type: string;
+  signed_by: string;
+  signed_at: string;
+  object_version: number;
+  dependency_manifest?: Record<string, unknown>;
+  signature_hash?: string;
+  invalidated_at?: string | null;
+};
+export type AccountsVersion = {
+  id: string;
+  version: number;
+  status: "DRAFT" | "REVIEWED" | "APPROVED" | "FINAL" | "FILED" | "SUPERSEDED";
+  trial_balance_id: string;
+  framework_pack_id: string;
+  content_manifest: Record<string, unknown>;
+  content_hash: string;
+  html_storage_key?: string | null;
+  pdf_storage_key?: string | null;
+  ixbrl_storage_key?: string | null;
+  generated_by: string;
+  generated_at: string;
+  frozen_at?: string | null;
+  signoffs?: Signoff[];
+};
+export type ReportingPack = {
+  pack_code: string;
+  version_no: number;
+  title: string;
+  framework_code: string;
+  sector_code: string;
+  effective_from: string;
+  effective_to?: string | null;
+  certification_status: string;
+  provenance_label: string;
+  certification_label: string;
+};
+export type HtmlArtefact = {
+  kind: "HTML";
+  status: "READY";
+  rendererVersion: string;
+  contentHash: string;
+  byteSize: number;
+  viewPath: string;
+  downloadPath: string;
+};
+export type PdfArtefact = {
+  kind: "PDF";
+  status: "READY";
+  rendererVersion: string;
+  contentHash: string;
+  byteSize: number;
+  viewPath: string;
+  downloadPath: string;
+};
+export type DocxArtefact = {
+  kind: "DOCX";
+  status: "READY";
+  rendererVersion: string;
+  contentHash: string;
+  byteSize: number;
+  downloadPath: string;
+};
+export type ArtefactCapabilities = {
+  html: { available: boolean; generated: boolean; rendererVersion?: string };
+  pdf: {
+    available: boolean;
+    generated: boolean;
+    rendererVersion?: string;
+    code?: string;
+    message?: string;
+  };
+  docx: {
+    available: boolean;
+    generated: boolean;
+    rendererVersion?: string;
+    code?: string;
+    message?: string;
+  };
+  ixbrl: {
+    available: false;
+    code: string;
+    message: string;
+    taxonomyMappings: number;
+  };
+};
+export type EvidenceBundleCapability = {
+  available: boolean;
+  code: string;
+  formatVersion: string;
+  accountsVersion: {
+    id: string;
+    version: number;
+    status: string;
+    contentHash: string;
+  };
+  dependencies: {
+    complete: boolean;
+    referencedObjectCount: number;
+    missing: { kind: string; dependency_id: string }[];
+  };
+  signoffs: {
+    total: number;
+    active: number;
+    invalidated: number;
+    activeTypes: string[];
+    preparedAndReviewed: boolean;
+    clientAndPartnerApproved: boolean;
+    filingAuthorised: boolean;
+  };
+  artefacts: { html: { generated: boolean }; pdf: { generated: boolean } };
+  auditEventCount: number;
+  maxSourceBytes: number;
+};
+export type FilingAttempt = {
+  id: string;
+  accounts_version_id: string;
+  accounts_version?: number;
+  regulator: string;
+  attempt_no: number;
+  status:
+    | "PREPARED"
+    | "SUBMITTED"
+    | "ACCEPTED"
+    | "REJECTED"
+    | "FAILED"
+    | "WITHDRAWN";
+  payload_hash: string;
+  response_content_hash?: string | null;
+  regulator_reference?: string | null;
+  submitted_by?: string | null;
+  submitted_at?: string | null;
+  responded_at?: string | null;
+  created_at: string;
+  evidence?: {
+    filename: string;
+    contentType: string;
+    byteSize: number;
+    contentHash: string;
+  };
+};
+export type AuditEvent = {
+  event_id: string;
+  occurred_at_utc: string;
+  actor_id: string;
+  event_type: string;
+  object_type: string;
+  object_id: string;
+  reason: string | null;
+  correlation_id: string;
+  metadata: Record<string, unknown> | null;
+  event_hash: string;
+};
+export type PortalContact = {
+  id: string;
+  displayName: string;
+  email: string;
+  accessRole: "CLIENT_PREPARER" | "CLIENT_APPROVER" | "CLIENT_VIEWER";
+  contactStatus: "ACTIVE" | "INACTIVE";
+  accessStatus: "INVITED" | "ACTIVE" | "SUSPENDED" | "REVOKED";
+  createdAt: string;
+};
+export type DocumentResponse = {
+  id: string;
+  requestId: string;
+  version: number;
+  filename: string;
+  contentType: string;
+  byteSize: number;
+  contentHash: string;
+  createdAt: string;
+};
+export type DocumentRequest = {
+  id: string;
+  title: string;
+  description?: string | null;
+  dueAt?: string | null;
+  assignedContactId?: string | null;
+  documentType?: string | null;
+  status: "OPEN" | "RESPONDED" | "APPROVED" | "REJECTED" | "CANCELLED";
+  createdAt: string;
+  latestResponse?: DocumentResponse | null;
+};
+export type Integration = {
+  id: string;
+  connectorCode: "CSV";
+  organisationId?: string;
+  displayName: string;
+  status: "CONFIGURED" | "DISABLED" | "REAUTH_REQUIRED";
+  hasCredentials: false;
+  configuration: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+};
+export type SyncRun = {
+  id: string;
+  integrationId?: string;
+  engagementId?: string;
+  status:
+    | "QUEUED"
+    | "RUNNING"
+    | "SUCCEEDED"
+    | "PARTIAL"
+    | "FAILED"
+    | "CANCELLED";
+  counts?: Record<string, number>;
+  errorSummary?: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  createdAt?: string;
+};
+export type NotificationItem = {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  severity: "INFO" | "SUCCESS" | "WARNING" | "ERROR";
+  status: "UNREAD" | "READ";
+  actionPath?: string | null;
+  createdAt: string;
+  readAt?: string | null;
+};
+export type TenantSettings = {
+  id: string;
+  name: string;
+  lifecycleStatus: "ACTIVE" | "SUSPENDED" | "CLOSURE_REQUESTED" | "CLOSED";
+  createdAt: string;
+  updatedAt: string;
+};
+export type ExportRequest = {
+  id: string;
+  scope: "TENANT" | "ENGAGEMENT";
+  engagementId?: string | null;
+  format: "ZIP";
+  status: "REQUESTED" | "PROCESSING" | "READY" | "FAILED" | "EXPIRED";
+  requestedAt: string;
+  completedAt?: string | null;
+  downloadPath?: string | null;
+};
+export type ExportCapability = {
+  generationAvailable: false;
+  code?: string;
+  message?: string;
+};
+export type AccountsPresentation = {
+  accountsVersionId: string;
+  currentPeriod: { start: string; end: string };
+  comparativePeriod: null | {
+    start: string;
+    end: string;
+    accountsVersionId: string;
+  };
+  statements: {
+    statementCode: string;
+    title: string;
+    columns: { key: "current" | "comparative"; label: string }[];
+    lines: {
+      code: string;
+      caption: string;
+      current: string | number;
+      comparative: string | number | null;
+    }[];
+  }[];
+  readiness: {
+    comparativeConfigured: boolean;
+    comparativeComplete: boolean;
+    blocks: string[];
+  };
+};
+export type NormalizedImportPreview = {
+  detectedColumns?: string[];
+  columns?: string[];
+  rows?: Record<string, unknown>[];
+  preview?: Record<string, unknown>[];
+  rowCount?: number;
+  warnings?: string[];
+};
+export type ApiContext = { tenantId: string };
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    message: string,
+    public code?: string,
+  ) {
+    super(message);
+  }
+}
+const apiBase = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
+const demoTransport =
+  import.meta.env.DEV && import.meta.env.VITE_DEMO_MODE === "true";
+
+async function request<T>(
+  path: string,
+  context?: ApiContext,
+  init?: RequestInit,
+): Promise<T> {
+  if (demoTransport)
+    return (await import("./demo")).demoRequest(path, init) as T;
   let response: Response;
   try {
-    response = await fetch(`${apiBase}${path}`, { ...init, headers: { "x-tenant-id": context.tenantId, "x-actor-id": context.actorId, ...(init?.body instanceof FormData ? {} : { "content-type": "application/json" }), ...init?.headers } });
-  } catch { throw new ApiError(0, "The accounts service could not be reached. Check the API address and try again.", "OFFLINE"); }
+    const token = await freshAuthToken();
+    response = await fetch(`${apiBase}${path}`, {
+      ...init,
+      headers: {
+        authorization: `Bearer ${token}`,
+        ...(context?.tenantId ? { "x-tenant-id": context.tenantId } : {}),
+        ...(init?.body instanceof FormData
+          ? {}
+          : { "content-type": "application/json" }),
+        ...init?.headers,
+      },
+    });
+  } catch (error) {
+    if (error instanceof AuthRequiredError) {
+      notifyUnauthorized();
+      throw new ApiError(401, error.message, "AUTH_REQUIRED");
+    }
+    throw new ApiError(
+      0,
+      "The accounts service could not be reached. Check the API address and try again.",
+      "OFFLINE",
+    );
+  }
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) { const error = payload?.error; throw new ApiError(response.status, error?.message ?? `Request failed (${response.status})`, error?.code); }
+  if (!response.ok) {
+    const error = payload?.error;
+    if (response.status === 401) notifyUnauthorized();
+    throw new ApiError(
+      response.status,
+      error?.message ?? `Request failed (${response.status})`,
+      error?.code,
+    );
+  }
   return payload as T;
 }
 
+async function requestBlob(path: string, context: ApiContext): Promise<Blob> {
+  if (demoTransport) return (await import("./demo")).demoBlob(path);
+  if (!path.startsWith("/v1/"))
+    throw new ApiError(
+      400,
+      "The artefact path returned by the service is invalid.",
+      "INVALID_ARTEFACT_PATH",
+    );
+  let response: Response;
+  try {
+    const token = await freshAuthToken();
+    response = await fetch(`${apiBase}${path}`, {
+      headers: {
+        authorization: `Bearer ${token}`,
+        "x-tenant-id": context.tenantId,
+      },
+    });
+  } catch (error) {
+    if (error instanceof AuthRequiredError) {
+      notifyUnauthorized();
+      throw new ApiError(401, error.message, "AUTH_REQUIRED");
+    }
+    throw new ApiError(
+      0,
+      "The accounts artefact could not be reached. Try again.",
+      "OFFLINE",
+    );
+  }
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    if (response.status === 401) notifyUnauthorized();
+    throw new ApiError(
+      response.status,
+      payload?.error?.message ?? `Artefact request failed (${response.status})`,
+      payload?.error?.code,
+    );
+  }
+  return response.blob();
+}
+
+let unauthorizedHandler: (() => void) | null = null;
+function notifyUnauthorized() {
+  unauthorizedHandler?.();
+}
+export function onUnauthorized(handler: (() => void) | null) {
+  unauthorizedHandler = handler;
+}
+
 export const api = {
-  engagements: (context: ApiContext) => request<{ items: Engagement[] }>("/v1/engagements", context),
-  canonicalAccounts: (context: ApiContext) => request<{ items: CanonicalAccount[] }>("/v1/canonical-accounts?taxonomyVersion=UK-CANONICAL-2026", context),
-  trialBalance: (context: ApiContext, id: string) => request<{ items: TrialBalanceLine[] }>(`/v1/engagements/${encodeURIComponent(id)}/trial-balance`, context),
-  history: (context: ApiContext, id: string) => request<{ items: AuditEvent[] }>(`/v1/engagements/${encodeURIComponent(id)}/history`, context),
-  report: (context: ApiContext, id: string) => request<{ balanced: boolean; fullyMapped: boolean; lines: ReportLine[] }>(`/v1/engagements/${encodeURIComponent(id)}/report`, context),
-  importTrialBalance: (context: ApiContext, id: string, file: File) => { const body = new FormData(); body.append("file", file); return request<{ item: { id: string; trial_balance_id: string; snapshot_id: string; version_no: number; record_count: number } }>(`/v1/engagements/${encodeURIComponent(id)}/imports`, context, { method: "POST", body }); },
-  updateMapping: (context: ApiContext, id: string, sourceAccountId: string, canonicalAccountId: string) => request<{ item: unknown }>(`/v1/engagements/${encodeURIComponent(id)}/mappings`, context, { method: "POST", body: JSON.stringify({ sourceAccountId, canonicalAccountId, reason: "Mapped in accounts workspace" }) }),
+  tenantMemberships: () =>
+    request<{
+      items: TenantMembership[];
+      onboarding?: TenantOnboarding | null;
+    }>("/v1/me/tenants"),
+  createTenant: (name: string) =>
+    request<{
+      item: { id: string; name: string; role: "OWNER" };
+      created: boolean;
+    }>("/v1/me/tenants", undefined, {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    }),
+  acceptInvitation: (token: string) =>
+    request<{
+      item: { tenantId: string; name: string; role: string };
+      accepted: boolean;
+      memberCreated: boolean;
+    }>("/v1/me/invitations/accept", undefined, {
+      method: "POST",
+      body: JSON.stringify({ token }),
+    }),
+  team: (context: ApiContext) =>
+    request<{ members: TeamMember[]; invitations: TeamInvitation[] }>(
+      "/v1/team",
+      context,
+    ),
+  createTeamInvitation: (
+    context: ApiContext,
+    role: "ADMIN" | "MEMBER",
+    expiresInHours: number,
+  ) =>
+    request<{ item: TeamInvitation; token: string; inviteUrl: string }>(
+      "/v1/team/invitations",
+      context,
+      { method: "POST", body: JSON.stringify({ role, expiresInHours }) },
+    ),
+  revokeTeamInvitation: (context: ApiContext, invitationId: string) =>
+    request<{
+      item: {
+        id: string;
+        role: string;
+        status: "REVOKED";
+        expiresAt: string;
+        revokedAt: string;
+      };
+    }>(
+      `/v1/team/invitations/${encodeURIComponent(invitationId)}/revoke`,
+      context,
+      { method: "POST" },
+    ),
+  updateTeamMemberRole: (
+    context: ApiContext,
+    memberId: string,
+    role: "OWNER" | "ADMIN" | "MEMBER",
+  ) =>
+    request<{
+      item: { id: string; previousRole: string; role: string; removed: false };
+    }>(`/v1/team/members/${encodeURIComponent(memberId)}/role`, context, {
+      method: "POST",
+      body: JSON.stringify({ role }),
+    }),
+  removeTeamMember: (context: ApiContext, memberId: string) =>
+    request<{
+      item: { id: string; previousRole: string; role: null; removed: true };
+    }>(`/v1/team/members/${encodeURIComponent(memberId)}/remove`, context, {
+      method: "POST",
+    }),
+  organisations: (context: ApiContext) =>
+    request<{ items: Organisation[] }>("/v1/organisations", context),
+  organisationPermanentFile: (context: ApiContext, organisationId: string) =>
+    request<{ item: OrganisationPermanentFile }>(
+      `/v1/organisations/${encodeURIComponent(organisationId)}/permanent-file`,
+      context,
+    ),
+  updateOrganisationPermanentFile: (
+    context: ApiContext,
+    organisationId: string,
+    body: Record<string, string | number | null>,
+  ) =>
+    request<{ item: { organisationId: string; updatedAt: string } }>(
+      `/v1/organisations/${encodeURIComponent(organisationId)}/permanent-file`,
+      context,
+      { method: "PATCH", body: JSON.stringify(body) },
+    ),
+  createPermanentFileOfficer: (
+    context: ApiContext,
+    organisationId: string,
+    body: Record<string, string | null>,
+  ) =>
+    request<{ item: PermanentFileOfficer }>(
+      `/v1/organisations/${encodeURIComponent(organisationId)}/permanent-file/officers`,
+      context,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+  updatePermanentFileOfficer: (
+    context: ApiContext,
+    organisationId: string,
+    officerId: string,
+    body: Record<string, string | null>,
+  ) =>
+    request<{ item: PermanentFileOfficer }>(
+      `/v1/organisations/${encodeURIComponent(organisationId)}/permanent-file/officers/${encodeURIComponent(officerId)}`,
+      context,
+      { method: "PATCH", body: JSON.stringify(body) },
+    ),
+  createPermanentFileAdviser: (
+    context: ApiContext,
+    organisationId: string,
+    body: Record<string, string | null>,
+  ) =>
+    request<{ item: PermanentFileAdviser }>(
+      `/v1/organisations/${encodeURIComponent(organisationId)}/permanent-file/advisers`,
+      context,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+  updatePermanentFileAdviser: (
+    context: ApiContext,
+    organisationId: string,
+    adviserId: string,
+    body: Record<string, string | null>,
+  ) =>
+    request<{ item: PermanentFileAdviser }>(
+      `/v1/organisations/${encodeURIComponent(organisationId)}/permanent-file/advisers/${encodeURIComponent(adviserId)}`,
+      context,
+      { method: "PATCH", body: JSON.stringify(body) },
+    ),
+  createOrganisation: (
+    context: ApiContext,
+    body: { legalName: string; legalForm: string; jurisdiction: string },
+  ) =>
+    request<{ item: Organisation }>("/v1/organisations", context, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  createEngagement: (
+    context: ApiContext,
+    body: {
+      organisationId: string;
+      periodStart: string;
+      periodEnd: string;
+      framework: string;
+      sectorProfile: string;
+    },
+  ) =>
+    request<{ item: Engagement }>("/v1/engagements", context, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  engagements: (context: ApiContext) =>
+    request<{ items: Engagement[] }>("/v1/engagements", context),
+  canonicalAccounts: (context: ApiContext) =>
+    request<{ items: CanonicalAccount[] }>(
+      "/v1/canonical-accounts?taxonomyVersion=UK-CANONICAL-2026",
+      context,
+    ),
+  trialBalance: (context: ApiContext, id: string) =>
+    request<{ items: TrialBalanceLine[] }>(
+      `/v1/engagements/${encodeURIComponent(id)}/trial-balance`,
+      context,
+    ),
+  history: (context: ApiContext, id: string) =>
+    request<{ items: AuditEvent[] }>(
+      `/v1/engagements/${encodeURIComponent(id)}/history`,
+      context,
+    ),
+  report: (context: ApiContext, id: string) =>
+    request<{ balanced: boolean; fullyMapped: boolean; lines: ReportLine[] }>(
+      `/v1/engagements/${encodeURIComponent(id)}/report`,
+      context,
+    ),
+  importTrialBalance: (context: ApiContext, id: string, file: File) => {
+    const body = new FormData();
+    body.append("file", file);
+    return request<{
+      item: {
+        id: string;
+        trial_balance_id: string;
+        snapshot_id: string;
+        version_no: number;
+        record_count: number;
+      };
+    }>(`/v1/engagements/${encodeURIComponent(id)}/imports`, context, {
+      method: "POST",
+      body,
+    });
+  },
+  updateMapping: (
+    context: ApiContext,
+    id: string,
+    sourceAccountId: string,
+    canonicalAccountId: string,
+  ) =>
+    request<{ item: unknown }>(
+      `/v1/engagements/${encodeURIComponent(id)}/mappings`,
+      context,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          sourceAccountId,
+          canonicalAccountId,
+          reason: "Mapped in accounts workspace",
+        }),
+      },
+    ),
+  normalizeImport: (context: ApiContext, id: string, file: File) => {
+    const body = new FormData();
+    body.append("file", file);
+    return request<{ item: NormalizedImportPreview }>(
+      `/v1/engagements/${encodeURIComponent(id)}/imports/normalize`,
+      context,
+      { method: "POST", body },
+    );
+  },
+  dashboard: (context: ApiContext, id: string) =>
+    request<Dashboard>(
+      `/v1/engagements/${encodeURIComponent(id)}/dashboard`,
+      context,
+    ),
+  journals: (context: ApiContext, id: string) =>
+    request<{ items: Journal[] }>(
+      `/v1/engagements/${encodeURIComponent(id)}/journals`,
+      context,
+    ),
+  createJournal: (
+    context: ApiContext,
+    id: string,
+    body: {
+      journalType: string;
+      description: string;
+      lines: {
+        canonicalAccountId: string;
+        debit: string;
+        credit: string;
+        narrative?: string;
+      }[];
+    },
+  ) =>
+    request<{ item: Journal }>(
+      `/v1/engagements/${encodeURIComponent(id)}/journals`,
+      context,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+  transitionJournal: (
+    context: ApiContext,
+    id: string,
+    journalId: string,
+    status: string,
+  ) =>
+    request<{ item: Journal }>(
+      `/v1/engagements/${encodeURIComponent(id)}/journals/${encodeURIComponent(journalId)}/transitions`,
+      context,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          status,
+          reason: `${status.toLowerCase()} from accounts workspace`,
+        }),
+      },
+    ),
+  reconciliations: (context: ApiContext, id: string) =>
+    request<{ items: Reconciliation[] }>(
+      `/v1/engagements/${encodeURIComponent(id)}/reconciliations`,
+      context,
+    ),
+  updateReconciliation: (
+    context: ApiContext,
+    id: string,
+    body: Record<string, unknown>,
+  ) =>
+    request<{ item: Reconciliation }>(
+      `/v1/engagements/${encodeURIComponent(id)}/reconciliations`,
+      context,
+      { method: "PUT", body: JSON.stringify(body) },
+    ),
+  reviewReconciliation: (
+    context: ApiContext,
+    id: string,
+    reconciliationId: string,
+  ) =>
+    request<{ item: Reconciliation }>(
+      `/v1/engagements/${encodeURIComponent(id)}/reconciliations/${encodeURIComponent(reconciliationId)}/review`,
+      context,
+      {
+        method: "POST",
+        body: JSON.stringify({ reason: "Reviewed in accounts workspace" }),
+      },
+    ),
+  workflowTasks: (context: ApiContext, id: string) =>
+    request<{ items: WorkflowTask[] }>(
+      `/v1/engagements/${encodeURIComponent(id)}/workflow-tasks`,
+      context,
+    ),
+  createWorkflowTask: (
+    context: ApiContext,
+    id: string,
+    body: {
+      taskType: string;
+      title: string;
+      blocking?: boolean;
+      assignedTo?: string;
+      dueAt?: string;
+    },
+  ) =>
+    request<{ item: WorkflowTask }>(
+      `/v1/engagements/${encodeURIComponent(id)}/workflow-tasks`,
+      context,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+  updateWorkflowTask: (
+    context: ApiContext,
+    id: string,
+    taskId: string,
+    body: Partial<WorkflowTask>,
+  ) =>
+    request<{ item: WorkflowTask }>(
+      `/v1/engagements/${encodeURIComponent(id)}/workflow-tasks/${encodeURIComponent(taskId)}`,
+      context,
+      { method: "PATCH", body: JSON.stringify(body) },
+    ),
+  reviewPoints: (context: ApiContext, id: string) =>
+    request<{ items: ReviewPoint[] }>(
+      `/v1/engagements/${encodeURIComponent(id)}/review-points`,
+      context,
+    ),
+  createReviewPoint: (
+    context: ApiContext,
+    id: string,
+    body: {
+      objectType: string;
+      objectId: string;
+      question: string;
+      severity?: string;
+      assignedTo?: string;
+    },
+  ) =>
+    request<{ item: ReviewPoint }>(
+      `/v1/engagements/${encodeURIComponent(id)}/review-points`,
+      context,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+  updateReviewPoint: (
+    context: ApiContext,
+    id: string,
+    pointId: string,
+    body: Partial<ReviewPoint>,
+  ) =>
+    request<{ item: ReviewPoint }>(
+      `/v1/engagements/${encodeURIComponent(id)}/review-points/${encodeURIComponent(pointId)}`,
+      context,
+      { method: "PATCH", body: JSON.stringify(body) },
+    ),
+  workingPapers: (context: ApiContext, id: string) =>
+    request<{ items: WorkingPaper[] }>(
+      `/v1/engagements/${encodeURIComponent(id)}/working-papers`,
+      context,
+    ),
+  workingPaperLibrary: (context: ApiContext, id: string) =>
+    request<{ items: WorkingPaperLibraryItem[] }>(
+      `/v1/engagements/${encodeURIComponent(id)}/working-paper-library`,
+      context,
+    ),
+  customiseWorkingPaperTemplate: (
+    context: ApiContext,
+    id: string,
+    templateCode: string,
+    body: {
+      scope: "PRACTICE" | "CLIENT";
+      templateVersion: number;
+      disposition: "INCLUDE" | "EXCLUDE";
+      title?: string;
+      objective?: string;
+      guidance?: string;
+      required?: boolean;
+      reason: string;
+    },
+  ) =>
+    request<{ item: Record<string, unknown> }>(
+      `/v1/engagements/${encodeURIComponent(id)}/working-paper-library/${encodeURIComponent(templateCode)}`,
+      context,
+      { method: "PUT", body: JSON.stringify(body) },
+    ),
+  createCustomWorkingPaperTemplate: (
+    context: ApiContext,
+    id: string,
+    body: {
+      scope: "PRACTICE" | "CLIENT";
+      code: string;
+      categoryCode: WorkingPaperCategory;
+      title: string;
+      objective: string;
+      guidance?: string;
+      required?: boolean;
+    },
+  ) =>
+    request<{ item: Record<string, unknown> }>(
+      `/v1/engagements/${encodeURIComponent(id)}/working-paper-library`,
+      context,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+  deployWorkingPaperLibrary: (
+    context: ApiContext,
+    id: string,
+    templateCodes?: string[],
+  ) =>
+    request<{ created: number; skipped: number; items: WorkingPaper[] }>(
+      `/v1/engagements/${encodeURIComponent(id)}/working-papers/deploy`,
+      context,
+      {
+        method: "POST",
+        body: JSON.stringify(templateCodes ? { templateCodes } : {}),
+      },
+    ),
+  setWorkingPaperApplicability: (
+    context: ApiContext,
+    id: string,
+    paperId: string,
+    body: {
+      applicability: "APPLICABLE" | "NOT_APPLICABLE";
+      reason?: string;
+    },
+  ) =>
+    request<{ item: WorkingPaper }>(
+      `/v1/engagements/${encodeURIComponent(id)}/working-papers/${encodeURIComponent(paperId)}/applicability`,
+      context,
+      { method: "PATCH", body: JSON.stringify(body) },
+    ),
+  createWorkingPaper: (
+    context: ApiContext,
+    id: string,
+    body: {
+      code: string;
+      title: string;
+      reportLineId?: string;
+      content: Record<string, unknown>;
+    },
+  ) =>
+    request<{ item: WorkingPaper }>(
+      `/v1/engagements/${encodeURIComponent(id)}/working-papers`,
+      context,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+  workingPaperVersions: (context: ApiContext, id: string, paperId: string) =>
+    request<{ items: WorkingPaperVersion[] }>(
+      `/v1/engagements/${encodeURIComponent(id)}/working-papers/${encodeURIComponent(paperId)}/versions`,
+      context,
+    ),
+  createWorkingPaperVersion: (
+    context: ApiContext,
+    id: string,
+    paperId: string,
+    content: Record<string, unknown>,
+  ) =>
+    request<{ item: WorkingPaperVersion }>(
+      `/v1/engagements/${encodeURIComponent(id)}/working-papers/${encodeURIComponent(paperId)}/versions`,
+      context,
+      { method: "POST", body: JSON.stringify({ content }) },
+    ),
+  transitionWorkingPaper: (
+    context: ApiContext,
+    id: string,
+    paperId: string,
+    status: string,
+  ) =>
+    request<{ item: WorkingPaper }>(
+      `/v1/engagements/${encodeURIComponent(id)}/working-papers/${encodeURIComponent(paperId)}/transitions`,
+      context,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          status,
+          reason: `${status.toLowerCase()} from accounts workspace`,
+        }),
+      },
+    ),
+  disclosures: (context: ApiContext, id: string) =>
+    request<{ items: Disclosure[] }>(
+      `/v1/engagements/${encodeURIComponent(id)}/disclosures`,
+      context,
+    ),
+  createDisclosure: (
+    context: ApiContext,
+    id: string,
+    body: {
+      disclosureCode: string;
+      applicability: Disclosure["applicability"];
+      ruleVersion?: string;
+      answer: Record<string, unknown>;
+    },
+  ) =>
+    request<{ item: Disclosure }>(
+      `/v1/engagements/${encodeURIComponent(id)}/disclosures`,
+      context,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+  updateDisclosure: (
+    context: ApiContext,
+    id: string,
+    disclosureId: string,
+    body: { applicability?: string; status?: string },
+  ) =>
+    request<{ item: Disclosure }>(
+      `/v1/engagements/${encodeURIComponent(id)}/disclosures/${encodeURIComponent(disclosureId)}`,
+      context,
+      { method: "PATCH", body: JSON.stringify(body) },
+    ),
+  createDisclosureVersion: (
+    context: ApiContext,
+    id: string,
+    disclosureId: string,
+    answer: Record<string, unknown>,
+  ) =>
+    request<{ item: DisclosureVersion }>(
+      `/v1/engagements/${encodeURIComponent(id)}/disclosures/${encodeURIComponent(disclosureId)}/versions`,
+      context,
+      { method: "POST", body: JSON.stringify({ answer }) },
+    ),
+  accountsVersions: (context: ApiContext, id: string) =>
+    request<{ items: AccountsVersion[] }>(
+      `/v1/engagements/${encodeURIComponent(id)}/accounts-versions`,
+      context,
+    ),
+  reportingPacks: (context: ApiContext, id: string) =>
+    request<{ items: ReportingPack[] }>(
+      `/v1/engagements/${encodeURIComponent(id)}/reporting-packs`,
+      context,
+    ),
+  generateAccountsVersion: (
+    context: ApiContext,
+    id: string,
+    frameworkPackId: string,
+    frameworkPackVersionNo: number,
+    comparativeAccountsVersionId?: string,
+  ) =>
+    request<{ item: AccountsVersion }>(
+      `/v1/engagements/${encodeURIComponent(id)}/accounts-versions/generate`,
+      context,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          frameworkPackId,
+          frameworkPackVersionNo,
+          ...(comparativeAccountsVersionId
+            ? { comparativeAccountsVersionId }
+            : {}),
+        }),
+      },
+    ),
+  accountsPresentation: (context: ApiContext, id: string, versionId: string) =>
+    request<{ item: AccountsPresentation }>(
+      `/v1/engagements/${encodeURIComponent(id)}/accounts-versions/${encodeURIComponent(versionId)}/presentation`,
+      context,
+    ),
+  transitionAccountsVersion: (
+    context: ApiContext,
+    id: string,
+    versionId: string,
+    status: string,
+  ) =>
+    request<{ item: AccountsVersion }>(
+      `/v1/engagements/${encodeURIComponent(id)}/accounts-versions/${encodeURIComponent(versionId)}/transitions`,
+      context,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          status,
+          reason: `${status.toLowerCase()} from accounts workspace`,
+        }),
+      },
+    ),
+  signoffAccountsVersion: (
+    context: ApiContext,
+    id: string,
+    versionId: string,
+    objectVersion: number,
+    signoffType: string,
+  ) =>
+    request<{ item: Signoff }>(
+      `/v1/engagements/${encodeURIComponent(id)}/signoffs`,
+      context,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          objectType: "ACCOUNTS_VERSION",
+          objectId: versionId,
+          objectVersion,
+          signoffType,
+        }),
+      },
+    ),
+  accountsArtefactCapabilities: (
+    context: ApiContext,
+    id: string,
+    versionId: string,
+  ) =>
+    request<{ capabilities: ArtefactCapabilities }>(
+      `/v1/engagements/${encodeURIComponent(id)}/accounts-versions/${encodeURIComponent(versionId)}/artefacts/capabilities`,
+      context,
+    ),
+  generateAccountsHtml: (context: ApiContext, id: string, versionId: string) =>
+    request<{ item: HtmlArtefact; created: boolean }>(
+      `/v1/engagements/${encodeURIComponent(id)}/accounts-versions/${encodeURIComponent(versionId)}/artefacts/html`,
+      context,
+      { method: "POST" },
+    ),
+  accountsHtmlBlob: (context: ApiContext, path: string) =>
+    requestBlob(path, context),
+  generateAccountsPdf: (context: ApiContext, id: string, versionId: string) =>
+    request<{ item: PdfArtefact; created: boolean }>(
+      `/v1/engagements/${encodeURIComponent(id)}/accounts-versions/${encodeURIComponent(versionId)}/artefacts/pdf`,
+      context,
+      { method: "POST" },
+    ),
+  accountsPdfBlob: (context: ApiContext, path: string) =>
+    requestBlob(path, context),
+  generateAccountsDocx: (context: ApiContext, id: string, versionId: string) =>
+    request<{ item: DocxArtefact; created: boolean }>(
+      `/v1/engagements/${encodeURIComponent(id)}/accounts-versions/${encodeURIComponent(versionId)}/artefacts/docx`,
+      context,
+      { method: "POST" },
+    ),
+  accountsDocxBlob: (context: ApiContext, path: string) =>
+    requestBlob(path, context),
+  evidenceBundleCapability: (
+    context: ApiContext,
+    id: string,
+    versionId: string,
+  ) =>
+    request<{ capability: EvidenceBundleCapability }>(
+      `/v1/engagements/${encodeURIComponent(id)}/accounts-versions/${encodeURIComponent(versionId)}/evidence-bundle/capabilities`,
+      context,
+    ),
+  evidenceBundleBlob: (context: ApiContext, id: string, versionId: string) =>
+    requestBlob(
+      `/v1/engagements/${encodeURIComponent(id)}/accounts-versions/${encodeURIComponent(versionId)}/evidence-bundle.zip`,
+      context,
+    ),
+  filingAttempts: (context: ApiContext, id: string) =>
+    request<{ items: FilingAttempt[] }>(
+      `/v1/engagements/${encodeURIComponent(id)}/filing-attempts`,
+      context,
+    ),
+  createFilingAttempt: (
+    context: ApiContext,
+    id: string,
+    accountsVersionId: string,
+    regulator: string,
+  ) =>
+    request<{ item: FilingAttempt }>(
+      `/v1/engagements/${encodeURIComponent(id)}/filing-attempts`,
+      context,
+      {
+        method: "POST",
+        body: JSON.stringify({ accountsVersionId, regulator }),
+      },
+    ),
+  updateFilingAttempt: (
+    context: ApiContext,
+    id: string,
+    filingId: string,
+    status: "SUBMITTED" | "FAILED" | "WITHDRAWN",
+  ) =>
+    request<{ item: FilingAttempt }>(
+      `/v1/engagements/${encodeURIComponent(id)}/filing-attempts/${encodeURIComponent(filingId)}`,
+      context,
+      { method: "PATCH", body: JSON.stringify({ status }) },
+    ),
+  uploadFilingEvidence: (
+    context: ApiContext,
+    id: string,
+    filingId: string,
+    file: File,
+    status: "ACCEPTED" | "REJECTED",
+    regulatorReference?: string,
+  ) => {
+    const body = new FormData();
+    body.append("file", file);
+    body.append("status", status);
+    if (regulatorReference?.trim())
+      body.append("regulatorReference", regulatorReference.trim());
+    return request<{ item: FilingAttempt; created: boolean }>(
+      `/v1/engagements/${encodeURIComponent(id)}/filing-attempts/${encodeURIComponent(filingId)}/evidence`,
+      context,
+      { method: "POST", body },
+    );
+  },
+  portalContacts: (context: ApiContext, id: string) =>
+    request<{ items: PortalContact[] }>(
+      `/v1/engagements/${encodeURIComponent(id)}/client-portal/contacts`,
+      context,
+    ),
+  createPortalContact: (
+    context: ApiContext,
+    id: string,
+    body: {
+      displayName: string;
+      email: string;
+      accessRole: PortalContact["accessRole"];
+    },
+  ) =>
+    request<{ item: PortalContact }>(
+      `/v1/engagements/${encodeURIComponent(id)}/client-portal/contacts`,
+      context,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+  invitePortalContact: (context: ApiContext, id: string, contactId: string) =>
+    request<{
+      item: {
+        id: string;
+        contactId: string;
+        status: "ACTIVE";
+        expiresAt: string;
+      };
+      token: string;
+      inviteUrl: string;
+    }>(
+      `/v1/engagements/${encodeURIComponent(id)}/client-portal/contacts/${encodeURIComponent(contactId)}/invitations`,
+      context,
+      { method: "POST" },
+    ),
+  updatePortalAccess: (
+    context: ApiContext,
+    id: string,
+    contactId: string,
+    status: "ACTIVE" | "SUSPENDED" | "REVOKED",
+    reason?: string,
+  ) =>
+    request<{ item: PortalContact }>(
+      `/v1/engagements/${encodeURIComponent(id)}/client-portal/contacts/${encodeURIComponent(contactId)}/access`,
+      context,
+      { method: "PATCH", body: JSON.stringify({ status, reason }) },
+    ),
+  documentRequests: (context: ApiContext, id: string) =>
+    request<{ items: DocumentRequest[] }>(
+      `/v1/engagements/${encodeURIComponent(id)}/client-portal/document-requests`,
+      context,
+    ),
+  createDocumentRequest: (
+    context: ApiContext,
+    id: string,
+    body: {
+      title: string;
+      description?: string;
+      dueAt?: string;
+      assignedContactId?: string;
+      documentType?: string;
+    },
+  ) =>
+    request<{ item: DocumentRequest }>(
+      `/v1/engagements/${encodeURIComponent(id)}/client-portal/document-requests`,
+      context,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+  cancelDocumentRequest: (
+    context: ApiContext,
+    id: string,
+    requestId: string,
+    reason: string,
+  ) =>
+    request<{ item: DocumentRequest }>(
+      `/v1/engagements/${encodeURIComponent(id)}/client-portal/document-requests/${encodeURIComponent(requestId)}/cancel`,
+      context,
+      { method: "POST", body: JSON.stringify({ reason }) },
+    ),
+  reviewDocumentResponse: (
+    context: ApiContext,
+    id: string,
+    requestId: string,
+    responseId: string,
+    decision: "APPROVED" | "REJECTED",
+    reason: string,
+  ) =>
+    request<{ item: DocumentRequest }>(
+      `/v1/engagements/${encodeURIComponent(id)}/client-portal/document-requests/${encodeURIComponent(requestId)}/review`,
+      context,
+      {
+        method: "POST",
+        body: JSON.stringify({ responseId, decision, reason }),
+      },
+    ),
+  integrations: (context: ApiContext) =>
+    request<{ items: Integration[] }>("/v1/integrations", context),
+  createIntegration: (
+    context: ApiContext,
+    organisationId: string,
+    displayName: string,
+    configuration: Record<string, unknown> = {},
+  ) =>
+    request<{ item: Integration }>("/v1/integrations", context, {
+      method: "POST",
+      body: JSON.stringify({
+        organisationId,
+        connectorCode: "CSV",
+        displayName,
+        configuration,
+      }),
+    }),
+  updateIntegration: (
+    context: ApiContext,
+    integrationId: string,
+    body: {
+      displayName?: string;
+      status?: "CONFIGURED" | "DISABLED";
+      configuration?: Record<string, unknown>;
+    },
+  ) =>
+    request<{ item: Integration }>(
+      `/v1/integrations/${encodeURIComponent(integrationId)}`,
+      context,
+      { method: "PATCH", body: JSON.stringify(body) },
+    ),
+  syncRuns: (context: ApiContext, integrationId: string) =>
+    request<{ items: SyncRun[] }>(
+      `/v1/integrations/${encodeURIComponent(integrationId)}/sync-runs`,
+      context,
+    ),
+  createSyncRun: (
+    context: ApiContext,
+    integrationId: string,
+    engagementId: string,
+    idempotencyKey: string,
+  ) =>
+    request<{ item: SyncRun }>(
+      `/v1/integrations/${encodeURIComponent(integrationId)}/sync-runs`,
+      context,
+      {
+        method: "POST",
+        body: JSON.stringify({ engagementId, idempotencyKey }),
+      },
+    ),
+  notifications: (context: ApiContext, status?: "UNREAD" | "READ") =>
+    request<{ items: NotificationItem[] }>(
+      `/v1/notifications${status ? `?status=${status}` : ""}`,
+      context,
+    ),
+  markNotificationRead: (context: ApiContext, notificationId: string) =>
+    request<{ item: NotificationItem }>(
+      `/v1/notifications/${encodeURIComponent(notificationId)}/read`,
+      context,
+      { method: "POST" },
+    ),
+  tenantSettings: (context: ApiContext) =>
+    request<{ item: TenantSettings }>("/v1/tenant/settings", context),
+  updateTenantSettings: (context: ApiContext, name: string) =>
+    request<{ item: TenantSettings }>("/v1/tenant/settings", context, {
+      method: "PATCH",
+      body: JSON.stringify({ name }),
+    }),
+  updateTenantLifecycle: (
+    context: ApiContext,
+    status: "ACTIVE" | "SUSPENDED" | "CLOSURE_REQUESTED" | "CLOSED",
+    reason?: string,
+  ) =>
+    request<{ item: TenantSettings }>("/v1/tenant/lifecycle", context, {
+      method: "POST",
+      body: JSON.stringify({ status, reason }),
+    }),
+  exportRequests: (context: ApiContext) =>
+    request<{ items: ExportRequest[]; capability?: ExportCapability }>(
+      "/v1/tenant/export-requests",
+      context,
+    ),
+  createExportRequest: (
+    context: ApiContext,
+    body: {
+      scope: "TENANT" | "ENGAGEMENT";
+      engagementId?: string;
+      idempotencyKey: string;
+    },
+  ) =>
+    request<{ item: ExportRequest }>("/v1/tenant/export-requests", context, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 };

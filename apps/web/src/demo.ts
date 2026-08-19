@@ -1,0 +1,1635 @@
+import type {
+  AccountsVersion,
+  OrganisationPermanentFile,
+  PermanentFileAdviser,
+  PermanentFileOfficer,
+  WorkingPaper,
+  WorkingPaperLibraryItem,
+} from "./api";
+
+const now = "2027-03-18T09:30:00.000Z";
+const engagement = {
+  id: "demo-engagement",
+  organisation_id: "demo-org",
+  legal_name: "Northstar Community Foundation",
+  period_start: "2026-01-01",
+  period_end: "2026-12-31",
+  framework: "FRS_102",
+  sector_profile: "CHARITIES_SORP_2026",
+  assurance_regime: "INDEPENDENT_EXAMINATION",
+  status: "IN_PROGRESS",
+  version: 4,
+};
+const companyEngagement = {
+  id: "demo-company-engagement",
+  organisation_id: "demo-org-2",
+  legal_name: "Harbour Trading Ltd",
+  period_start: "2026-01-01",
+  period_end: "2026-12-31",
+  framework: "FRS_102_1A",
+  sector_profile: "NONE",
+  assurance_regime: "NO_EXTERNAL_SCRUTINY",
+  status: "IN_PROGRESS",
+  version: 2,
+};
+const demoLibrarySeed: [string, WorkingPaperLibraryItem["categoryCode"], string][] = [
+  ["A01","ACCEPTANCE","Engagement acceptance and continuance"], ["A02","ACCEPTANCE","Ethics and independence"], ["A03","ACCEPTANCE","Engagement letter and scope"],
+  ["B01","PLANNING","Understanding the entity"], ["B02","PLANNING","Risk assessment and response"], ["B03","PLANNING","Materiality and trivial threshold"], ["B04","PLANNING","Accounts production plan"],
+  ["C01","RECORDS","Trial balance control"], ["C02","RECORDS","Opening balances and comparatives"], ["C03","RECORDS","Journal review"], ["C04","RECORDS","Accounting estimates"],
+  ["D01","INCOME","Revenue and income"], ["D02","INCOME","Other income"], ["E01","EXPENDITURE","Operating expenditure"], ["E02","EXPENDITURE","Payroll and people costs"], ["E03","EXPENDITURE","Taxation"],
+  ["F01","ASSETS","Bank and cash"], ["F02","ASSETS","Trade and other debtors"], ["F03","ASSETS","Tangible and intangible fixed assets"], ["F04","ASSETS","Investments"],
+  ["G01","LIABILITIES","Creditors and accruals"], ["G02","LIABILITIES","Borrowings and finance"], ["G03","LIABILITIES","Provisions and contingencies"],
+  ["H01","FUNDS","Fund accounting and reconciliation"], ["H02","FUNDS","Restricted funds"], ["H03","FUNDS","Reserves policy"], ["H04","FUNDS","Support cost allocation"], ["H05","INCOME","Donations, legacies and grants"], ["H06","EXPENDITURE","Charitable activities and grants payable"],
+  ["H07","REPORTING","Trustees, related parties and benefits"], ["H08","REPORTING","Public benefit and activities report"], ["H09","REPORTING","Fundraising and safeguarding disclosures"],
+  ["I01","REPORTING","Accounting policies"], ["I02","REPORTING","Statutory disclosure checklist"], ["I03","REPORTING","Trustees’ or directors’ report"],
+  ["J01","COMPLETION","Going concern"], ["J02","COMPLETION","Subsequent events"], ["J03","COMPLETION","Related parties and laws"], ["J04","COMPLETION","Final analytical review"], ["J05","COMPLETION","Management representations"], ["J06","COMPLETION","Completion and review clearance"],
+];
+let demoWorkingPaperLibrary: WorkingPaperLibraryItem[] = demoLibrarySeed.map(
+  ([code, categoryCode, title], index) => ({
+    templateCode: code,
+    templateVersion: 1,
+    customTemplateId: null,
+    categoryCode,
+    sequenceNo: (index + 1) * 10,
+    code,
+    title,
+    objective: `Document the evidence, procedures and conclusion for ${title.toLowerCase()}.`,
+    guidance: "",
+    defaultContent: { procedures: [], findings: "", conclusion: "" },
+    required: !["D02","E03","F03","F04","G02","G03","H09"].includes(code),
+    disposition: "INCLUDE",
+    sourceScope: "STANDARD",
+    overrideReason: null,
+    deployedWorkingPaperId: ["F01","H02"].includes(code) ? `wp-${code}` : null,
+    deployedApplicability: ["F01","H02"].includes(code) ? "APPLICABLE" : null,
+  }),
+);
+let demoWorkingPapers: WorkingPaper[] = [
+  {
+    id: "wp-F01",
+    code: "F01",
+    title: "Bank and cash",
+    status: "PREPARED",
+    current_version: 2,
+    prepared_by: "Demo Preparer",
+    template_code: "F01",
+    template_version: 1,
+    template_scope: "STANDARD",
+    category_code: "ASSETS",
+    objective: "Verify the existence, completeness and presentation of cash.",
+    applicability: "APPLICABLE",
+    content: {
+      narrative:
+        "Cash agrees to the independent bank evidence and the ledger reconciliation. No exceptions were identified.",
+    },
+    content_hash: "sha256:wp2",
+    version_created_by: "Demo Preparer",
+    version_created_at: now,
+    updated_at: now,
+  },
+  {
+    id: "wp-H02",
+    code: "H02",
+    title: "Restricted funds",
+    status: "IN_PROGRESS",
+    current_version: 1,
+    template_code: "H02",
+    template_version: 1,
+    template_scope: "STANDARD",
+    category_code: "FUNDS",
+    objective: "Confirm restrictions, movements and closing balances by fund.",
+    applicability: "APPLICABLE",
+    content: {
+      narrative:
+        "Fund conditions and movements are being agreed to the underlying grant records.",
+    },
+    content_hash: "sha256:wp-h02",
+    updated_at: now,
+  },
+];
+const accountsVersion: AccountsVersion = {
+  id: "demo-accounts-v3",
+  version: 3,
+  status: "FINAL",
+  trial_balance_id: "demo-tb",
+  framework_pack_id: "CHARITIES-SORP-2026",
+  content_manifest: {
+    framework: "FRS 102",
+    period: "31 December 2026",
+    sections: [
+      "Trustees' report",
+      "Statement of financial activities",
+      "Balance sheet",
+      "Cash flow statement",
+      "Notes to the accounts",
+    ],
+    sourceTrialBalance: "demo-tb-v4",
+    disclosureRuleSet: "CHARITIES-SORP-2026@1",
+    generatedLineCount: 47,
+  },
+  content_hash: "sha256:9b7b…4f21",
+  generated_by: "Demo Partner",
+  generated_at: now,
+  frozen_at: now,
+  signoffs: [
+    {
+      id: "sig-0",
+      signoff_type: "PREPARED",
+      signed_by: "Demo Preparer",
+      signed_at: "2027-03-16T14:00:00Z",
+      object_version: 3,
+    },
+    {
+      id: "sig-review",
+      signoff_type: "REVIEWED",
+      signed_by: "Demo Reviewer",
+      signed_at: "2027-03-17T08:45:00Z",
+      object_version: 3,
+    },
+    {
+      id: "sig-1",
+      signoff_type: "PARTNER_APPROVED",
+      signed_by: "Demo Partner",
+      signed_at: now,
+      object_version: 3,
+    },
+    {
+      id: "sig-2",
+      signoff_type: "CLIENT_APPROVED",
+      signed_by: "Client approver",
+      signed_at: now,
+      object_version: 3,
+    },
+    {
+      id: "sig-3",
+      signoff_type: "FILING_AUTHORISED",
+      signed_by: "Demo Partner",
+      signed_at: now,
+      object_version: 3,
+    },
+  ],
+};
+let demoAccountsVersions: AccountsVersion[] = [
+  accountsVersion,
+  {
+    ...accountsVersion,
+    id: "demo-accounts-v2",
+    version: 2,
+    status: "SUPERSEDED",
+    content_hash: "sha256:1a42…90de",
+    generated_at: "2027-03-14T11:00:00Z",
+    frozen_at: "2027-03-15T12:00:00Z",
+    signoffs: [],
+  },
+];
+let demoNarrativeVersion = 3;
+const portalContacts = [
+  {
+    id: "portal-contact-1",
+    displayName: "Amelia Hart",
+    email: "amelia@northstar.example.org",
+    accessRole: "CLIENT_APPROVER",
+    contactStatus: "ACTIVE",
+    accessStatus: "ACTIVE",
+    createdAt: now,
+  },
+  {
+    id: "portal-contact-2",
+    displayName: "Jon Bell",
+    email: "jon@northstar.example.org",
+    accessRole: "CLIENT_PREPARER",
+    contactStatus: "ACTIVE",
+    accessStatus: "INVITED",
+    createdAt: now,
+  },
+];
+const documentRequests = [
+  {
+    id: "request-1",
+    title: "December bank statement",
+    description: "Signed year-end statement",
+    dueAt: "2027-03-22T17:00:00Z",
+    assignedContactId: "portal-contact-2",
+    documentType: "Bank statement",
+    status: "RESPONDED",
+    createdAt: now,
+    latestResponse: {
+      id: "response-1",
+      requestId: "request-1",
+      version: 1,
+      filename: "current-account-december.pdf",
+      contentType: "application/pdf",
+      byteSize: 184220,
+      contentHash: "sha256:portal-response",
+      createdAt: now,
+    },
+  },
+  {
+    id: "request-2",
+    title: "Trustee approval minutes",
+    dueAt: "2027-03-25T17:00:00Z",
+    assignedContactId: "portal-contact-1",
+    documentType: "Minutes",
+    status: "OPEN",
+    createdAt: now,
+  },
+];
+const integrations = [
+  {
+    id: "integration-1",
+    connectorCode: "CSV",
+    organisationId: "demo-org",
+    displayName: "Northstar nominal export",
+    status: "CONFIGURED",
+    hasCredentials: false,
+    configuration: { templateVersion: 1, headerRow: 1 },
+    createdAt: now,
+    updatedAt: now,
+  },
+];
+const notifications = [
+  {
+    id: "notification-1",
+    type: "DOCUMENT_RESPONSE",
+    title: "Bank statement received",
+    message:
+      "Northstar uploaded a response to the December bank statement request.",
+    severity: "INFO",
+    status: "UNREAD",
+    actionPath: "/engagement/demo-engagement/portal",
+    createdAt: now,
+  },
+  {
+    id: "notification-2",
+    type: "ACCOUNTS_FINAL",
+    title: "Accounts version finalised",
+    message: "Version 3 passed client and partner approval.",
+    severity: "SUCCESS",
+    status: "READ",
+    createdAt: now,
+    readAt: now,
+  },
+];
+
+const reads: Array<[RegExp, unknown]> = [
+  [
+    /^\/v1\/me\/tenants$/,
+    {
+      items: [
+        {
+          tenant_id: "demo-workspace",
+          name: "Northstar Accounts Demo",
+          role_code: "OWNER",
+        },
+      ],
+      onboarding: null,
+    },
+  ],
+  [
+    /^\/v1\/team$/,
+    {
+      members: [
+        {
+          id: "member-demo",
+          role: "OWNER",
+          createdAt: now,
+          isCurrentActor: true,
+        },
+        {
+          id: "member-reviewer",
+          role: "MEMBER",
+          createdAt: now,
+          isCurrentActor: false,
+        },
+      ],
+      invitations: [],
+    },
+  ],
+  [
+    /^\/v1\/organisations$/,
+    {
+      items: [
+        {
+          id: "demo-org",
+          legal_name: "Northstar Community Foundation",
+          legal_form: "Charitable company",
+          jurisdiction: "England and Wales",
+          created_at: now,
+        },
+        {
+          id: "demo-org-2",
+          legal_name: "Harbour Trading Ltd",
+          legal_form: "Private limited company",
+          jurisdiction: "England and Wales",
+          created_at: now,
+        },
+      ],
+    },
+  ],
+  [/^\/v1\/engagements$/, { items: [engagement, companyEngagement] }],
+  [
+    /^\/v1\/organisations\/demo-org\/permanent-file$/,
+    {
+      item: {
+        organisation: {
+          id: "demo-org",
+          legalName: "Northstar Community Foundation",
+          legalForm: "CHARITABLE_COMPANY",
+          jurisdiction: "ENGLAND_AND_WALES",
+          officerNameStyle: "FULL_NAME_WITH_HONOURS",
+          tradingName: "Northstar Foundation",
+          companyRegistrationNumber: "09481247",
+          charityRegistrationNumber: "1182047",
+          registeredOfficeAddress: {
+            line1: "14 Harbour Street",
+            locality: "Bristol",
+            postalCode: "BS1 4QF",
+            countryCode: "GB",
+          },
+          accountingReferenceMonth: 12,
+          accountingReferenceDay: 31,
+          principalActivity:
+            "Community grants, youth services and neighbourhood programmes",
+          website: "https://northstar.example.org",
+          telephone: "0117 555 0142",
+          notes: "Public benefit review completed annually by the trustees.",
+          createdAt: "2021-01-01T09:00:00Z",
+          updatedAt: now,
+        },
+        officers: [
+          {
+            id: "officer-1",
+            displayName: "Amelia Hart",
+            title: "Ms",
+            givenNames: "Amelia",
+            familyName: "Hart",
+            suffixHonours: "MA",
+            officerType: "TRUSTEE",
+            appointedOn: "2022-06-15",
+            resignedOn: null,
+            occupation: "Community programme director",
+            updatedAt: now,
+          },
+          {
+            id: "officer-2",
+            displayName: "Jon Bell",
+            officerType: "TRUSTEE",
+            appointedOn: "2024-02-01",
+            resignedOn: null,
+            updatedAt: now,
+          },
+          {
+            id: "officer-3",
+            displayName: "Priya Shah",
+            officerType: "COMPANY_SECRETARY",
+            appointedOn: "2023-09-12",
+            resignedOn: null,
+            updatedAt: now,
+          },
+        ],
+        advisers: [
+          {
+            id: "adviser-1",
+            adviserType: "BANKER",
+            firmName: "North West Commercial Bank",
+            contactName: "Charities team",
+            telephone: "0345 555 0180",
+            address: {
+              line1: "1 Exchange Square",
+              locality: "Bristol",
+              postalCode: "BS1 6AA",
+              countryCode: "GB",
+            },
+            status: "ACTIVE",
+            activeFrom: "2021-01-01",
+            activeTo: null,
+            updatedAt: now,
+          },
+          {
+            id: "adviser-2",
+            adviserType: "SOLICITOR",
+            firmName: "Mason & Cole LLP",
+            contactName: "Rebecca Cole",
+            email: "rebecca.cole@example.org",
+            address: {
+              line1: "8 King Street",
+              locality: "Bristol",
+              postalCode: "BS1 4EF",
+              countryCode: "GB",
+            },
+            status: "ACTIVE",
+            activeFrom: "2023-04-01",
+            activeTo: null,
+            updatedAt: now,
+          },
+          {
+            id: "adviser-3",
+            adviserType: "INDEPENDENT_EXAMINER",
+            firmName: "Westborough Assurance LLP",
+            contactName: "Ruth Morgan",
+            contactQualifications: "FCA",
+            professionalBody: "ICAEW",
+            reportStyle: "ICAEW",
+            status: "ACTIVE",
+            activeFrom: "2025-01-01",
+            activeTo: null,
+            updatedAt: now,
+          },
+        ],
+        engagements: [
+          {
+            id: engagement.id,
+            periodStart: engagement.period_start,
+            periodEnd: engagement.period_end,
+            framework: engagement.framework,
+            sectorProfile: engagement.sector_profile,
+            status: engagement.status,
+          },
+        ],
+      },
+    },
+  ],
+  [
+    /^\/v1\/organisations\/demo-org-2\/permanent-file$/,
+    {
+      item: {
+        organisation: {
+          id: "demo-org-2",
+          legalName: "Harbour Trading Ltd",
+          legalForm: "PRIVATE_LIMITED_COMPANY",
+          jurisdiction: "ENGLAND_AND_WALES",
+          officerNameStyle: "INITIALS_AND_SURNAME",
+          tradingName: "Harbour Trading",
+          companyRegistrationNumber: "12874621",
+          registeredOfficeAddress: {
+            line1: "22 Queen Square",
+            locality: "Bristol",
+            postalCode: "BS1 4ND",
+            countryCode: "GB",
+          },
+          accountingReferenceMonth: 12,
+          accountingReferenceDay: 31,
+          principalActivity: "Wholesale distribution of marine equipment",
+          website: "https://harbour-trading.example.org",
+          telephone: "0117 555 0198",
+          notes: "Small-company audit exemption reviewed annually.",
+          createdAt: "2020-05-12T09:00:00Z",
+          updatedAt: now,
+        },
+        officers: [
+          { id: "company-officer-1", displayName: "Daniel Price", officerType: "DIRECTOR", appointedOn: "2020-05-12", resignedOn: null, updatedAt: now },
+          { id: "company-officer-2", displayName: "Sarah Wong", officerType: "DIRECTOR", appointedOn: "2022-03-01", resignedOn: null, updatedAt: now },
+        ],
+        advisers: [
+          { id: "company-adviser-1", adviserType: "BANKER", firmName: "North West Commercial Bank", contactName: "Business banking", status: "ACTIVE", activeFrom: "2020-05-12", activeTo: null, updatedAt: now },
+          { id: "company-adviser-2", adviserType: "ACCOUNTANT", firmName: "Ledgerly Practice", contactName: "Accounts team", status: "ACTIVE", activeFrom: "2025-01-01", activeTo: null, updatedAt: now },
+        ],
+        engagements: [
+          { id: companyEngagement.id, periodStart: companyEngagement.period_start, periodEnd: companyEngagement.period_end, framework: companyEngagement.framework, sectorProfile: companyEngagement.sector_profile, status: companyEngagement.status },
+        ],
+      },
+    },
+  ],
+  [/\/client-portal\/contacts$/, { items: portalContacts }],
+  [/\/client-portal\/document-requests$/, { items: documentRequests }],
+  [/^\/v1\/integrations$/, { items: integrations }],
+  [
+    /\/v1\/integrations\/[^/]+\/sync-runs$/,
+    {
+      items: [
+        {
+          id: "sync-1",
+          integrationId: "integration-1",
+          engagementId: engagement.id,
+          status: "SUCCEEDED",
+          counts: { imported: 47, rejected: 0 },
+          startedAt: now,
+          completedAt: now,
+        },
+      ],
+    },
+  ],
+  [/^\/v1\/notifications(?:\?.*)?$/, { items: notifications }],
+  [
+    /^\/v1\/tenant\/settings$/,
+    {
+      item: {
+        id: "demo-workspace",
+        name: "Northstar Accounts Demo",
+        lifecycleStatus: "ACTIVE",
+        createdAt: now,
+        updatedAt: now,
+      },
+    },
+  ],
+  [
+    /^\/v1\/tenant\/export-requests$/,
+    {
+      items: [
+        {
+          id: "export-1",
+          scope: "ENGAGEMENT",
+          engagementId: engagement.id,
+          format: "ZIP",
+          status: "REQUESTED",
+          requestedAt: now,
+          completedAt: now,
+        },
+      ],
+      capability: {
+        generationAvailable: false,
+        code: "EXPORT_RUNNER_NOT_PROVISIONED",
+        message: "Export generation is not available in this environment.",
+      },
+    },
+  ],
+  [
+    /\/accounts-versions\/[^/]+\/presentation$/,
+    {
+      item: {
+        accountsVersionId: accountsVersion.id,
+        currentPeriod: { start: "2026-01-01", end: "2026-12-31" },
+        comparativePeriod: {
+          start: "2025-01-01",
+          end: "2025-12-31",
+          accountsVersionId: "demo-accounts-v2",
+        },
+        statements: [
+          {
+            statementCode: "SOFA",
+            title: "Statement of financial activities",
+            columns: [
+              { key: "current", label: "2026" },
+              { key: "comparative", label: "2025" },
+            ],
+            lines: [
+              {
+                code: "SOFA.INCOME.DONATIONS",
+                caption: "Donations and legacies",
+                current: "184250.00",
+                comparative: "171400.00",
+              },
+              {
+                code: "SOFA.EXPENDITURE.CHARITABLE",
+                caption: "Charitable activities",
+                current: "-219430.00",
+                comparative: "-207800.00",
+              },
+            ],
+          },
+        ],
+        readiness: {
+          comparativeConfigured: true,
+          comparativeComplete: true,
+          blocks: [],
+        },
+      },
+    },
+  ],
+  [
+    /\/canonical-accounts/,
+    {
+      items: [
+        {
+          id: "ca-cash",
+          taxonomy_version: "UK-CANONICAL-2026",
+          canonical_code: "BS.CASH",
+          name: "Cash at bank and in hand",
+          report_line: "Cash",
+          normal_balance: "DEBIT",
+        },
+        {
+          id: "ca-income",
+          taxonomy_version: "UK-CANONICAL-2026",
+          canonical_code: "SOFA.DONATIONS",
+          name: "Donations and legacies",
+          report_line: "Income from donations",
+          normal_balance: "CREDIT",
+        },
+      ],
+    },
+  ],
+  [
+    /\/trial-balance$/,
+    {
+      items: [
+        {
+          source_account_id: "src-1000",
+          account_code: "1000",
+          account_name: "Current account",
+          debit: "184250.00",
+          credit: "0.00",
+          canonical_account_id: "ca-cash",
+          canonical_code: "BS.CASH",
+          canonical_name: "Cash at bank and in hand",
+          report_line: "Cash",
+        },
+        {
+          source_account_id: "src-1100",
+          account_code: "1100",
+          account_name: "Fixtures and equipment",
+          debit: "72300.00",
+          credit: "0.00",
+          canonical_account_id: "ca-fixed",
+          canonical_code: "BS.FIXED_ASSETS",
+          canonical_name: "Tangible fixed assets",
+          report_line: "Fixed assets",
+        },
+        {
+          source_account_id: "src-6000",
+          account_code: "6000",
+          account_name: "Community programme costs",
+          debit: "219430.00",
+          credit: "0.00",
+          canonical_account_id: "ca-charitable-expense",
+          canonical_code: "SOFA.CHARITABLE_EXPENDITURE",
+          canonical_name: "Charitable activities",
+          report_line: "Charitable expenditure",
+        },
+        {
+          source_account_id: "src-4000",
+          account_code: "4000",
+          account_name: "Donations and legacies",
+          debit: "0.00",
+          credit: "184250.00",
+          canonical_account_id: "ca-income",
+          canonical_code: "SOFA.DONATIONS",
+          canonical_name: "Donations and legacies",
+          report_line: "Income from donations",
+        },
+        {
+          source_account_id: "src-4100",
+          account_code: "4100",
+          account_name: "Programme service income",
+          debit: "0.00",
+          credit: "96800.00",
+          canonical_account_id: "ca-charitable-income",
+          canonical_code: "SOFA.CHARITABLE_INCOME",
+          canonical_name: "Charitable activities income",
+          report_line: "Charitable income",
+        },
+        {
+          source_account_id: "src-2000",
+          account_code: "2000",
+          account_name: "Trade and other creditors",
+          debit: "0.00",
+          credit: "28750.00",
+          canonical_account_id: "ca-creditors",
+          canonical_code: "BS.CREDITORS",
+          canonical_name: "Creditors within one year",
+          report_line: "Creditors",
+        },
+        {
+          source_account_id: "src-3000",
+          account_code: "3000",
+          account_name: "Funds brought forward",
+          debit: "0.00",
+          credit: "166180.00",
+          canonical_account_id: "ca-funds",
+          canonical_code: "BS.FUNDS",
+          canonical_name: "Charity funds",
+          report_line: "Funds",
+        },
+      ],
+    },
+  ],
+  [
+    /\/report$/,
+    {
+      balanced: true,
+      fullyMapped: true,
+      lines: [
+        {
+          code: "SOFA.INCOME.DONATIONS",
+          caption: "Donations and legacies",
+          statement_code: "SOFA",
+          display_order: 10,
+          balance: "184250.00",
+          canonical_codes: ["SOFA.DONATIONS"],
+          source_account_ids: ["src-4000"],
+          fund_balances: { unrestricted: "40000.00", restricted: "144250.00", endowment: "0.00" },
+          comparative_balance: "171400.00",
+        },
+        {
+          code: "SOFA.INCOME.CHARITABLE",
+          caption: "Income from charitable activities",
+          statement_code: "SOFA",
+          display_order: 20,
+          balance: "96800.00",
+          canonical_codes: ["SOFA.CHARITABLE_INCOME"],
+          source_account_ids: ["src-4100", "src-4110"],
+          fund_balances: { unrestricted: "96800.00", restricted: "0.00", endowment: "0.00" },
+          comparative_balance: "88500.00",
+        },
+        {
+          code: "SOFA.EXPENDITURE.CHARITABLE",
+          caption: "Expenditure on charitable activities",
+          statement_code: "SOFA",
+          display_order: 40,
+          balance: "-219430.00",
+          canonical_codes: ["SOFA.CHARITABLE_EXPENDITURE"],
+          source_account_ids: ["src-6000", "src-6100"],
+          fund_balances: { unrestricted: "-115180.00", restricted: "-104250.00", endowment: "0.00" },
+          comparative_balance: "-207800.00",
+        },
+        {
+          code: "SOFA.NET_MOVEMENT",
+          caption: "Net movement in funds",
+          statement_code: "SOFA",
+          display_order: 60,
+          balance: "61620.00",
+          canonical_codes: ["SOFA.NET_MOVEMENT"],
+          source_account_ids: ["src-9998"],
+          fund_balances: { unrestricted: "21620.00", restricted: "40000.00", endowment: "0.00" },
+          comparative_balance: "52100.00",
+        },
+        {
+          code: "BS.FIXED_ASSETS",
+          caption: "Tangible fixed assets",
+          statement_code: "BS",
+          display_order: 10,
+          balance: "72300.00",
+          canonical_codes: ["BS.FIXED_ASSETS"],
+          source_account_ids: ["src-1100"],
+        },
+        {
+          code: "BS.CASH",
+          caption: "Cash at bank and in hand",
+          statement_code: "BS",
+          display_order: 30,
+          balance: "184250.00",
+          canonical_codes: ["BS.CASH"],
+          source_account_ids: ["src-1000"],
+        },
+        {
+          code: "BS.CREDITORS",
+          caption: "Creditors: amounts falling due within one year",
+          statement_code: "BS",
+          display_order: 40,
+          balance: "-28750.00",
+          canonical_codes: ["BS.CREDITORS"],
+          source_account_ids: ["src-2000"],
+        },
+        {
+          code: "BS.FUNDS",
+          caption: "Total charity funds",
+          statement_code: "BS",
+          display_order: 70,
+          balance: "227800.00",
+          canonical_codes: ["BS.FUNDS"],
+          source_account_ids: ["src-3000", "src-3100"],
+        },
+      ],
+    },
+  ],
+  [
+    /\/history$/,
+    {
+      items: [
+        {
+          event_id: "audit-1",
+          occurred_at_utc: now,
+          actor_id: "demo-user",
+          event_type: "ACCOUNTS_VERSION_FINALISED",
+          object_type: "ACCOUNTS_VERSION",
+          object_id: "demo-accounts-v3",
+          reason: "Client and partner approval recorded",
+          correlation_id: "demo-correlation",
+          metadata: { version: 3 },
+          event_hash: "sha256:demo",
+        },
+      ],
+    },
+  ],
+  [
+    /\/dashboard$/,
+    {
+      engagementId: engagement.id,
+      journals: { total: 2, byStatus: { APPROVED: 1, DRAFT: 1 } },
+      reconciliations: { total: 3, byStatus: { REVIEWED: 2, IN_PROGRESS: 1 } },
+      tasks: { total: 8, byStatus: { COMPLETE: 6, IN_PROGRESS: 2 } },
+      reviewPoints: { total: 2, byStatus: { CLEARED: 1, OPEN: 1 } },
+      progress: { completedTasks: 6, totalTasks: 8, percent: 75 },
+      blockingItems: 1,
+    },
+  ],
+  [
+    /\/journals$/,
+    {
+      items: [
+        {
+          id: "journal-1",
+          journal_no: 1,
+          journal_type: "ADJUSTMENT",
+          description: "Accrued professional fees",
+          status: "APPROVED",
+          version: 2,
+          prepared_by: "Demo Preparer",
+          approved_by: "Demo Partner",
+          approved_at: now,
+          lines: [
+            {
+              id: "jl-1",
+              line_no: 1,
+              canonical_account_id: "ca-expense",
+              canonical_code: "SOFA.PROFESSIONAL_FEES",
+              account_name: "Professional fees",
+              debit: "4800.00",
+              credit: "0.00",
+            },
+            {
+              id: "jl-2",
+              line_no: 2,
+              canonical_account_id: "ca-accrual",
+              canonical_code: "BS.ACCRUALS",
+              account_name: "Accruals",
+              debit: "0.00",
+              credit: "4800.00",
+            },
+          ],
+        },
+      ],
+    },
+  ],
+  [
+    /\/reconciliations$/,
+    {
+      items: [
+        {
+          id: "rec-1",
+          reconciliation_type: "BANK",
+          title: "Current account – December 2026",
+          status: "REVIEWED",
+          ledger_balance: "184250.00",
+          supporting_balance: "184250.00",
+          tolerance: "1.00",
+          updated_at: now,
+        },
+        {
+          id: "rec-2",
+          reconciliation_type: "PAYROLL",
+          title: "December payroll control",
+          status: "IN_PROGRESS",
+          ledger_balance: "32200.00",
+          supporting_balance: "31950.00",
+          tolerance: "1.00",
+          updated_at: now,
+        },
+      ],
+    },
+  ],
+  [
+    /\/workflow-tasks$/,
+    {
+      items: [
+        {
+          id: "task-1",
+          task_type: "ACCOUNTS",
+          title: "Complete trustees' report",
+          status: "IN_PROGRESS",
+          blocking: true,
+          assigned_to: "Demo Preparer",
+          due_at: "2027-03-22",
+        },
+        {
+          id: "task-2",
+          task_type: "REVIEW",
+          title: "Partner review of financial statements",
+          status: "OPEN",
+          blocking: false,
+          assigned_to: "Demo Partner",
+          due_at: "2027-03-25",
+        },
+      ],
+    },
+  ],
+  [
+    /\/review-points$/,
+    {
+      items: [
+        {
+          id: "rp-1",
+          object_type: "WORKING_PAPER",
+          object_id: "wp-1",
+          question:
+            "Confirm post year-end grant receipts agree to bank evidence.",
+          status: "OPEN",
+          severity: "NORMAL",
+          assigned_to: "Demo Preparer",
+          created_at: now,
+        },
+      ],
+    },
+  ],
+  [
+    /\/working-papers\/[^/]+\/versions$/,
+    {
+      items: [
+        {
+          id: "wpv-2",
+          version: 2,
+          content: {
+            conclusion:
+              "Cash balance agrees to bank confirmation with no exceptions.",
+          },
+          content_hash: "sha256:wp2",
+          created_by: "Demo Preparer",
+          created_at: now,
+        },
+        {
+          id: "wpv-1",
+          version: 1,
+          content: { conclusion: "Initial reconciliation completed." },
+          content_hash: "sha256:wp1",
+          created_by: "Demo Preparer",
+          created_at: "2027-03-15T10:00:00Z",
+        },
+      ],
+    },
+  ],
+  [
+    /\/working-papers$/,
+    {
+      items: [
+        {
+          id: "wp-1",
+          code: "A1",
+          title: "Bank and cash reconciliation",
+          status: "PREPARED",
+          current_version: 2,
+          prepared_by: "Demo Preparer",
+          content: {
+            objective: "Verify existence and completeness of cash",
+            conclusion: "Agrees to independent bank evidence.",
+          },
+          content_hash: "sha256:wp2",
+          version_created_by: "Demo Preparer",
+          version_created_at: now,
+          updated_at: now,
+        },
+        {
+          id: "wp-2",
+          code: "B4",
+          title: "Restricted funds testing",
+          status: "IN_PROGRESS",
+          current_version: 1,
+          content: { sampleSize: 12, exceptions: 0 },
+          content_hash: "sha256:wpb4",
+          updated_at: now,
+        },
+      ],
+    },
+  ],
+  [
+    /\/disclosures$/,
+    {
+      items: [
+        {
+          id: "disc-1",
+          disclosure_code: "FRS102.1.2",
+          applicability: "REQUIRED",
+          status: "REVIEWED",
+          current_version: 2,
+          rule_version: "2026.1",
+          answer: {
+            narrative:
+              "The accounts have been prepared under FRS 102 and Charities SORP 2026.",
+          },
+          updated_at: now,
+        },
+        {
+          id: "disc-2",
+          disclosure_code: "SORP.FUNDS",
+          applicability: "REQUIRED",
+          status: "COMPLETE",
+          current_version: 1,
+          rule_version: "2026.1",
+          answer: {
+            policy:
+              "Restricted and unrestricted funds are separately disclosed.",
+          },
+          updated_at: now,
+        },
+      ],
+    },
+  ],
+  [
+    /\/reporting-packs$/,
+    {
+      items: [
+        {
+          pack_code: "CHARITIES-SORP-2026",
+          version_no: 1,
+          title: "Charities SORP 2026 baseline",
+          framework_code: "FRS_102",
+          sector_code: "CHARITIES_SORP_2026",
+          effective_from: "2026-01-01",
+          effective_to: null,
+          certification_status: "REPOSITORY_BASELINE",
+          provenance_label: "Version-controlled repository baseline",
+          certification_label: "Repository baseline - not regulator certified",
+        },
+      ],
+    },
+  ],
+  [
+    /\/artefacts\/capabilities$/,
+    {
+      capabilities: {
+        html: {
+          available: true,
+          generated: true,
+          rendererVersion: "accounts-html-v1",
+        },
+        pdf: {
+          available: true,
+          generated: true,
+          rendererVersion: "accounts-pdf-native-v1",
+        },
+        docx: {
+          available: true,
+          generated: true,
+          rendererVersion: "accounts-docx-v1",
+        },
+        ixbrl: {
+          available: false,
+          code: "TAXONOMY_MAPPINGS_UNAVAILABLE",
+          message: "iXBRL taxonomy mappings are not available.",
+          taxonomyMappings: 0,
+        },
+      },
+    },
+  ],
+  [
+    /\/evidence-bundle\/capabilities$/,
+    {
+      capability: {
+        available: true,
+        code: "EVIDENCE_BUNDLE_AVAILABLE",
+        formatVersion: "accounts-evidence-bundle-v1",
+        accountsVersion: {
+          id: accountsVersion.id,
+          version: 3,
+          status: "FINAL",
+          contentHash: accountsVersion.content_hash,
+        },
+        dependencies: {
+          complete: true,
+          referencedObjectCount: 11,
+          missing: [],
+        },
+        signoffs: {
+          total: 5,
+          active: 5,
+          invalidated: 0,
+          activeTypes: [
+            "CLIENT_APPROVED",
+            "FILING_AUTHORISED",
+            "PARTNER_APPROVED",
+            "PREPARED",
+            "REVIEWED",
+          ],
+          preparedAndReviewed: true,
+          clientAndPartnerApproved: true,
+          filingAuthorised: true,
+        },
+        artefacts: { html: { generated: true }, pdf: { generated: true } },
+        auditEventCount: 18,
+        maxSourceBytes: 10485760,
+      },
+    },
+  ],
+  [
+    /\/filing-attempts$/,
+    {
+      items: [
+        {
+          id: "filing-1",
+          accounts_version_id: accountsVersion.id,
+          accounts_version: 3,
+          regulator: "COMPANIES_HOUSE",
+          attempt_no: 1,
+          status: "SUBMITTED",
+          payload_storage_key: "server-managed",
+          payload_hash: "sha256:filing",
+          regulator_reference: "CH-DEMO-1042",
+          submitted_by: "Demo Partner",
+          submitted_at: now,
+          created_at: now,
+        },
+      ],
+    },
+  ],
+];
+
+export function demoRequest(path: string, init?: RequestInit): unknown {
+  const method = init?.method ?? "GET";
+  if (method === "POST" && path.endsWith("/imports/normalize")) {
+    return {
+      item: {
+        rowCount: 2,
+        detectedColumns: ["account_code", "account_name", "debit", "credit"],
+        rows: [
+          { accountCode: "1000", accountName: "Bank", debit: "100.00", credit: "" },
+          { accountCode: "4000", accountName: "Income", debit: "", credit: "100.00" },
+        ],
+        warnings: [],
+      },
+    };
+  }
+  if (method === "POST" && /\/engagements\/[^/]+\/imports$/.test(path)) {
+    return {
+      item: {
+        id: `demo-import-${Date.now()}`,
+        trial_balance_id: "demo-trial-balance",
+        snapshot_id: "demo-snapshot",
+        version_no: 2,
+        record_count: 2,
+      },
+    };
+  }
+  const memberMatch = path.match(/^\/v1\/team\/members\/([^/]+)\/(role|remove)$/);
+  if (memberMatch && method === "POST") {
+    const team = reads.find(([pattern]) => pattern.test("/v1/team"))?.[1] as
+      | { members: Array<{ id: string; role: "OWNER" | "ADMIN" | "MEMBER"; isCurrentActor: boolean }> }
+      | undefined;
+    const member = team?.members.find((item) => item.id === memberMatch[1]);
+    if (!member || member.isCurrentActor) throw new Error("Workspace member not found");
+    const previousRole = member.role;
+    if (memberMatch[2] === "remove") {
+      team!.members = team!.members.filter((item) => item.id !== member.id);
+      return { item: { id: member.id, previousRole, role: null, removed: true } };
+    }
+    const body = JSON.parse(String(init?.body || "{}")) as { role?: "OWNER" | "ADMIN" | "MEMBER" };
+    if (!body.role) throw new Error("Select a valid workspace role");
+    member.role = body.role;
+    return { item: { id: member.id, previousRole, role: member.role, removed: false } };
+  }
+  const permanentMatch = path.match(/^\/v1\/organisations\/(demo-org(?:-2)?)\/permanent-file(?:\/(officers|advisers)(?:\/([^/]+))?)?$/);
+  if (permanentMatch && method !== "GET") {
+    const [, organisationId, collection, recordId] = permanentMatch;
+    const source = reads.find(([pattern]) => pattern.test(`/v1/organisations/${organisationId}/permanent-file`))?.[1] as { item: OrganisationPermanentFile } | undefined;
+    const body = JSON.parse(String(init?.body || "{}")) as Record<string, string | null>;
+    if (source && collection === "officers") {
+      const existing = source.item.officers.find((entry) => entry.id === recordId);
+      const item = existing || ({ id: `demo-officer-${Date.now()}`, updatedAt: now } as PermanentFileOfficer);
+      Object.assign(item, {
+        officerType: body.officerType ?? item.officerType,
+        displayName: body.displayName ?? item.displayName,
+        title: body.title ?? null,
+        givenNames: body.givenNames ?? null,
+        middleNames: body.middleNames ?? null,
+        familyName: body.familyName ?? null,
+        suffixHonours: body.suffixHonours ?? null,
+        appointedOn: body.appointedOn ?? item.appointedOn,
+        resignedOn: body.resignedOn ?? null,
+        occupation: body.occupation ?? null,
+        email: body.email ?? null,
+        telephone: body.telephone ?? null,
+        updatedAt: new Date().toISOString(),
+      });
+      if (!existing) source.item.officers.push(item);
+      return { item: structuredClone(item) };
+    }
+    if (source && collection === "advisers") {
+      const existing = source.item.advisers.find((entry) => entry.id === recordId);
+      const item = existing || ({ id: `demo-adviser-${Date.now()}`, updatedAt: now } as PermanentFileAdviser);
+      Object.assign(item, {
+        adviserType: body.adviserType ?? item.adviserType,
+        firmName: body.firmName ?? item.firmName,
+        contactName: body.contactName ?? null,
+        contactQualifications: body.contactQualifications ?? null,
+        professionalBody: body.professionalBody ?? null,
+        reportStyle: body.reportStyle ?? "GENERIC",
+        activeFrom: body.activeFrom ?? item.activeFrom,
+        activeTo: body.activeTo ?? null,
+        status: body.activeTo ? "ENDED" : "ACTIVE",
+        email: body.email ?? null,
+        telephone: body.telephone ?? null,
+        reference: body.reference ?? null,
+        address: body.addressLine1 ? {
+          line1: body.addressLine1,
+          locality: body.addressLocality || null,
+          postalCode: body.addressPostalCode || null,
+          countryCode: body.addressCountryCode || "GB",
+        } : null,
+        updatedAt: new Date().toISOString(),
+      });
+      if (!existing) source.item.advisers.push(item);
+      return { item: structuredClone(item) };
+    }
+    if (source && !collection) {
+      Object.assign(source.item.organisation, {
+        legalForm: body.legalForm ?? source.item.organisation.legalForm,
+        officerNameStyle: body.officerNameStyle ?? source.item.organisation.officerNameStyle,
+        tradingName: body.tradingName ?? source.item.organisation.tradingName,
+        companyRegistrationNumber: body.companyRegistrationNumber ?? source.item.organisation.companyRegistrationNumber,
+        charityRegistrationNumber: body.charityRegistrationNumber ?? source.item.organisation.charityRegistrationNumber,
+        principalActivity: body.principalActivity ?? source.item.organisation.principalActivity,
+        website: body.website ?? source.item.organisation.website,
+        telephone: body.telephone ?? source.item.organisation.telephone,
+        notes: body.notes ?? source.item.organisation.notes,
+        updatedAt: new Date().toISOString(),
+      });
+      return { item: { organisationId, updatedAt: source.item.organisation.updatedAt } };
+    }
+  }
+  if (method === "GET") {
+    if (path.includes(`/engagements/${companyEngagement.id}/trial-balance`))
+      return {
+        items: [
+          ["1000", "Bank current account", "120000.00", "0.00", "BS.CASH"],
+          ["1100", "Trade debtors", "35000.00", "0.00", "BS.DEBTORS"],
+          ["1200", "Plant and equipment", "80000.00", "0.00", "BS.FIXED_ASSETS"],
+          ["5000", "Operating costs", "540000.00", "0.00", "PNL.OPERATING_COSTS"],
+          ["2000", "Trade creditors", "0.00", "45000.00", "BS.CREDITORS"],
+          ["3000", "Called-up share capital", "0.00", "10000.00", "BS.SHARE_CAPITAL"],
+          ["4000", "Turnover", "0.00", "720000.00", "PNL.TURNOVER"],
+        ].map(([code, name, debit, credit, canonical], index) => ({
+          source_account_id: `company-src-${index + 1}`,
+          account_code: code,
+          account_name: name,
+          debit,
+          credit,
+          canonical_account_id: `company-ca-${index + 1}`,
+          canonical_code: canonical,
+          canonical_name: name,
+          report_line: name,
+        })),
+      };
+    if (path.includes(`/engagements/${companyEngagement.id}/report`))
+      return {
+        balanced: true,
+        fullyMapped: true,
+        lines: [
+          ["PNL.TURNOVER", "Turnover", "PNL", 10, "720000.00"],
+          ["PNL.OPERATING_COSTS", "Administrative expenses", "PNL", 30, "-540000.00"],
+          ["PNL.PROFIT", "Profit for the financial year", "PNL", 50, "180000.00"],
+          ["BS.FIXED_ASSETS", "Tangible fixed assets", "BS", 10, "80000.00"],
+          ["BS.DEBTORS", "Debtors", "BS", 20, "35000.00"],
+          ["BS.CASH", "Cash at bank and in hand", "BS", 30, "120000.00"],
+          ["BS.CREDITORS", "Creditors: amounts falling due within one year", "BS", 40, "-45000.00"],
+          ["BS.NET_ASSETS", "Net assets", "BS", 60, "190000.00"],
+          ["BS.SHARE_CAPITAL", "Called-up share capital", "BS", 70, "10000.00"],
+          ["BS.RESERVES", "Profit and loss account", "BS", 80, "180000.00"],
+        ].map(([code, caption, statement_code, display_order, balance], index) => ({
+          code, caption, statement_code, display_order, balance,
+          canonical_codes: [code], source_account_ids: [`company-src-${index + 1}`],
+        })),
+      };
+    if (path.includes(`/engagements/${companyEngagement.id}/dashboard`))
+      return {
+        engagementId: companyEngagement.id,
+        journals: { total: 1, byStatus: { DRAFT: 1 } },
+        reconciliations: { total: 2, byStatus: { REVIEWED: 2 } },
+        tasks: { total: 6, byStatus: { COMPLETE: 4, IN_PROGRESS: 2 } },
+        reviewPoints: { total: 1, byStatus: { OPEN: 1 } },
+        progress: { completedTasks: 4, totalTasks: 6, percent: 67 },
+        blockingItems: 1,
+      };
+    if (path.endsWith("/working-paper-library"))
+      return { items: structuredClone(demoWorkingPaperLibrary) };
+    if (path.endsWith("/working-papers"))
+      return { items: structuredClone(demoWorkingPapers) };
+    if (path.endsWith("/accounts-versions"))
+      return { items: structuredClone(demoAccountsVersions) };
+    const match = reads.find(([pattern]) => pattern.test(path));
+    if (match) return structuredClone(match[1]);
+  }
+  if (path.endsWith("/artefacts/html"))
+    return {
+      item: {
+        kind: "HTML",
+        status: "READY",
+        rendererVersion: "accounts-html-v1",
+        contentHash: "sha256:demo-html",
+        byteSize: 48210,
+        viewPath: "/v1/demo/accounts.html",
+        downloadPath: "/v1/demo/accounts.html?download=1",
+      },
+      created: false,
+    };
+  if (path.endsWith("/artefacts/pdf"))
+    return {
+      item: {
+        kind: "PDF",
+        status: "READY",
+        rendererVersion: "accounts-pdf-native-v1",
+        contentHash: "sha256:demo-pdf",
+        byteSize: 96320,
+        viewPath: "/v1/demo/accounts.pdf",
+        downloadPath: "/v1/demo/accounts.pdf?download=1",
+      },
+      created: false,
+    };
+  if (path.endsWith("/artefacts/docx"))
+    return {
+      item: {
+        kind: "DOCX",
+        status: "READY",
+        rendererVersion: "accounts-docx-v1",
+        contentHash: "sha256:demo-docx",
+        byteSize: 28672,
+        downloadPath: "/v1/demo/accounts.docx?download=1",
+      },
+      created: false,
+    };
+  if (path.endsWith("/imports/normalize"))
+    return {
+      item: {
+        detectedColumns: ["Account code", "Account name", "Debit", "Credit"],
+        rowCount: 47,
+        preview: [
+          {
+            accountCode: "1000",
+            accountName: "Current account",
+            debit: "184250.00",
+            credit: "0.00",
+          },
+        ],
+        warnings: [],
+      },
+    };
+  if (
+    path.includes("/client-portal/contacts/") &&
+    path.endsWith("/invitations")
+  )
+    return {
+      item: {
+        id: "portal-invite-1",
+        contactId: "portal-contact-2",
+        status: "ACTIVE",
+        expiresAt: "2027-03-21T09:30:00Z",
+      },
+      token: "demo-portal-token",
+      inviteUrl: `${location.origin}/client-invite#token=demo-portal-token`,
+    };
+  if (path.includes("/invitations"))
+    return {
+      item: {
+        id: "demo-invite",
+        role: "MEMBER",
+        status: "ACTIVE",
+        expiresAt: "2027-03-21T09:30:00Z",
+        createdAt: now,
+      },
+      token: "demo-token",
+      inviteUrl: `${location.origin}/invite#token=demo-token`,
+      accepted: true,
+      memberCreated: true,
+    };
+  if (method === "POST" && path.endsWith("/working-papers")) {
+    const body = JSON.parse(String(init?.body || "{}"));
+    const item: WorkingPaper = {
+        id: `demo-working-paper-${Date.now()}`,
+        code: body.code,
+        title: body.title,
+        status: "IN_PROGRESS",
+        current_version: 1,
+        template_scope: "ENGAGEMENT",
+        applicability: "APPLICABLE",
+        content: body.content || {},
+        created_at: now,
+        updated_at: now,
+      };
+    demoWorkingPapers = [...demoWorkingPapers, item];
+    return { item };
+  }
+  if (method === "POST" && path.endsWith("/working-papers/deploy")) {
+    let created = 0;
+    const deployed: WorkingPaper[] = [];
+    demoWorkingPaperLibrary = demoWorkingPaperLibrary.map((item) => {
+      if (item.disposition === "EXCLUDE" || item.deployedWorkingPaperId)
+        return item;
+      created += 1;
+      const paper: WorkingPaper = {
+        id: `demo-deployed-${item.templateCode}`,
+        code: item.code,
+        title: item.title,
+        status: "NOT_STARTED",
+        current_version: 1,
+        template_code: item.templateVersion ? item.templateCode : null,
+        template_version: item.templateVersion,
+        template_scope: item.sourceScope,
+        category_code: item.categoryCode,
+        objective: item.objective,
+        applicability: "APPLICABLE",
+        content: structuredClone(item.defaultContent),
+        content_hash: `sha256:demo-${item.templateCode}`,
+        updated_at: now,
+      };
+      deployed.push(paper);
+      return {
+        ...item,
+        deployedWorkingPaperId: paper.id,
+        deployedApplicability: "APPLICABLE",
+      };
+    });
+    demoWorkingPapers = [...demoWorkingPapers, ...deployed];
+    return {
+      created,
+      skipped: demoWorkingPaperLibrary.length - created,
+      items: structuredClone(deployed),
+    };
+  }
+  if (method === "PUT" && /\/working-paper-library\/[^/]+$/.test(path)) {
+    const body = JSON.parse(String(init?.body || "{}"));
+    const code = decodeURIComponent(path.split("/").at(-1) || "");
+    demoWorkingPaperLibrary = demoWorkingPaperLibrary.map((item) =>
+      item.templateCode === code
+        ? {
+            ...item,
+            title: body.title || item.title,
+            objective: body.objective || item.objective,
+            required: typeof body.required === "boolean" ? body.required : item.required,
+            disposition: body.disposition || item.disposition,
+            sourceScope: body.scope || item.sourceScope,
+            overrideReason: body.reason || null,
+          }
+        : item,
+    );
+    return { item: demoWorkingPaperLibrary.find((item) => item.templateCode === code) };
+  }
+  if (method === "POST" && path.endsWith("/working-paper-library")) {
+    const body = JSON.parse(String(init?.body || "{}"));
+    const item: WorkingPaperLibraryItem = {
+      templateCode: `CUSTOM:${Date.now()}`,
+      templateVersion: null,
+      customTemplateId: `demo-custom-${Date.now()}`,
+      categoryCode: body.categoryCode,
+      sequenceNo: demoWorkingPaperLibrary.length * 10 + 10,
+      code: body.code,
+      title: body.title,
+      objective: body.objective,
+      guidance: body.guidance || "",
+      defaultContent: { procedures: [], findings: "", conclusion: "" },
+      required: body.required === true,
+      disposition: "INCLUDE",
+      sourceScope: body.scope,
+      overrideReason: null,
+      deployedWorkingPaperId: null,
+      deployedApplicability: null,
+    };
+    demoWorkingPaperLibrary = [...demoWorkingPaperLibrary, item];
+    return { item };
+  }
+  if (method === "PATCH" && path.endsWith("/applicability")) {
+    const body = JSON.parse(String(init?.body || "{}"));
+    const paperId = path.split("/").at(-2);
+    demoWorkingPapers = demoWorkingPapers.map((paper) =>
+      paper.id === paperId
+        ? {
+            ...paper,
+            applicability: body.applicability,
+            not_applicable_reason: body.reason || null,
+          }
+        : paper,
+    );
+    return { item: demoWorkingPapers.find((paper) => paper.id === paperId) };
+  }
+  if (
+    method === "POST" &&
+    /\/working-papers\/[^/]+\/versions$/.test(path)
+  ) {
+    const body = JSON.parse(String(init?.body || "{}"));
+    demoNarrativeVersion += 1;
+    const paperId = path.split("/working-papers/")[1].split("/")[0];
+    demoWorkingPapers = demoWorkingPapers.map((paper) =>
+      paper.id === paperId
+        ? {
+            ...paper,
+            content: body.content || {},
+            current_version: paper.current_version + 1,
+            content_hash: `sha256:demo-narrative-${demoNarrativeVersion}`,
+            updated_at: now,
+          }
+        : paper,
+    );
+    return {
+      item: {
+        id: `demo-working-paper-version-${demoNarrativeVersion}`,
+        version: demoNarrativeVersion,
+        content: body.content || {},
+        content_hash: `sha256:demo-narrative-${demoNarrativeVersion}`,
+        created_by: "Demo Preparer",
+        created_at: now,
+      },
+    };
+  }
+  if (
+    method === "POST" &&
+    /\/working-papers\/[^/]+\/transitions$/.test(path)
+  ) {
+    const body = JSON.parse(String(init?.body || "{}"));
+    const paperId = path.split("/working-papers/")[1].split("/")[0];
+    demoWorkingPapers = demoWorkingPapers.map((paper) =>
+      paper.id === paperId ? { ...paper, status: body.status } : paper,
+    );
+    return { item: demoWorkingPapers.find((paper) => paper.id === paperId) };
+  }
+  if (method === "POST" && path.endsWith("/disclosures")) {
+    const body = JSON.parse(String(init?.body || "{}"));
+    return {
+      item: {
+        id: `demo-disclosure-${Date.now()}`,
+        disclosure_code: body.disclosureCode,
+        applicability: body.applicability || "REQUIRED",
+        status: "OPEN",
+        current_version: 1,
+        answer: body.answer || {},
+        updated_at: now,
+      },
+    };
+  }
+  if (
+    method === "POST" &&
+    /\/disclosures\/[^/]+\/versions$/.test(path)
+  ) {
+    const body = JSON.parse(String(init?.body || "{}"));
+    demoNarrativeVersion += 1;
+    return {
+      item: {
+        id: `demo-disclosure-version-${demoNarrativeVersion}`,
+        version: demoNarrativeVersion,
+        answer: body.answer || {},
+        content_hash: `sha256:demo-disclosure-${demoNarrativeVersion}`,
+        created_by: "Demo Preparer",
+        created_at: now,
+      },
+    };
+  }
+  if (path.endsWith("/signoffs")) {
+    const body = JSON.parse(String(init?.body || "{}"));
+    const version =
+      demoAccountsVersions.find((item) => item.id === body.objectId) ||
+      demoAccountsVersions[0];
+    const item = {
+      id: `sig-demo-${Date.now()}`,
+      signoff_type: body.signoffType || "PREPARED",
+      signed_by: "Demo Partner",
+      signed_at: now,
+      object_version: version.version,
+    };
+    version.signoffs = [
+      ...(version.signoffs || []).filter(
+        (entry) => entry.signoff_type !== item.signoff_type,
+      ),
+      item,
+    ];
+    return { item };
+  }
+  if (path.endsWith("/accounts-versions/generate")) {
+    const version: AccountsVersion = {
+      ...accountsVersion,
+      id: `demo-accounts-v${demoAccountsVersions.length + 2}`,
+      version:
+        Math.max(...demoAccountsVersions.map((item) => item.version)) + 1,
+      status: "DRAFT",
+      frozen_at: null,
+      generated_at: now,
+      signoffs: [],
+      content_hash: `sha256:demo-${Date.now()}`,
+    };
+    demoAccountsVersions = [version, ...demoAccountsVersions];
+    return { item: version };
+  }
+  if (path.includes("/accounts-versions/") && path.endsWith("/transitions")) {
+    const body = JSON.parse(String(init?.body || "{}"));
+    const versionId = path.split("/accounts-versions/")[1].split("/")[0];
+    const version =
+      demoAccountsVersions.find((item) => item.id === versionId) ||
+      demoAccountsVersions[0];
+    version.status = body.status || version.status;
+    if (["APPROVED", "FINAL"].includes(version.status)) version.frozen_at = now;
+    return { item: structuredClone(version) };
+  }
+  if (path.endsWith("/filing-attempts"))
+    return { item: (reads.at(-1)?.[1] as { items: unknown[] }).items[0] };
+  return {
+    item: { id: "demo-created", status: "IN_PROGRESS", created_at: now },
+  };
+}
+
+export async function demoBlob(path: string): Promise<Blob> {
+  if (path.includes("evidence-bundle.zip")) {
+    return new Blob(["Ledgerly DEV showcase evidence bundle"], {
+      type: "application/zip",
+    });
+  }
+  if (path.includes(".pdf") || path.includes("/artefacts/pdf")) {
+    const response = await fetch("/northstar-charity-accounts.pdf");
+    if (!response.ok) throw new Error("The showcase PDF could not be loaded.");
+    return response.blob();
+  }
+  if (path.includes(".docx") || path.includes("/artefacts/docx")) {
+    const response = await fetch("/northstar-charity-accounts.docx");
+    if (!response.ok) throw new Error("The showcase Word file could not be loaded.");
+    return response.blob();
+  }
+  return new Blob(
+    [
+      "<!doctype html><title>Northstar demo accounts</title><h1>Northstar Community Foundation</h1><p>Demo HTML accounts artefact.</p>",
+    ],
+    { type: "text/html" },
+  );
+}

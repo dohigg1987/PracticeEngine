@@ -1,0 +1,36 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "uk-accounts-api-production",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-17",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    {
+      "pattern": "<CONTROLLED_API_HOST>",
+      "custom_domain": true
+    }
+  ],
+  "vars": {
+    "WEB_ORIGIN": "<EXACT_HTTPS_WEB_ORIGIN>",
+    "NEON_AUTH_URL": "https://ep-wispy-thunder-zatp3scz.neonauth.c-2.eu-west-2.aws.neon.tech/neondb/auth"
+  },
+  "observability": {
+    "enabled": true,
+    "logs": { "head_sampling_rate": 1 },
+    "traces": { "enabled": true, "head_sampling_rate": 0.05 }
+  },
+  "r2_buckets": [
+    {
+      "binding": "ARTEFACTS",
+      "bucket_name": "uk-accounts-prod-artefacts"
+    }
+  ],
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "a07d1364c5c74e558ef127d515cdce92"
+    }
+  ]
+}
