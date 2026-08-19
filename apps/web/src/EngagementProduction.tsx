@@ -1665,18 +1665,18 @@ function DisclosureRow({
               ? "Disclosure text (synced to accounts)"
               : "Assessment or disclosure text"
           }
+          validationState={placeholders.length > 0 ? "warning" : "none"}
+          validationMessage={
+            placeholders.length > 0
+              ? `${placeholders.length} item${placeholders.length === 1 ? "" : "s"} to complete: ${placeholders.join(" · ")}`
+              : undefined
+          }
         >
           <Textarea
             rows={2}
             value={answer}
             onChange={(e) => setAnswer(e.target.value)}
           />
-          {placeholders.length > 0 && (
-            <div className="disclosure-placeholders" role="status">
-              <b>{placeholders.length} item{placeholders.length === 1 ? "" : "s"} to complete</b>
-              <span>{placeholders.join(" · ")}</span>
-            </div>
-          )}
         </Field>
         <Field
           className="wide"
