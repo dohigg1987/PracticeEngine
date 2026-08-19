@@ -6,7 +6,7 @@ describe("statusBadgeProps", () => {
     ["ACTIVE", { appearance: "tint", color: "success" }],
     ["FAILED", { appearance: "tint", color: "danger" }],
     ["Restricted", { appearance: "tint", color: "warning" }],
-    ["Not configured", { appearance: "outline", color: "subtle" }],
+    ["Not configured", { appearance: "tint", color: "informative" }],
     ["PREPARATION", { appearance: "outline", color: "subtle" }],
   ] as const)("maps %s to its approved semantic treatment", (status, expected) => {
     expect(statusBadgeProps(status)).toEqual(expected);

@@ -45,7 +45,7 @@ const statusTones = {
   DISABLED: "neutral",
   DRAFT: "neutral",
   IN_PROGRESS: "neutral",
-  NOT_CONFIGURED: "neutral",
+  NOT_CONFIGURED: "informative",
   OPEN: "neutral",
   PENDING: "neutral",
   PREPARATION: "neutral",

@@ -80,6 +80,29 @@ for (const viewport of viewportCases) {
   });
 }
 
+for (const viewport of [
+  { name: "desktop", width: 1440, height: 900 },
+  { name: "mobile", width: 390, height: 844 },
+]) {
+  test(`clients create form remains coherent at ${viewport.name} width`, async ({ page }, testInfo) => {
+    await page.setViewportSize(viewport);
+    await waitForShowcase(page);
+    await openSurface(page, { ...viewportCases[1], width: viewport.width, height: viewport.height });
+
+    await page.getByRole("button", { name: "New client" }).click();
+    const form = page.locator(".client-form");
+    await expect(form.getByRole("heading", { name: "Add legal entity" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Close" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Add first client" })).toHaveCount(0);
+    await expect(form.getByLabel("Jurisdiction")).toBeVisible();
+    await assertNoRootOverflow(page);
+    await testInfo.attach(`clients-create-${viewport.name}`, {
+      body: await page.screenshot({ fullPage: true }),
+      contentType: "image/png",
+    });
+  });
+}
+
 for (const width of [1440, 1920]) {
   test(`desktop accounts panes remain distinct at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: width === 1440 ? 900 : 1080 });

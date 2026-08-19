@@ -66,7 +66,7 @@
   margin-top: 10px;
   padding: 12px;
   border: 1px solid var(--border);
-  background: #fafafa;
+  background: var(--colorNeutralBackground2);
 }
 .production-empty {
   text-align: center;
@@ -88,7 +88,7 @@
   padding: 14px 16px;
   margin: 0;
   border-bottom: 1px solid var(--border);
-  background: #fafafa;
+  background: var(--colorNeutralBackground2);
 }
 .production-form label,
 .paper-editor label,
@@ -130,7 +130,7 @@
 .production-list button:hover,
 .production-list button.active {
   background: white;
-  box-shadow: inset 3px 0 #0f6cbd;
+  box-shadow: inset 3px 0 var(--colorBrandStroke1);
 }
 .production-list button span {
   display: grid;
@@ -165,7 +165,7 @@
 }
 .paper-editor > header .mono {
   margin: 0;
-  color: #424242;
+  color: var(--colorNeutralForeground2);
   font-size: 12px;
   line-height: 18px;
 }
@@ -224,7 +224,7 @@
 }
 .accounts-version-summary small {
   min-width: 0;
-  color: #616161;
+  color: var(--colorNeutralForeground3);
   font-weight: 400;
   overflow-wrap: anywhere;
 }
@@ -252,10 +252,10 @@
   padding: 7px 9px;
   border-left: 3px solid var(--colorPaletteMarigoldBorderActive, #bc4b09);
   background: var(--colorPaletteMarigoldBackground1, #fff4ce);
-  color: var(--colorNeutralForeground1, #242424);
+  color: var(--colorNeutralForeground1);
   font-size: 12px;
 }
-.disclosure-placeholders span { color: var(--colorNeutralForeground2, #424242); }
+.disclosure-placeholders span { color: var(--colorNeutralForeground2); }
 .disclosure-fields {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -299,7 +299,7 @@
   padding: 10px;
   border: 1px solid var(--border);
   border-radius: 2px;
-  background: #fafafa;
+  background: var(--colorNeutralBackground2);
   color: var(--ink);
   font-size: 12px;
 }
@@ -312,7 +312,7 @@
 .comparative-readiness {
   margin-top: 16px;
   border: 1px solid var(--border);
-  background: #fff;
+  background: var(--colorNeutralBackground1);
 }
 .comparative-readiness > header {
   display: flex;
@@ -397,7 +397,7 @@
   padding: 14px;
   border: 1px solid #d6d6d6;
   border-radius: var(--borderRadiusSmall);
-  background: #fff;
+  background: var(--colorNeutralBackground1);
 }
 .review-heading {
   display: flex;
@@ -410,7 +410,7 @@
   font-size: 16px;
 }
 .review-heading strong {
-  color: #424242;
+  color: var(--colorNeutralForeground2);
   white-space: nowrap;
 }
 .review-progress {
@@ -418,13 +418,13 @@
   margin: 10px 0 8px;
   overflow: hidden;
   border-radius: 0;
-  background: #e0e0e0;
+  background: var(--colorNeutralStroke2);
 }
 .review-progress span {
   display: block;
   height: 100%;
   border-radius: 0;
-  background: #0f6cbd;
+  background: var(--colorBrandBackground);
 }
 .release-checks {
   display: block;
@@ -454,7 +454,7 @@
 }
 .release-checks li.complete > span {
   background: transparent;
-  color: #0f6cbd;
+  color: var(--colorBrandForeground1);
 }
 .release-checks li.outstanding > span {
   background: transparent;
@@ -489,7 +489,7 @@
   margin-top: 12px;
   padding: 10px 12px;
   border-left: 3px solid #6a8f87;
-  background: #fafafa;
+  background: var(--colorNeutralBackground2);
 }
 .version-comparison span {
   color: var(--muted);
@@ -502,7 +502,7 @@
   margin: 0 0 12px;
   border-block: 1px solid #b8d6f2;
   border-radius: 0;
-  background: #fafafa;
+  background: var(--colorNeutralBackground2);
   color: var(--ink);
 }
 .evidence-note b {
@@ -515,7 +515,7 @@
   padding: 14px;
   border: 1px solid #d6d6d6;
   border-radius: var(--borderRadiusSmall);
-  background: #fff;
+  background: var(--colorNeutralBackground1);
 }
 .evidence-bundle > header,
 .evidence-bundle > footer {
@@ -534,27 +534,27 @@
 .evidence-bundle p,
 .evidence-bundle footer > span {
   margin-top: 3px;
-  color: #616161;
+  color: var(--colorNeutralForeground3);
   font-size: 12px;
 }
 .evidence-bundle-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  border-block: 1px solid #e0e0e0;
+  border-block: 1px solid var(--colorNeutralStroke2);
 }
 .evidence-bundle-grid span {
   display: grid;
   gap: 2px;
   padding: 9px 10px;
-  border-right: 1px solid #e0e0e0;
-  color: #616161;
+  border-right: 1px solid var(--colorNeutralStroke2);
+  color: var(--colorNeutralForeground3);
   font-size: 12px;
 }
 .evidence-bundle-grid span:last-child {
   border-right: 0;
 }
 .evidence-bundle-grid b {
-  color: #242424;
+  color: var(--colorNeutralForeground1);
   font-size: 13px;
 }
 
@@ -645,12 +645,12 @@
   padding: 10px 12px;
   border: 1px solid #edc873;
   border-radius: 2px;
-  background: #fafafa;
+  background: var(--colorNeutralBackground2);
   color: #72500b;
 }
 .pack-warning.certified {
   border-color: var(--border);
-  background: #fafafa;
+  background: var(--colorNeutralBackground2);
   color: var(--ink);
 }
 .pack-warning span {
@@ -665,7 +665,7 @@
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: 2px;
-  background: #fafafa;
+  background: var(--colorNeutralBackground2);
   font-size: 12px;
 }
 .artefact-control > div:first-child {
@@ -679,7 +679,7 @@
 }
 .artefact-control.error {
   border-color: #efcbc6;
-  background: #fafafa;
+  background: var(--colorNeutralBackground2);
 }
 .artefact-actions {
   display: flex;
@@ -695,16 +695,16 @@
   margin: 0;
   padding: 16px 20px 18px;
   border-bottom: 1px solid var(--border);
-  background: #fff;
+  background: var(--colorNeutralBackground1);
 }
 .filing-panel {
   border-color: var(--border) !important;
-  background: #fff;
+  background: var(--colorNeutralBackground1);
 }
 .filing-panel > .panel-head {
   border-left: 0;
   border-bottom-color: var(--border);
-  background: #fff;
+  background: var(--colorNeutralBackground1);
 }
 .filing-panel > .filing-message {
   margin: 12px 20px 0;
@@ -732,7 +732,7 @@
   justify-content: space-between;
   gap: 20px;
   padding: 16px 20px 10px;
-  background: #fff;
+  background: var(--colorNeutralBackground1);
 }
 .filing-register > header h3,
 .filing-register > header p {
@@ -861,7 +861,7 @@
 }
 .upload-progress progress {
   width: 100%;
-  accent-color: #0f6cbd;
+  accent-color: var(--colorBrandBackground);
 }
 .sr-only {
   position: absolute !important;
@@ -875,7 +875,7 @@
   border: 0 !important;
 }
 :where(button, a, input, select, textarea, summary):focus-visible {
-  outline: 2px solid #0f6cbd;
+  outline: 2px solid var(--colorBrandStroke1);
   outline-offset: 2px;
 }
 .mono,

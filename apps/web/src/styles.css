@@ -45,7 +45,8 @@ button {
   align-items: center;
   color: white;
   text-decoration: none;
-  font-size: 18px;
+  font-size: var(--fontSizeBase500);
+  line-height: var(--lineHeightBase500);
 }
 .brand span {
   display: grid;
@@ -281,7 +282,8 @@ button {
   margin-bottom: 8px;
 }
 .metrics b {
-  font-size: 18px;
+  font-size: var(--fontSizeBase500);
+  line-height: var(--lineHeightBase500);
 }
 .success {
   color: #16715d;
@@ -305,7 +307,8 @@ button {
 }
 .panel-head h2,
 .modal h2 {
-  font-size: 17px;
+  font-size: var(--fontSizeBase500);
+  line-height: var(--lineHeightBase500);
   margin: 0;
 }
 .panel-head small {
@@ -849,7 +852,8 @@ tfoot td {
     display: none;
   }
   .page-head h1 {
-    font-size: 22px;
+    font-size: var(--fontSizeBase600);
+    line-height: var(--lineHeightBase600);
   }
   .page-head > div > div {
     align-items: flex-start;
@@ -859,7 +863,8 @@ tfoot td {
     padding: 13px;
   }
   .metrics b {
-    font-size: 15px;
+    font-size: var(--fontSizeBase400);
+    line-height: var(--lineHeightBase400);
   }
   .panel-head {
     align-items: flex-start;
