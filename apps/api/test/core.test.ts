@@ -23,6 +23,8 @@ test("rejects incompatible reporting framework, sector and entity combinations",
   assert.equal(reportingRegimeError("FRS_102", "CHARITIES_SORP_2026", "Charitable company"), null);
   assert.equal(reportingRegimeError("FRS_102", "ACADEMIES_2026", "Academy trust"), null);
   assert.equal(reportingRegimeError("FRS_102", "LLP_SORP_2026", "LLP"), null);
+  assert.equal(reportingRegimeError("FRS_102", "CHARITIES_SORP_2026", "Private limited company"), null);
+  assert.equal(reportingRegimeError("FRS_102", "ACADEMIES_2026", "Private limited company"), null);
   assert.match(reportingRegimeError("FRS_105", "LLP_SORP_2026", "LLP")!, /only available with FRS 102/);
   assert.match(reportingRegimeError("FRS_102", "LLP_SORP_2026", "Charitable company")!, /matching sector reporting profile/);
   assert.match(reportingRegimeError("FRS_102", "NONE", "Charitable company")!, /matching sector reporting profile/);

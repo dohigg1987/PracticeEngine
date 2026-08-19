@@ -20,7 +20,18 @@ describe("reporting regime compatibility", () => {
 
   it("filters the setup choices instead of presenting invalid combinations", () => {
     expect(permittedSectorProfiles("FRS_105", "Private limited company").map((item) => item.value)).toEqual(["NONE"]);
+    expect(permittedSectorProfiles("FRS_102", "Private limited company").map((item) => item.value)).toEqual([
+      "NONE",
+      "CHARITIES_SORP_2026",
+      "ACADEMIES_2026",
+    ]);
     expect(permittedSectorProfiles("FRS_102", "Charitable company").map((item) => item.value)).toEqual(["CHARITIES_SORP_2026"]);
     expect(reportingRegimeError("FRS_102", "NONE", "Charitable company")).toMatch(/require the Charities SORP 2026 profile/);
+  });
+
+  it("keeps sector classification separate from a corporate legal form", () => {
+    expect(reportingRegimeError("FRS_102", "CHARITIES_SORP_2026", "Private limited company")).toBeNull();
+    expect(reportingRegimeError("FRS_102", "ACADEMIES_2026", "Private limited company")).toBeNull();
+    expect(reportingRegimeError("FRS_102", "LLP_SORP_2026", "Private limited company")).toMatch(/limited liability partnership/);
   });
 });

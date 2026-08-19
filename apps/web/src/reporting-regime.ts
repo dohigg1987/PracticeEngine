@@ -45,14 +45,6 @@ export function reportingRegimeError(
   }
   const entity = legalForm.trim().toLocaleLowerCase();
   if (
-    sectorProfile === "CHARITIES_SORP_2026" &&
-    entity &&
-    !/(charit|academy)/.test(entity)
-  )
-    return "The Charities SORP profile requires a charity or charitable entity.";
-  if (sectorProfile === "ACADEMIES_2026" && entity && !/academy/.test(entity))
-    return "The Academies profile requires an academy trust entity.";
-  if (
     sectorProfile === "LLP_SORP_2026" &&
     entity &&
     !/(^|\b)llp(\b|$)|limited liability partnership/.test(entity)
@@ -65,6 +57,14 @@ export function permittedSectorProfiles(framework: string, legalForm: string) {
   const requiredProfile = requiredSectorProfile(legalForm);
   if (requiredProfile)
     return SECTOR_PROFILES.filter((profile) => profile.value === requiredProfile);
+  if (framework === "FRS_102") {
+    // Legal structure and sector classification are separate facts. A charity or
+    // academy trust may use a corporate legal form, so an ordinary company form
+    // must not silently suppress those reporting profiles.
+    return SECTOR_PROFILES.filter(
+      (profile) => profile.value !== "LLP_SORP_2026",
+    );
+  }
   return SECTOR_PROFILES.filter(
     (profile) => !reportingRegimeError(framework, profile.value, legalForm),
   );

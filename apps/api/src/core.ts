@@ -43,14 +43,6 @@ export function reportingRegimeError(
   if (framework !== "FRS_102")
     return "The selected sector reporting profile is only available with FRS 102";
   if (
-    sectorProfile === "CHARITIES_SORP_2026" &&
-    entity &&
-    !/(charit|academy)/.test(entity)
-  )
-    return "The Charities SORP profile requires a charity or charitable entity";
-  if (sectorProfile === "ACADEMIES_2026" && entity && !/academy/.test(entity))
-    return "The Academies profile requires an academy trust entity";
-  if (
     sectorProfile === "LLP_SORP_2026" &&
     entity &&
     !/(^|\b)llp(\b|$)|limited liability partnership/.test(entity)
