@@ -5977,20 +5977,18 @@ function HistoryView({
         <ol className="timeline">
           {events.map((event) => (
             <li key={event.event_id}>
-              <i aria-hidden="true" />
-              <div>
-                <header>
-                  <b>{title(event.event_type)}</b>
-                  <time dateTime={event.occurred_at_utc}>
-                    {formatDateTime(event.occurred_at_utc)}
-                  </time>
-                </header>
+              <span className="timeline-marker" aria-hidden="true" />
+              <div className="timeline-content">
+                <b>{title(event.event_type)}</b>
                 <p>
                   {event.reason ||
                     `${title(event.object_type)} activity recorded`}
                 </p>
                 <small>Recorded by {actorDisplayLabel(event.actor_id)}</small>
               </div>
+              <time dateTime={event.occurred_at_utc}>
+                {formatDateTime(event.occurred_at_utc)}
+              </time>
             </li>
           ))}
         </ol>
