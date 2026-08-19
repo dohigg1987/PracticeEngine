@@ -98,6 +98,14 @@ test("library selection excludes drafts and deterministically prefers effective 
   assert.match(source, /governance_status='BASELINE' and provenance_label='REPOSITORY_BASELINE_NOT_CERTIFIED'/);
   assert.match(source, /case governance_status when 'APPROVED' then 0 else 1 end/);
   assert.doesNotMatch(source, /governance_status\s+in\s*\([^)]*DRAFT/i);
+  assert.match(
+    source,
+    /insert into working_paper_version\(id,tenant_id,working_paper_id,version,content,content_hash,created_by\)[\s\S]+?tx\.json\(template\.defaultContent\)/,
+  );
+  assert.doesNotMatch(
+    source,
+    /canonicalJson\(template\.defaultContent\)\}::jsonb/,
+  );
 });
 
 test("report-line catalogue and writes use the engagement pack-derived taxonomy", async () => {
