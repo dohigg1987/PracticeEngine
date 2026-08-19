@@ -903,28 +903,40 @@ function WorkingPaperEditor({
         engagementId={engagementId}
         paper={paper}
       />
-      <details className="version-history" open>
-        <summary>Immutable version history ({versions.length})</summary>
-        {versionsError ? (
-          <ErrorPanel message={versionsError} retry={retryVersions} />
-        ) : !versions.length ? (
-          <p>No saved versions were returned.</p>
-        ) : (
-          <ol>
-            {[...versions]
-              .sort((a, b) => b.version - a.version)
-              .map((version) => (
-                <li key={version.id}>
-                  <div>
-                    <b>Version {version.version}</b>
-                    <small>{when(version.created_at)}</small>
-                  </div>
-                  <span>Integrity recorded</span>
-                </li>
-              ))}
-          </ol>
-        )}
-      </details>
+      <Accordion
+        collapsible
+        defaultOpenItems={["version-history"]}
+        className="version-history"
+      >
+        <AccordionItem value="version-history">
+          <AccordionHeader
+            button={{ className: "version-history-trigger" }}
+          >
+            Immutable version history ({versions.length})
+          </AccordionHeader>
+          <AccordionPanel>
+            {versionsError ? (
+              <ErrorPanel message={versionsError} retry={retryVersions} />
+            ) : !versions.length ? (
+              <p>No saved versions were returned.</p>
+            ) : (
+              <ol>
+                {[...versions]
+                  .sort((a, b) => b.version - a.version)
+                  .map((version) => (
+                    <li key={version.id}>
+                      <div>
+                        <b>Version {version.version}</b>
+                        <small>{when(version.created_at)}</small>
+                      </div>
+                      <span>Integrity recorded</span>
+                    </li>
+                  ))}
+              </ol>
+            )}
+          </AccordionPanel>
+        </AccordionItem>
+      </Accordion>
     </div>
   );
 }
