@@ -51,6 +51,17 @@ Record the build commit, tenant, engagement, tester roles, browser, start/end ti
 
 Do not deploy until the owner has chosen the Cloudflare account, Pages project name, production hostname and API hostname. `VITE_API_URL` and `VITE_NEON_AUTH_URL` are public browser configuration, not secrets, but they must point to the production services before Vite builds the immutable assets.
 
+### Pages production-branch correction
+
+Read-only Cloudflare discovery on 19 August 2026 found that production
+deployments for `ledgerly-accounts` were labelled with branch
+`codex/accounts-vertical-slice`, while the repository release branch is
+`main`. Before the next production upload, change the Pages project's
+production branch to `main` under **Settings > Builds & deployments > Branch
+control**. The guarded release always supplies `--branch main` and the exact
+Git SHA; if the remote project still treats another branch as production, the
+upload will be only a preview and must not be promoted as a release.
+
 Build from the repository root in a clean checkout:
 
 ```powershell
@@ -68,12 +79,20 @@ npm run build:production -w apps/web
 
 Replace every `.example` value above with the selected real HTTPS production origin before running it. `build:production` fails before Vite runs if any origin is absent, non-HTTPS, local, credentialed, wildcarded or recognisably placeholder-based. It reduces API and Neon Auth URLs to exact origins and generates `apps/web/public/_headers`; that generated environment-specific file is ignored by Git and copied into `dist` by Vite. Run `npm run test:headers -w apps/web` to verify rejection rules and the generated policy contract.
 
-Deploy output is `apps/web/dist`. For a Cloudflare Pages Direct Upload project, authenticate to the selected account, create the project once, then deploy the directory:
+Deploy output is `apps/web/dist`. For a Cloudflare Pages Direct Upload project,
+authenticate to the selected account and create the project once. Subsequent
+production builds and uploads must use the guarded root command so a dirty tree
+cannot be published and Cloudflare records the exact Git SHA:
 
 ```powershell
 npx wrangler login
 npx wrangler pages project create
-npx wrangler pages deploy apps/web/dist --project-name=<chosen-pages-project>
+$env:WEB_ORIGIN="https://accounts.example"
+$env:VITE_API_URL="https://api.accounts.example"
+$env:VITE_NEON_AUTH_URL="https://your-neon-auth-host/neondb/auth"
+$env:VITE_DEMO_MODE="false"
+npm run release:check:web
+npm run release:web
 ```
 
 Use `--branch=<preview-name>` for a preview deployment. A Direct Upload project cannot later be converted to Git integration; choose Git integration at project creation if automatic repository builds are required. Equivalent static hosts must serve `index.html` for unknown application routes, retain URL fragments, use HTTPS and never rewrite `/v1/*` to the SPA when the API shares the hostname.
