@@ -2351,7 +2351,7 @@ type WorkingPaperLibraryItem = {
   title: string;
   objective: string;
   guidance: string;
-  defaultContent: Record<string, unknown>;
+  defaultContent: Record<string, postgres.JSONValue>;
   required: boolean;
   disposition: "INCLUDE" | "EXCLUDE";
   sourceScope: "STANDARD" | "PRACTICE" | "CLIENT";
@@ -2447,7 +2447,7 @@ async function effectiveWorkingPaperLibrary(
       objective: String(applied?.objective_override ?? template.objective),
       guidance: String(applied?.guidance_override ?? template.guidance),
       defaultContent: (applied?.default_content_override ??
-        template.default_content) as Record<string, unknown>,
+        template.default_content) as Record<string, postgres.JSONValue>,
       required: Boolean(applied?.required_override ?? template.required_by_default),
       disposition: String(
         applied?.disposition ??
@@ -2479,7 +2479,7 @@ async function effectiveWorkingPaperLibrary(
       title: String(custom.title),
       objective: String(custom.objective),
       guidance: String(custom.guidance),
-      defaultContent: custom.default_content as Record<string, unknown>,
+      defaultContent: custom.default_content as Record<string, postgres.JSONValue>,
       required: Boolean(custom.required_by_default),
       disposition: "INCLUDE",
       sourceScope: custom.organisation_id ? "CLIENT" : "PRACTICE",
@@ -2650,7 +2650,7 @@ async function deployWorkingPaperLibrary(
         await tx`insert into working_paper(id,tenant_id,engagement_id,code,title,status,current_version,template_code,template_version,template_scope,category_code,objective)
           values(${id},${ctx.tenantId},${engagementId},${template.code},${template.title},'NOT_STARTED',1,${template.customTemplateId ? null : template.templateCode},${template.templateVersion},${template.sourceScope},${template.categoryCode},${template.objective})`;
         await tx`insert into working_paper_version(id,tenant_id,working_paper_id,version,content,content_hash,created_by)
-          values(${crypto.randomUUID()},${ctx.tenantId},${id},1,${canonicalJson(template.defaultContent)}::jsonb,${contentHash},${ctx.actorId})`;
+          values(${crypto.randomUUID()},${ctx.tenantId},${id},1,${tx.json(template.defaultContent)},${contentHash},${ctx.actorId})`;
         if (!template.customTemplateId)
           await tx`insert into working_paper_theme_link(id,tenant_id,engagement_id,working_paper_id,theme_code,is_primary,created_by)
             select gen_random_uuid(),${ctx.tenantId},${engagementId},${id},theme_code,is_primary,${ctx.actorId}
