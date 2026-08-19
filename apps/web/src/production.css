@@ -140,58 +140,58 @@
   border-right: 1px solid var(--colorNeutralStroke1);
   background: var(--colorNeutralBackground2);
 }
-.working-paper-group + .working-paper-group {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--colorNeutralStroke2);
+.working-paper-navigation {
+  display: grid;
+  gap: 4px;
 }
-.working-paper-group > header {
-  padding: 2px 8px 6px;
+.production-list .working-paper-group-trigger {
+  min-height: 32px;
+  padding: 4px 6px;
+  font-weight: var(--fontWeightSemibold);
 }
-.working-paper-group > header h3 {
+.working-paper-group-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+.production-list .working-paper-group-panel {
   margin: 0;
-  color: var(--colorNeutralForeground1);
-  font-size: var(--fontSizeBase300);
-  line-height: var(--lineHeightBase300);
 }
-.working-paper-group > header span {
-  display: block;
-  margin-top: 1px;
-  color: var(--colorNeutralForeground3);
-  font-size: var(--fontSizeBase200);
-  line-height: var(--lineHeightBase200);
+.working-paper-group-items {
+  display: grid;
+  gap: 2px;
+  padding-bottom: 4px;
 }
-.production-list button {
+.production-list .working-paper-item {
   display: grid;
   grid-template-columns: 1fr auto;
   width: 100%;
   padding: 9px 10px;
-  border: 0;
-  border-radius: var(--borderRadiusSmall);
-  background: transparent;
   text-align: left;
-  color: inherit;
 }
-.production-list button:hover,
-.production-list button.active {
-  background: var(--colorSubtleBackgroundHover);
+.production-list .working-paper-item.active {
+  background: var(--colorSubtleBackgroundSelected);
   color: var(--colorBrandForeground1);
 }
-.production-list button span {
+.working-paper-item-copy {
   display: grid;
   gap: 3px;
+  min-width: 0;
 }
-.production-list button span b {
+.working-paper-item-copy b {
   color: var(--colorBrandForeground1);
 }
-.production-list button small {
+.production-list .working-paper-item small {
   grid-column: 1/-1;
   margin-top: 7px;
   color: var(--colorNeutralForeground2);
 }
-.production-list .tag {
+.working-paper-status-badge {
   align-self: start;
-  font-style: normal;
+  justify-self: end;
 }
 .working-paper-metadata {
   display: grid;
