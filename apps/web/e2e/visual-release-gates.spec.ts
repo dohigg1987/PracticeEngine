@@ -14,6 +14,7 @@ const viewportCases: ViewportCase[] = [
   { name: "desktop-1920", width: 1920, height: 1080, surface: "clients", heading: "Clients" },
   { name: "tablet-768", width: 768, height: 1024, surface: "data", heading: "Trial balance", group: "Source data" },
   { name: "mobile-390", width: 390, height: 844, surface: "clients", heading: "Clients" },
+  { name: "reflow-400-percent", width: 320, height: 720, surface: "clients", heading: "Clients" },
 ];
 
 async function waitForShowcase(page: Page) {
@@ -218,4 +219,20 @@ test("keyboard navigation reaches a section and returns through the engagement b
   await expect(workspaceCrumb).toBeFocused();
   await workspaceCrumb.press("Enter");
   await expect(page.getByRole("heading", { name: "Clients" })).toBeVisible();
+});
+
+test("WCAG text-spacing override preserves content and actions", async ({ page }) => {
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await waitForShowcase(page);
+  await openSurface(page, viewportCases[0]);
+  await page.addStyleTag({
+    content: `
+      * { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; }
+      p { margin-block-end: 2em !important; }
+    `,
+  });
+  await expect(page.getByRole("heading", { name: "Statutory accounts document" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Document outline" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Review inspector" })).toBeVisible();
+  await assertNoRootOverflow(page);
 });

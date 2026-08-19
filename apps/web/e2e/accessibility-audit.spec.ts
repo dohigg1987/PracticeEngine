@@ -12,10 +12,23 @@ type Surface = {
 // editable accounting data, the statutory document, submission and admin.
 const surfaces: Surface[] = [
   { name: "Clients", value: "clients", heading: "Clients" },
+  { name: "Team", value: "team", heading: "Team" },
   { name: "Overview", value: "overview", heading: "Preparation overview" },
+  { name: "Imports and integrations", value: "integrations", heading: "Imports and integrations", group: "Source data" },
+  { name: "Source data", value: "data", heading: "Trial balance", group: "Source data" },
+  { name: "Mapping", value: "mapping", heading: "Account mapping", group: "Source data" },
   { name: "Journals", value: "journals", heading: "Journals", group: "Adjustments" },
+  { name: "Reconciliations", value: "reconciliations", heading: "Reconciliations", group: "Adjustments" },
+  { name: "Working papers", value: "working-papers", heading: "Working papers", group: "Accounts builder" },
+  { name: "Disclosures", value: "disclosures", heading: "Disclosure checklist", group: "Accounts builder" },
   { name: "Draft accounts", value: "accounts", heading: "Statutory accounts document", group: "Accounts builder" },
+  { name: "Tasks", value: "tasks", heading: "Task board", group: "Review & approval" },
+  { name: "Review points", value: "review", heading: "Review points", group: "Review & approval" },
+  { name: "Accounts versions", value: "versions", heading: "Accounts versions", group: "Review & approval" },
+  { name: "History", value: "history", heading: "History", group: "Review & approval" },
   { name: "Filing evidence", value: "filing", heading: "Regulator filing record", group: "Submission" },
+  { name: "Client portal", value: "portal", heading: "Client portal", group: "Submission" },
+  { name: "Inbox", value: "inbox", heading: "Inbox", group: "Administration" },
   { name: "Workspace settings", value: "settings", heading: "Workspace settings", group: "Administration" },
 ];
 
@@ -42,6 +55,7 @@ const knownViolationNodes: Record<string, KnownViolationNode[]> = {
       ],
     },
   ],
+  team: [{ id: "color-contrast", target: [".page-head > div > small"] }],
   overview: [
     { id: "color-contrast", target: [".page-head > div:nth-child(1) > small"] },
     { id: "color-contrast", target: ["div:nth-child(1) > span"] },
@@ -49,15 +63,31 @@ const knownViolationNodes: Record<string, KnownViolationNode[]> = {
     { id: "color-contrast", target: [".metrics > div:nth-child(3) > span"] },
     { id: "color-contrast", target: [".metrics > div:nth-child(4) > span"] },
   ],
+  data: [
+    { id: "color-contrast", target: [".page-head > div:nth-child(1) > small"] },
+    { id: "color-contrast", target: ["div:nth-child(1) > span"] },
+    { id: "color-contrast", target: [".metrics > div:nth-child(2) > span"] },
+    { id: "color-contrast", target: [".metrics > div:nth-child(3) > span"] },
+    { id: "color-contrast", target: [".metrics > div:nth-child(4) > span"] },
+  ],
+  mapping: [{ id: "color-contrast", target: [".page-head > div:nth-child(1) > small"] }],
   journals: [
     { id: "color-contrast", target: [".page-head > div:nth-child(1) > small"] },
   ],
+  reconciliations: [{ id: "color-contrast", target: [".page-head > div:nth-child(1) > small"] }],
+  "working-papers": [{ id: "color-contrast", target: [".page-head > div:nth-child(1) > small"] }],
+  disclosures: [{ id: "color-contrast", target: [".page-head > div:nth-child(1) > small"] }],
   accounts: [
     { id: "color-contrast", target: [".page-head > div:nth-child(1) > small"] },
   ],
+  tasks: [{ id: "color-contrast", target: [".page-head > div:nth-child(1) > small"] }],
+  review: [{ id: "color-contrast", target: [".page-head > div:nth-child(1) > small"] }],
+  versions: [{ id: "color-contrast", target: ["div:nth-child(1) > small"] }],
+  history: [{ id: "color-contrast", target: [".page-head > div:nth-child(1) > small"] }],
   filing: [
     { id: "color-contrast", target: ["div:nth-child(1) > small"] },
   ],
+  portal: [{ id: "color-contrast", target: ["div:nth-child(1) > small"] }],
   settings: [],
 };
 

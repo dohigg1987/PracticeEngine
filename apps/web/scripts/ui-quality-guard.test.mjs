@@ -19,11 +19,11 @@ async function fixture(files) {
 test("detects every prohibited UI source pattern", async (t) => {
   const root = await fixture({
     "bad.tsx": `export const Bad = () => <><button onClick={() => window.confirm("Sure?")}>Go</button><dt>Content hash</dt><code>{item.content_hash}</code></>`,
-    "bad.css": `.thing.fui-Button { font-size: 11px; border-radius: 12px; }`,
+    "bad.css": `.thing.fui-Button { color: #123456; font-size: 11px; border-radius: 12px; }`,
   });
   t.after(() => rm(root, { recursive: true, force: true }));
   const rules = new Set((await auditSource(root)).map(({ rule }) => rule));
-  assert.deepEqual(rules, new Set(["browser-dialog", "off-ramp-radius", "private-fluent-selector", "small-font", "visible-hash"]));
+  assert.deepEqual(rules, new Set(["browser-dialog", "literal-color", "native-interactive", "off-ramp-radius", "private-fluent-selector", "small-font", "visible-hash"]));
 });
 
 test("detects confirm and prompt browser-dialog variants", async (t) => {
@@ -39,11 +39,40 @@ test("detects confirm and prompt browser-dialog variants", async (t) => {
 
 test("accepts public selectors, the type floor, and the Fluent radius ramp", async (t) => {
   const root = await fixture({
-    "good.tsx": `export const Good = () => <button>Continue</button>`,
+    "good.tsx": `import { Button } from "@fluentui/react-components"; export const Good = () => <Button>Continue</Button>`,
     "good.css": `.a { font-size: 12px; border-radius: 2px; } .b { border-radius: 4px; } .c { border-radius: 6px; } .d { border-radius: 8px; } .round { border-radius: 50%; } .token { border-radius: var(--borderRadiusMedium); } .circular { border-radius: 10000px; }`,
   });
   t.after(() => rm(root, { recursive: true, force: true }));
   assert.deepEqual(await auditSource(root), []);
+});
+
+test("detects native interactive elements but permits hidden file plumbing", async (t) => {
+  const root = await fixture({
+    "controls.tsx": `export const Bad = () => <><a href="/">Home</a><button>Save</button><details><summary>More</summary></details><input /><select /><textarea /></>`,
+    "file.tsx": `export const File = () => <input hidden type="file" />`,
+  });
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const findings = (await auditSource(root)).filter(({ rule }) => rule === "native-interactive");
+  assert.deepEqual(findings.map(({ key }) => key), ["a", "button", "details", "input", "select", "summary", "textarea"]);
+});
+
+test("requires semantic color tokens outside controlled statutory and forced-color output", async (t) => {
+  const root = await fixture({
+    "app.css": `.bad { color: #fff; background: rgba(0, 0, 0, .2); } .good { color: var(--colorNeutralForeground1); } .statutory-page { color: #242424; }`,
+    "forced-colors.css": `@media (forced-colors: active) { .selected { color: HighlightText; } }`,
+  });
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const findings = (await auditSource(root)).filter(({ rule }) => rule === "literal-color");
+  assert.deepEqual(findings.map(({ key }) => key), ["#fff", "rgba(0, 0, 0, .2)"]);
+});
+
+test("detects generated and attribute-based Fluent implementation selectors", async (t) => {
+  const root = await fixture({
+    "internals.css": `.fui-Button {} .___abc123 {} [class^="fui-"] {}`,
+  });
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const findings = (await auditSource(root)).filter(({ rule }) => rule === "private-fluent-selector");
+  assert.equal(findings.length, 3);
 });
 
 test("baseline is a debt ceiling and a new occurrence fails", async (t) => {
