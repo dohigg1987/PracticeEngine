@@ -5,3 +5,10 @@ dist/
 .wrangler/
 .DS_Store
 coverage/
+test-results/
+playwright-report/
+blob-report/
+apps/web/public/_headers
+work/
+apps/api/work/
+apps/web/*.png

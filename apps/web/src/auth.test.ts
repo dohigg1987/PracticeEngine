@@ -1,0 +1,34 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({ token: vi.fn(), getSession: vi.fn() }));
+vi.mock("@neondatabase/neon-js/auth", () => ({
+  createAuthClient: vi.fn(() => ({ token: mocks.token, getSession: mocks.getSession })),
+}));
+
+describe("Neon Auth session boundary", () => {
+  beforeEach(() => { vi.resetModules(); vi.stubEnv("VITE_NEON_AUTH_URL", "https://auth.example.test/neondb/auth"); mocks.token.mockReset(); mocks.getSession.mockReset(); });
+
+  it("returns the current JWT instead of caching an earlier token", async () => {
+    mocks.token.mockResolvedValueOnce({ data: { token: "jwt-one" }, error: null }).mockResolvedValueOnce({ data: { token: "jwt-two" }, error: null });
+    const { authTransportUrl, freshAuthToken } = await import("./auth");
+    expect(authTransportUrl).toMatch(/^http:\/\/127\.0\.0\.1(?::\d+)?\/neon-auth$/);
+    await expect(freshAuthToken()).resolves.toBe("jwt-one");
+    await expect(freshAuthToken()).resolves.toBe("jwt-two");
+    expect(mocks.token).toHaveBeenCalledTimes(2);
+  });
+
+  it("diagnoses local network failures without reflecting sensitive exception text", async () => {
+    const { authFailureMessage } = await import("./auth");
+    const message = authFailureMessage(new TypeError("fetch failed for https://secret.example/?token=secret"), true);
+    expect(message).toContain("/neon-auth proxy");
+    expect(message).not.toContain("secret.example");
+    expect(message).not.toContain("token=secret");
+    expect(authFailureMessage(new TypeError("failed"), false)).not.toContain("VITE_NEON_AUTH_URL");
+  });
+
+  it("turns an expired or missing token into an authentication-required error", async () => {
+    mocks.token.mockResolvedValue({ data: null, error: { message: "expired" } });
+    const { AuthRequiredError, freshAuthToken } = await import("./auth");
+    await expect(freshAuthToken()).rejects.toBeInstanceOf(AuthRequiredError);
+  });
+});

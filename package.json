@@ -7,7 +7,9 @@
   "scripts": {
     "build:core": "tsc -p tsconfig.core.json",
     "test:core": "npm run build:core && node --test dist/packages/domain/test/*.test.js",
-    "demo": "npm run build:core && node dist/scripts/demo.js"
+    "demo": "npm run build:core && node dist/scripts/demo.js",
+    "verify:pilot": "node scripts/verify-pilot.mjs",
+    "verify:lockstep": "node scripts/verify-release-lockstep.mjs"
   },
   "engines": {"node": ">=22"}
 }

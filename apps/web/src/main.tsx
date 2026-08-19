@@ -1,4 +1,23 @@
-import React from "react";import{createRoot}from"react-dom/client";import"./styles.css";
-const stages=["Data","Mapping","Adjustments","Reconciliations","Compliance","Accounts","Review","Approval","iXBRL","Filing"];
-function App(){return <main><header><div><small>EXAMPLE CHARITY LTD</small><h1>31 December 2026 accounts</h1></div><span className="status">Preparation</span></header><nav>{stages.map((s,i)=><button className={i===1?"active":""} key={s}>{s}</button>)}</nav><section className="grid"><aside><h2>Mapping exceptions</h2><p className="muted">2 accounts require review</p><div className="item"><b>7305</b><span>Consultancy costs</span><em>Unmapped</em></div><div className="item"><b>1165</b><span>Other debtors</span><em>Suggested</em></div></aside><article><div className="toolbar"><h2>Trial balance mapping</h2><button>Import trial balance</button></div><table><thead><tr><th>Code</th><th>Account</th><th>Balance</th><th>Canonical mapping</th><th>Status</th></tr></thead><tbody><tr><td>1000</td><td>Bank</td><td>£125,000</td><td>Cash at bank</td><td>Reviewed</td></tr><tr><td>4000</td><td>Service income</td><td>(£150,000)</td><td>Income from charitable activities</td><td>Reviewed</td></tr><tr><td>7305</td><td>Consultancy costs</td><td>£18,500</td><td><select><option>Select mapping…</option><option>Support costs</option></select></td><td className="warn">Action</td></tr></tbody></table></article></section></main>}
-createRoot(document.getElementById("root")!).render(<App/>);
+import React from "react";
+import { createRoot } from "react-dom/client";
+import { FluentProvider, webLightTheme } from "@fluentui/react-components";
+import { App } from "./App";
+import { ErrorBoundary } from "./ErrorBoundary";
+import "./styles.css";
+import "./auth.css";
+import "./operations.css";
+import "./clients.css";
+import "./production.css";
+import "./team.css";
+import "./commercial.css";
+import "./fluent-cleanup.css";
+
+createRoot(document.getElementById("root")!).render(
+  <React.StrictMode>
+    <FluentProvider theme={webLightTheme}>
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
+    </FluentProvider>
+  </React.StrictMode>,
+);

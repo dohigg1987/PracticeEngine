@@ -1,0 +1,155 @@
+.team-section {
+  margin: 0 0 24px;
+  border: 1px solid var(--border);
+  background: #fff;
+}
+.team-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 72px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.team-section-head h2,
+.team-section-head p { margin: 0; }
+.team-section-head h2 { font-size: 18px; line-height: 24px; }
+.team-section-head p {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 20px;
+}
+.invitation-list {
+  display: grid;
+}
+.invitation-list article {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.invitation-list article:last-child {
+  border-bottom: 0;
+}
+.invitation-list small {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.invite-form {
+  display: grid;
+  grid-template-columns: minmax(190px, 1fr) minmax(150px, 0.6fr) auto;
+  align-items: end;
+  gap: 16px;
+  padding: 16px 16px 6px;
+}
+.invite-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+.invite-form input,
+.invite-form select {
+  width: 100%;
+  height: 38px;
+  min-width: 0;
+}
+.invite-form label small {
+  font-weight: 400;
+}
+.delivery-note {
+  margin: 4px 16px 16px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 18px;
+}
+.one-time-link {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.7fr) minmax(260px, 1.4fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 22px 20px;
+  padding: 15px;
+  border: 1px solid #a5d4c8;
+  border-radius: 9px;
+  background: #eef9f5;
+}
+.one-time-link > div:first-child {
+  display: grid;
+  gap: 4px;
+  color: #236458;
+  font-size: 13px;
+}
+.one-time-link input {
+  width: 100%;
+  min-width: 0;
+  height: 38px;
+  font-family: Consolas, "SFMono-Regular", ui-monospace, monospace;
+  font-size: 12px;
+}
+.one-time-link > div:nth-of-type(2) {
+  display: flex;
+  gap: 7px;
+}
+.one-time-link > small {
+  grid-column: 1/-1;
+  color: #236458;
+}
+.invitation-list {
+  border-top: 1px solid var(--border);
+}
+.team-member-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.invitation-list > h3 {
+  margin: 0;
+  padding: 14px 16px 8px;
+  font-size: 14px;
+}
+.invitation-list > p {
+  margin: 0;
+  padding: 0 16px 16px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.invitation-list article {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+.invite-accept > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.invite-accept .form-error {
+  margin: 16px 0 0;
+}
+@media (max-width: 760px) {
+  .invite-form {
+    grid-template-columns: 1fr;
+  }
+  .invite-form button {
+    justify-self: start;
+  }
+  .one-time-link {
+    grid-template-columns: 1fr;
+    margin-inline: 14px;
+  }
+}
+@media (max-width: 520px) {
+  .invitation-list article {
+    grid-template-columns: 1fr auto;
+  }
+  .invitation-list article button {
+    grid-column: 1/-1;
+    justify-self: start;
+  }
+}
