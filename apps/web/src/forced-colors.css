@@ -1,0 +1,121 @@
+@media (forced-colors: active) {
+  :root {
+    color-scheme: light;
+  }
+
+  body,
+  .app-shell,
+  .workspace,
+  .content,
+  .topbar,
+  .sidebar,
+  .panel,
+  .commercial-section,
+  .modal,
+  .document-tree,
+  .accounts-inspector {
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  a,
+  .brand {
+    color: LinkText;
+    text-decoration: underline;
+  }
+
+  :where(
+      a,
+      button,
+      input,
+      select,
+      textarea,
+      [role="button"],
+      [role="link"],
+      [role="menuitem"],
+      [role="tab"],
+      [role="treeitem"]
+    ):focus-visible {
+    outline: 3px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  :where(button, input, select, textarea, [role="button"], [role="tab"]) {
+    border-color: ButtonBorder;
+  }
+
+  :where(button, input, select, textarea):disabled,
+  :where([role="button"], [role="tab"])[aria-disabled="true"] {
+    border-color: GrayText;
+    color: GrayText;
+  }
+
+  :where(
+      [aria-current="page"],
+      [aria-selected="true"],
+      [aria-pressed="true"],
+      .active
+    ) {
+    border: 2px solid Highlight;
+    background: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+
+  :where(
+      [role="alert"],
+      .error-state,
+      .panel-error,
+      .auth-message,
+      .field-error
+    ) {
+    border: 2px solid Mark;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  :where(
+      [role="status"],
+      .stage-status,
+      .summary,
+      .delivery-capability-status,
+      .inspector-summary
+    ) {
+    border: 1px solid CanvasText;
+  }
+
+  .modal-backdrop,
+  .document-tree.mobile-panel-open,
+  .accounts-inspector.mobile-panel-open {
+    background: Canvas;
+  }
+
+  .modal,
+  .document-tree.mobile-panel-open,
+  .accounts-inspector.mobile-panel-open {
+    border: 2px solid CanvasText;
+    box-shadow: none;
+  }
+
+  .page-canvas,
+  .statutory-page {
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  .statutory-page {
+    border: 2px solid CanvasText;
+    box-shadow: none;
+    forced-color-adjust: auto;
+  }
+
+  .statutory-page :where(table, th, td, hr),
+  .page-canvas :where(table, th, td, hr) {
+    border-color: CanvasText;
+  }
+
+  svg {
+    color: currentColor;
+    fill: currentColor;
+  }
+}

@@ -29,6 +29,7 @@ import {
   PermanentFileOfficer,
 } from "./api";
 import { personDisplayName, statutoryLabel } from "./format";
+import { statusBadgeProps } from "./statusBadge";
 
 const officerTypes = ["DIRECTOR", "TRUSTEE", "COMPANY_SECRETARY", "PARTNER", "DESIGNATED_MEMBER", "LLP_MEMBER", "OTHER"] as const;
 const adviserTypes = ["ACCOUNTANT", "AUDITOR", "INDEPENDENT_EXAMINER", "BANKER", "SOLICITOR", "TAX_ADVISER", "INSURER", "INVESTMENT_MANAGER", "OTHER"] as const;
@@ -519,7 +520,7 @@ export default function ClientPermanentFile({
                     {label(engagement.sectorProfile || "NONE")}
                   </TableCell>
                   <TableCell>
-                    <Badge appearance="outline">
+                    <Badge {...statusBadgeProps(engagement.status)}>
                       {label(engagement.status)}
                     </Badge>
                   </TableCell>

@@ -33,6 +33,7 @@ import {
 } from "./api";
 import { ConfirmAction } from "./ConfirmAction";
 import { statutoryLabel } from "./format";
+import { statusBadgeProps } from "./statusBadge";
 
 export type CommercialView = "portal" | "integrations" | "inbox" | "settings";
 type Props = {
@@ -60,17 +61,6 @@ const errorText = (error: unknown) =>
   error instanceof Error
     ? error.message
     : "The request could not be completed.";
-const statusColour = (status: string) =>
-  ["ACTIVE", "CONFIGURED", "SUCCEEDED", "READY", "APPROVED", "READ"].includes(
-    status,
-  )
-    ? "success"
-    : ["FAILED", "ERROR", "REJECTED", "CLOSED"].includes(status)
-      ? "danger"
-      : ["WARNING", "PARTIAL", "REAUTH_REQUIRED"].includes(status)
-        ? "warning"
-        : "informative";
-
 function PageHead({
   title,
   body,
@@ -301,10 +291,7 @@ function PortalWorkspace({
                   </TableCell>
                   <TableCell>{readable(item.accessRole)}</TableCell>
                   <TableCell>
-                    <Badge
-                      appearance="outline"
-                      color={statusColour(item.accessStatus)}
-                    >
+                    <Badge {...statusBadgeProps(item.accessStatus)}>
                       {readable(item.accessStatus)}
                     </Badge>
                   </TableCell>
@@ -493,10 +480,7 @@ function PortalWorkspace({
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge
-                      appearance="outline"
-                      color={statusColour(item.status)}
-                    >
+                    <Badge {...statusBadgeProps(item.status)}>
                       {readable(item.status)}
                     </Badge>
                     <div className="row-actions">
@@ -640,6 +624,18 @@ function ImportCentre({ context, engagements, onOpenSource }: Props) {
     (item) => item.id === engagementId,
   );
   const organisationId = selectedEngagement?.organisation_id || "";
+  const previewReason = !engagementId
+    ? "Select an engagement to preview a CSV file."
+    : !file
+      ? "Choose a CSV file to enable preview."
+      : "";
+  const saveConfigurationReason = !name.trim()
+    ? "Enter a template name to save this configuration."
+    : !organisationId
+      ? "Select an engagement with a client organisation to save this configuration."
+      : !preview
+        ? "Preview a CSV file before saving this configuration."
+        : "";
   return (
     <section className="commercial-page">
       <PageHead
@@ -713,9 +709,16 @@ function ImportCentre({ context, engagements, onOpenSource }: Props) {
             appearance="primary"
             type="submit"
             disabled={!file || !engagementId || busy === "preview"}
+            disabledFocusable={Boolean(previewReason) && busy !== "preview"}
+            aria-describedby={previewReason ? "import-preview-reason" : undefined}
           >
             Preview file
           </Button>
+          {previewReason && (
+            <small id="import-preview-reason" className="action-precondition">
+              {previewReason}
+            </small>
+          )}
         </form>
         {preview && (
           <div className="import-preview" role="status">
@@ -775,9 +778,23 @@ function ImportCentre({ context, engagements, onOpenSource }: Props) {
             appearance="primary"
             type="submit"
             disabled={!name.trim() || !organisationId || !preview || busy === "create"}
+            disabledFocusable={
+              Boolean(saveConfigurationReason) && busy !== "create"
+            }
+            aria-describedby={
+              saveConfigurationReason ? "save-configuration-reason" : undefined
+            }
           >
             Save configuration
           </Button>
+          {saveConfigurationReason && (
+            <small
+              id="save-configuration-reason"
+              className="action-precondition"
+            >
+              {saveConfigurationReason}
+            </small>
+          )}
         </form>
         {!organisationId && (
           <MessageBar className="commercial-message" intent="warning">
@@ -809,20 +826,14 @@ function ImportCentre({ context, engagements, onOpenSource }: Props) {
                     </TableCell>
                     <TableCell>{item.connectorCode}</TableCell>
                     <TableCell>
-                      <Badge
-                        appearance="outline"
-                        color={statusColour(item.status)}
-                      >
+                      <Badge {...statusBadgeProps(item.status)}>
                         {readable(item.status)}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       {latest ? (
                         <>
-                          <Badge
-                            appearance="outline"
-                            color={statusColour(latest.status)}
-                          >
+                          <Badge {...statusBadgeProps(latest.status)}>
                             {readable(latest.status)}
                           </Badge>
                           <small>
@@ -836,6 +847,15 @@ function ImportCentre({ context, engagements, onOpenSource }: Props) {
                     </TableCell>
                     <TableCell>
                       <div className="row-actions">
+                        <Button
+                          size="small"
+                          appearance="secondary"
+                          disabled
+                          disabledFocusable
+                          aria-describedby={`sync-unavailable-${item.id}`}
+                        >
+                          Run sync
+                        </Button>
                         <Button
                           size="small"
                           appearance="subtle"
@@ -853,6 +873,12 @@ function ImportCentre({ context, engagements, onOpenSource }: Props) {
                           {item.status === "DISABLED" ? "Enable" : "Disable"}
                         </Button>
                       </div>
+                      <small
+                        id={`sync-unavailable-${item.id}`}
+                        className="action-precondition"
+                      >
+                        Sync is unavailable until connector execution is enabled.
+                      </small>
                     </TableCell>
                   </TableRow>
                 );
@@ -930,10 +956,7 @@ function Inbox({ context }: Props) {
               <div>
                 <header>
                   <b>{item.title}</b>
-                  <Badge
-                    appearance="outline"
-                    color={statusColour(item.severity)}
-                  >
+                  <Badge {...statusBadgeProps(item.severity)}>
                     {readable(item.severity)}
                   </Badge>
                 </header>
@@ -976,7 +999,10 @@ function Inbox({ context }: Props) {
             <TableRow>
               <TableCell>In-app inbox</TableCell>
               <TableCell>
-                <Badge className="delivery-capability-status" color="success" appearance="outline">
+                <Badge
+                  className="delivery-capability-status"
+                  {...statusBadgeProps("AVAILABLE")}
+                >
                   Available
                 </Badge>
               </TableCell>
@@ -987,7 +1013,12 @@ function Inbox({ context }: Props) {
             <TableRow>
               <TableCell>Email publisher</TableCell>
               <TableCell>
-                <Badge className="delivery-capability-status" appearance="outline">Not configured</Badge>
+                <Badge
+                  className="delivery-capability-status"
+                  {...statusBadgeProps("NOT_CONFIGURED")}
+                >
+                  Not configured
+                </Badge>
               </TableCell>
               <TableCell>
                 Scheduled worker and delivery retry visibility remain internal.
@@ -996,7 +1027,12 @@ function Inbox({ context }: Props) {
             <TableRow>
               <TableCell>Dead-letter queue</TableCell>
               <TableCell>
-                <Badge className="delivery-capability-status" appearance="outline">Restricted</Badge>
+                <Badge
+                  className="delivery-capability-status"
+                  {...statusBadgeProps("RESTRICTED")}
+                >
+                  Restricted
+                </Badge>
               </TableCell>
               <TableCell>No public retry or DLQ action is exposed.</TableCell>
             </TableRow>
@@ -1062,10 +1098,7 @@ function WorkspaceSettings({ context, engagements }: Props) {
         title="Workspace settings"
         body="Workspace identity, controlled exports and lifecycle requests."
       >
-        <Badge
-          appearance="outline"
-          color={statusColour(settings.lifecycleStatus)}
-        >
+        <Badge {...statusBadgeProps(settings.lifecycleStatus)}>
           {readable(settings.lifecycleStatus)}
         </Badge>
       </PageHead>
@@ -1162,10 +1195,7 @@ function WorkspaceSettings({ context, engagements }: Props) {
                   <TableCell>{readable(item.scope)}</TableCell>
                   <TableCell>{when(item.requestedAt)}</TableCell>
                   <TableCell>
-                    <Badge
-                      appearance="outline"
-                      color={statusColour(item.status)}
-                    >
+                    <Badge {...statusBadgeProps(item.status)}>
                       {readable(item.status)}
                     </Badge>
                   </TableCell>

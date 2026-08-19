@@ -45,6 +45,7 @@ import {
   TableRow,
   Textarea,
   Toolbar,
+  Tooltip,
   Tree,
   TreeItem,
   TreeItemLayout,
@@ -90,6 +91,7 @@ import {
   WorkingPaper,
 } from "./api";
 import { statutoryLabel } from "./format";
+import { statusBadgeProps } from "./statusBadge";
 import {
   authClient,
   authConfigured,
@@ -1071,13 +1073,15 @@ function AccountsWorkspace({
   return (
     <div className="app-shell">
       <header className="topbar">
-        <FluentButton
-          className="nav-toggle"
-          appearance="subtle"
-          icon={<NavigationRegular />}
-          aria-label="Open practice navigation"
-          onClick={() => setMobileNavOpen((open) => !open)}
-        />
+        <Tooltip content="Open practice navigation" relationship="description">
+          <FluentButton
+            className="nav-toggle"
+            appearance="subtle"
+            icon={<NavigationRegular />}
+            aria-label="Open practice navigation"
+            onClick={() => setMobileNavOpen((open) => !open)}
+          />
+        </Tooltip>
         <a className="brand" href="/">
           <span>LD</span>
           <b>Ledgerly</b>
@@ -1606,7 +1610,9 @@ function AccountsWorkspace({
                   </Breadcrumb>
                   <div>
                     <h1>{engagement?.legal_name}</h1>
-                    <span>{title(engagement?.status || "preparation")}</span>
+                    <Badge {...statusBadgeProps(engagement?.status || "PREPARATION")}>
+                      {title(engagement?.status || "preparation")}
+                    </Badge>
                   </div>
                   <small>
                     Year ended{" "}
@@ -2712,13 +2718,15 @@ function EngagementSetup({
             <p className="eyebrow">Engagement setup</p>
             <h2 id="engagement-title">Create accounts period</h2>
           </div>
-          <FluentButton
-            appearance="subtle"
-            icon={<DismissRegular />}
-            onClick={onClose}
-            aria-label="Close engagement setup"
-            disabled={busy}
-          />
+          <Tooltip content="Close engagement setup" relationship="description">
+            <FluentButton
+              appearance="subtle"
+              icon={<DismissRegular />}
+              onClick={onClose}
+              aria-label="Close engagement setup"
+              disabled={busy}
+            />
+          </Tooltip>
         </div>
         {!organisations.length ? (
           <Empty

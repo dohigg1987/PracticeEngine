@@ -2247,13 +2247,21 @@ function FilingEvidence({
           appearance="primary"
           type="submit"
           disabled={!accountsVersionId || busy === "prepare"}
+          disabledFocusable={!accountsVersionId && busy !== "prepare"}
+          aria-describedby={
+            !accountsVersionId ? "filing-prepare-reason" : undefined
+          }
         >
           {busy === "prepare" ? "Preparing…" : "Prepare filing payload"}
         </Button>
         </fieldset>
       </form>
       {!eligible.length && (
-        <MessageBar className="filing-message" intent="warning">
+        <MessageBar
+          id="filing-prepare-reason"
+          className="filing-message"
+          intent="warning"
+        >
           <MessageBarBody>
             <b>No eligible accounts version.</b>{" "}
             {unsignedFinal
@@ -2363,17 +2371,18 @@ function FilingEvidence({
                           <ConfirmAction
                             label="Mark failed"
                             title="Mark filing attempt as failed?"
-                            body="This is a terminal filing status and cannot be reversed."
+                            body="This records an unsuccessful external filing attempt. This terminal status cannot be reversed."
                             confirmLabel="Mark failed"
+                            appearance="secondary"
                             disabled={busy === item.id}
                             onConfirm={() => transition(item, "FAILED")}
                           />
                           <ConfirmAction
                             label="Withdraw"
                             title="Withdraw filing attempt?"
-                            body="This is a terminal filing status and cannot be reversed."
+                            body="This records that the external filing attempt was withdrawn. This terminal status cannot be reversed."
                             confirmLabel="Withdraw"
-                            appearance="subtle"
+                            appearance="secondary"
                             disabled={busy === item.id}
                             onConfirm={() => transition(item, "WITHDRAWN")}
                           />
@@ -2518,13 +2527,24 @@ function FilingDecisionForm({
             </Button>
             <span title={file?.name}>{file?.name || "No file selected"}</span>
           </div>
-          <span className="decision-file-hint">
+          <span
+            id={`filing-evidence-reason-${attempt.id}`}
+            className="decision-file-hint"
+          >
             {file
               ? `${(file.size / 1024).toFixed(1)} KB selected`
-              : "Maximum 10 MB · PDF, XML, ZIP, image, email or text"}
+              : "Choose a response evidence file (maximum 10 MB; PDF, XML, ZIP, image, email or text)."}
           </span>
         </Field>
-        <Button appearance="primary" type="submit" disabled={!file || busy}>
+        <Button
+          appearance="primary"
+          type="submit"
+          disabled={!file || busy}
+          disabledFocusable={!file && !busy}
+          aria-describedby={
+            !file ? `filing-evidence-reason-${attempt.id}` : undefined
+          }
+        >
           {busy ? "Recording evidence…" : "Record decision evidence"}
         </Button>
       </fieldset>
