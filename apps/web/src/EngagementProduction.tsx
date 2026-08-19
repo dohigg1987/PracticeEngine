@@ -2070,7 +2070,16 @@ function AccountsVersions({
         body="Generated accounts, provenance, artefacts and sign-offs by version."
       >
         <div className="pack-actions">
-          <Field label="Reporting pack">
+          <Field
+            label="Reporting pack"
+            hint={
+              !selectedPack
+                ? framework === "FRS_101"
+                  ? "FRS 101 does not currently have a repository baseline."
+                  : "No pack matches this framework, sector and reporting period."
+                : undefined
+            }
+          >
             <Select
               id="reporting-pack"
               value={packCode}
@@ -2124,7 +2133,7 @@ function AccountsVersions({
           </Button>
         </div>
       </Head>
-      {selectedPack ? (
+      {selectedPack && (
         <MessageBar
           intent={
             selectedPack.certification_status === "CERTIFIED"
@@ -2140,15 +2149,6 @@ function AccountsVersions({
             {selectedPack.effective_to
               ? ` to ${selectedPack.effective_to}`
               : ""}
-          </MessageBarBody>
-        </MessageBar>
-      ) : (
-        <MessageBar intent="warning" layout="multiline">
-          <MessageBarBody>
-            <MessageBarTitle>No applicable reporting pack</MessageBarTitle>
-            {framework === "FRS_101"
-              ? "FRS 101 does not currently have a repository baseline. Accounts generation is unavailable."
-              : "No pack matches this engagement’s framework, sector and reporting period."}
           </MessageBarBody>
         </MessageBar>
       )}
