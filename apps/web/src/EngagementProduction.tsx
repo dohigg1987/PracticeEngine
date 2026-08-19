@@ -557,6 +557,7 @@ function WorkingPaperLibraryPanel({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
   const [mode, setMode] = useState<"included" | "all">("included");
   const [editing, setEditing] = useState<WorkingPaperLibraryItem | null>(null);
   const [adding, setAdding] = useState(false);
@@ -622,8 +623,16 @@ function WorkingPaperLibraryPanel({
     finally { setBusy(false); }
   }
   async function deploy() {
-    setBusy(true); setError("");
-    try { await api.deployWorkingPaperLibrary(context, engagementId); await Promise.all([load(),onDeployed()]); }
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const result = await api.deployWorkingPaperLibrary(context, engagementId);
+      setNotice(
+        result.created
+          ? `${result.created} accounts-production paper${result.created === 1 ? "" : "s"} deployed${result.replaced ? `; ${result.replaced} earlier version${result.replaced === 1 ? "" : "s"} retained as superseded` : ""}.`
+          : "The applicable accounts-production set is already deployed.",
+      );
+      await Promise.all([load(),onDeployed()]);
+    }
     catch (e) { setError(errorText(e)); }
     finally { setBusy(false); }
   }
@@ -637,17 +646,18 @@ function WorkingPaperLibraryPanel({
     .filter((group) => group.items.length);
   return (
     <section className="panel production-panel working-paper-library">
-      <Head title="Working paper library" body="Standard papers inherited through practice and client-specific settings.">
+      <Head title="Accounts-production working papers" body="A governed set assembled from core, reporting framework, sector, entity-form and client-specific layers.">
         <div className="working-paper-head-actions">
           <Button appearance="secondary" onClick={onBack}>Engagement file</Button>
-          <Button appearance="secondary" onClick={() => { setAdding(true); setEditing(null); }}>Add library paper</Button>
-          <Button appearance="primary" disabled={busy} onClick={deploy}>Deploy included set</Button>
+          <Button appearance="secondary" onClick={() => { setAdding(true); setEditing(null); }}>Add client paper</Button>
+          <Button appearance="primary" disabled={busy} onClick={deploy}>Deploy accounts-production set</Button>
         </div>
       </Head>
       {error && <MessageBar intent="error"><MessageBarBody>{error}</MessageBarBody><MessageBarActions><Button onClick={load}>Retry</Button></MessageBarActions></MessageBar>}
+      {notice && <MessageBar intent="success"><MessageBarBody>{notice}</MessageBarBody></MessageBar>}
       <div className="library-toolbar">
         <TabList selectedValue={mode} onTabSelect={(_, data) => setMode(data.value as "included" | "all")}>
-          <Tab value="included">Included set</Tab><Tab value="all">All standard papers</Tab>
+          <Tab value="included">Applicable set</Tab><Tab value="all">Available additions</Tab>
         </TabList>
         <span>{visible.length} papers</span>
       </div>
@@ -671,12 +681,12 @@ function WorkingPaperLibraryPanel({
         </form>
       )}
       <div className="table-wrap">
-        <Table size="small" aria-label="Working paper library">
+        <Table size="small" aria-label="Accounts-production working-paper library">
           <TableHeader>
             <TableRow>
               <TableHeaderCell>Reference</TableHeaderCell>
               <TableHeaderCell>Working paper</TableHeaderCell>
-              <TableHeaderCell>Theme</TableHeaderCell>
+              <TableHeaderCell>Layer</TableHeaderCell>
               <TableHeaderCell>Source and version</TableHeaderCell>
               <TableHeaderCell>Requirement</TableHeaderCell>
               <TableHeaderCell>Applicability</TableHeaderCell>
@@ -699,11 +709,11 @@ function WorkingPaperLibraryPanel({
                       <b>{item.title}</b>
                       <span className="library-objective">{item.objective}</span>
                     </TableCell>
-                    <TableCell>{pretty(item.categoryCode)}</TableCell>
+                    <TableCell><Badge appearance="outline">{pretty(item.applicabilityLayer)}</Badge></TableCell>
                     <TableCell>
-                      {pretty(item.sourceScope)} · {item.templateVersion ? `v${item.templateVersion}` : "Custom"}
+                      {item.serviceFamily === "CUSTOM" ? `${pretty(item.sourceScope)}-authored` : "Accounts production"} · {item.templateVersion ? `v${item.templateVersion}` : "Custom"}
                     </TableCell>
-                    <TableCell>{item.required ? "Required" : "Optional"}</TableCell>
+                    <TableCell><Badge appearance="outline" color={item.required ? "brand" : "subtle"}>{item.required ? "Required" : "Optional"}</Badge></TableCell>
                     <TableCell>
                       <Badge
                         appearance="outline"

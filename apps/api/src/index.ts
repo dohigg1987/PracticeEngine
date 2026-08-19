@@ -32,6 +32,10 @@ import {
 } from "./working-paper-evidence.js";
 import { workingPaperReadinessBlocks } from "./working-paper-controls.js";
 import {
+  incompatibleRequestedTemplateCodes,
+  workingPaperTemplateMatches,
+} from "./working-paper-library.js";
+import {
   SERVICE_NAME,
   readinessReport,
   requestCorrelationId,
@@ -2362,25 +2366,9 @@ type WorkingPaperLibraryItem = {
   governanceStatus: "APPROVED" | "BASELINE" | "CUSTOM";
   provenanceLabel: string;
   controlledFallback: boolean;
+  serviceFamily: "ACCOUNTS_PRODUCTION" | "CUSTOM";
+  applicabilityLayer: "CORE" | "FRAMEWORK" | "SECTOR" | "ENTITY_FORM" | "CLIENT";
 };
-function stringArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.map(String) : [];
-}
-function profileMatches(
-  row: Record<string, unknown>,
-  legalForm: string,
-  framework: string,
-  sector: string | null,
-): boolean {
-  const legalForms = stringArray(row.legal_forms),
-    frameworks = stringArray(row.framework_codes),
-    sectors = stringArray(row.sector_codes);
-  return (
-    (!legalForms.length || legalForms.includes(legalForm)) &&
-    (!frameworks.length || frameworks.includes(framework)) &&
-    (!sectors.length || (!!sector && sectors.includes(sector)))
-  );
-}
 async function effectiveWorkingPaperLibrary(
   tx: Transaction,
   ctx: RequestContext,
@@ -2401,7 +2389,7 @@ async function effectiveWorkingPaperLibrary(
   const [templates, tenantOverrides, organisationOverrides, customTemplates, deployed] =
     await Promise.all([
       tx`select distinct on(template_code) * from working_paper_template
-        where status='ACTIVE' and (
+        where status='ACTIVE' and service_family='ACCOUNTS_PRODUCTION' and (
           (governance_status='APPROVED' and effective_from<=${periodStart}::date and (effective_to is null or effective_to>=${periodEnd}::date))
           or (governance_status='BASELINE' and provenance_label='REPOSITORY_BASELINE_NOT_CERTIFIED')
         )
@@ -2431,7 +2419,9 @@ async function effectiveWorkingPaperLibrary(
         .map((row) => [`${row.template_code}:${row.template_version}`, row]),
     ),
     deployedByCode = new Map(deployed.map((row) => [String(row.code), row]));
-  const items: WorkingPaperLibraryItem[] = templates.map((template) => {
+  const items: WorkingPaperLibraryItem[] = templates
+    .filter((template) => workingPaperTemplateMatches(template,{legalForm,framework,sector}))
+    .map((template) => {
     const key = `${template.template_code}:${template.version}`,
       practice = tenantByTemplate.get(key),
       client = organisationByTemplate.get(key),
@@ -2450,12 +2440,7 @@ async function effectiveWorkingPaperLibrary(
       defaultContent: (applied?.default_content_override ??
         template.default_content) as Record<string, postgres.JSONValue>,
       required: Boolean(applied?.required_override ?? template.required_by_default),
-      disposition: String(
-        applied?.disposition ??
-          (profileMatches(template, legalForm, framework, sector)
-            ? "INCLUDE"
-            : "EXCLUDE"),
-      ) as "INCLUDE" | "EXCLUDE",
+      disposition: String(applied?.disposition ?? "INCLUDE") as "INCLUDE" | "EXCLUDE",
       sourceScope: client ? "CLIENT" : practice ? "PRACTICE" : "STANDARD",
       overrideReason: applied?.reason ? String(applied.reason) : null,
       deployedWorkingPaperId: deployedPaper ? String(deployedPaper.id) : null,
@@ -2465,10 +2450,12 @@ async function effectiveWorkingPaperLibrary(
       governanceStatus: String(template.governance_status) as "APPROVED" | "BASELINE",
       provenanceLabel: String(template.provenance_label),
       controlledFallback: String(template.governance_status) === "BASELINE",
+      serviceFamily: "ACCOUNTS_PRODUCTION",
+      applicabilityLayer: String(template.applicability_layer) as WorkingPaperLibraryItem["applicabilityLayer"],
     };
   });
   for (const custom of customTemplates) {
-    if (!profileMatches(custom, legalForm, framework, sector)) continue;
+    if (!workingPaperTemplateMatches(custom,{legalForm,framework,sector})) continue;
     const deployedPaper = deployedByCode.get(String(custom.code));
     items.push({
       templateCode: `CUSTOM:${custom.id}`,
@@ -2492,6 +2479,8 @@ async function effectiveWorkingPaperLibrary(
       governanceStatus: "CUSTOM",
       provenanceLabel: "TENANT_AUTHORED",
       controlledFallback: false,
+      serviceFamily: "CUSTOM",
+      applicabilityLayer: "CLIENT",
     });
   }
   return items.sort(
@@ -2561,9 +2550,16 @@ async function putWorkingPaperLibraryOverride(
         if (role !== "OWNER" && role !== "ADMIN")
           throw new ApiError(403, "FORBIDDEN", "Practice library changes require owner or administrator access");
       }
-      const templates = await tx`select template_code from working_paper_template where template_code=${templateCode} and version=${templateVersion}`;
+      const templates = await tx`select template_code,legal_forms,framework_codes,sector_codes from working_paper_template
+        where template_code=${templateCode} and version=${templateVersion} and status='ACTIVE' and service_family='ACCOUNTS_PRODUCTION'`;
       if (!templates.length)
         throw new ApiError(404, "NOT_FOUND", "Working paper template not found");
+      const profiles = await tx`select e.framework,e.sector_profile,o.legal_form
+        from engagement e join organisation o on o.tenant_id=e.tenant_id and o.id=e.organisation_id
+        where e.tenant_id=${ctx.tenantId} and e.id=${engagementId}`;
+      const profile = profiles[0]!;
+      if (!workingPaperTemplateMatches(templates[0]!, { legalForm:String(profile.legal_form), framework:String(profile.framework), sector:profile.sector_profile ? String(profile.sector_profile) : null }))
+        throw new ApiError(409, "WORKING_PAPER_TEMPLATE_INCOMPATIBLE", "This working paper is not compatible with the engagement framework, sector and entity form");
       const rows =
         scope === "PRACTICE"
           ? await tx`insert into tenant_working_paper_override(id,tenant_id,template_code,template_version,disposition,title_override,objective_override,guidance_override,required_override,reason,created_by,updated_by)
@@ -2644,7 +2640,12 @@ async function deployWorkingPaperLibrary(
       const engagement = await engagementAccess(tx,ctx,engagementId,["PARTNER","MANAGER"]);
       await lockEngagement(tx,ctx,engagementId);
       const library = await effectiveWorkingPaperLibrary(tx,ctx,engagementId,engagement.organisationId);
-      let created = 0, skipped = 0, controlledFallbacks = 0;
+      if (requested) {
+        const incompatible = incompatibleRequestedTemplateCodes(requested,library.filter((item) => item.disposition === "INCLUDE").map((item) => item.templateCode));
+        if (incompatible.length)
+          throw new ApiError(409,"WORKING_PAPER_TEMPLATE_INCOMPATIBLE",`Requested working papers are not in the applicable accounts-production set: ${incompatible.join(", ")}`);
+      }
+      let created = 0, skipped = 0, replaced = 0, controlledFallbacks = 0;
       for (const template of library) {
         if (template.disposition !== "INCLUDE" || template.deployedWorkingPaperId || (requested && !requested.has(template.templateCode))) { skipped++; continue; }
         const id = crypto.randomUUID(), contentHash = await canonicalHash(template.defaultContent);
@@ -2656,11 +2657,29 @@ async function deployWorkingPaperLibrary(
           await tx`insert into working_paper_theme_link(id,tenant_id,engagement_id,working_paper_id,theme_code,is_primary,created_by)
             select gen_random_uuid(),${ctx.tenantId},${engagementId},${id},theme_code,is_primary,${ctx.actorId}
             from working_paper_template_theme where template_code=${template.templateCode} and template_version=${template.templateVersion}`;
+        if (!template.customTemplateId) {
+          const superseded = await tx`update working_paper
+            set status='SUPERSEDED',updated_at=now()
+            where tenant_id=${ctx.tenantId} and engagement_id=${engagementId}
+              and template_code=${template.templateCode}
+              and template_version<>${template.templateVersion}
+              and status<>'SUPERSEDED'
+            returning id,template_version`;
+          replaced += superseded.length;
+          for (const previous of superseded)
+            await appendEvents(tx,ctx,engagement,"WORKING_PAPER_TEMPLATE_SUPERSEDED","WORKING_PAPER",String(previous.id),{
+              reason:"CONTROLLED_TEMPLATE_REPLACEMENT",
+              templateCode:template.templateCode,
+              previousVersion:Number(previous.template_version),
+              replacementVersion:template.templateVersion,
+              replacementWorkingPaperId:id,
+            });
+        }
         if (template.controlledFallback) controlledFallbacks++;
         created++;
       }
-      await appendEvents(tx,ctx,engagement,"WORKING_PAPER_LIBRARY_DEPLOYED","ENGAGEMENT",engagementId,{created,skipped,controlledFallbacks,requested:requested ? requested.size : null});
-      return { created, skipped, controlledFallbacks, items: await workingPaperItems(tx,ctx,engagementId) };
+      await appendEvents(tx,ctx,engagement,"WORKING_PAPER_LIBRARY_DEPLOYED","ENGAGEMENT",engagementId,{created,skipped,replaced,controlledFallbacks,requested:requested ? requested.size : null,serviceFamily:"ACCOUNTS_PRODUCTION"});
+      return { created, skipped, replaced, controlledFallbacks, items: await workingPaperItems(tx,ctx,engagementId) };
     });
     return json(result, result.created ? 201 : 200);
   } finally { await sql.end(); }

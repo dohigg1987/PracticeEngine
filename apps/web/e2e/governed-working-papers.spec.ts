@@ -25,7 +25,7 @@ test("governed library is primary and one-off papers retain governance metadata"
 
   await page.getByRole("button", { name: "Set up standard file" }).click();
   await expect(
-    page.getByRole("heading", { name: "Working paper library" }),
+    page.getByRole("heading", { name: "Accounts-production working papers" }),
   ).toBeVisible();
   await expect(page.getByRole("cell", { name: "Engagement and planning" })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "Source and version" })).toBeVisible();

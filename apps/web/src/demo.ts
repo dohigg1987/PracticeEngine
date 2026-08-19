@@ -38,8 +38,8 @@ const companyEngagement = {
   version: 2,
 };
 const demoLibrarySeed: [string, WorkingPaperLibraryItem["categoryCode"], string][] = [
-  ["A01","ACCEPTANCE","Engagement acceptance and continuance"], ["A02","ACCEPTANCE","Ethics and independence"], ["A03","ACCEPTANCE","Engagement letter and scope"],
-  ["B01","PLANNING","Understanding the entity"], ["B02","PLANNING","Risk assessment and response"], ["B03","PLANNING","Materiality and trivial threshold"], ["B04","PLANNING","Accounts production plan"],
+  ["A01","ACCEPTANCE","Engagement setup and responsibilities"], ["A02","ACCEPTANCE","Client information authority and access"], ["A03","ACCEPTANCE","Engagement letter and scope"],
+  ["B01","PLANNING","Entity and reporting profile"], ["B02","PLANNING","Information requirements and dependencies"], ["B03","PLANNING","Significant balances and judgements"], ["B04","PLANNING","Accounts production plan"],
   ["C01","RECORDS","Trial balance control"], ["C02","RECORDS","Opening balances and comparatives"], ["C03","RECORDS","Journal review"], ["C04","RECORDS","Accounting estimates"],
   ["D01","INCOME","Revenue and income"], ["D02","INCOME","Other income"], ["E01","EXPENDITURE","Operating expenditure"], ["E02","EXPENDITURE","Payroll and people costs"], ["E03","EXPENDITURE","Taxation"],
   ["F01","ASSETS","Bank and cash"], ["F02","ASSETS","Trade and other debtors"], ["F03","ASSETS","Tangible and intangible fixed assets"], ["F04","ASSETS","Investments"],
@@ -47,7 +47,7 @@ const demoLibrarySeed: [string, WorkingPaperLibraryItem["categoryCode"], string]
   ["H01","FUNDS","Fund accounting and reconciliation"], ["H02","FUNDS","Restricted funds"], ["H03","FUNDS","Reserves policy"], ["H04","FUNDS","Support cost allocation"], ["H05","INCOME","Donations, legacies and grants"], ["H06","EXPENDITURE","Charitable activities and grants payable"],
   ["H07","REPORTING","Trustees, related parties and benefits"], ["H08","REPORTING","Public benefit and activities report"], ["H09","REPORTING","Fundraising and safeguarding disclosures"],
   ["I01","REPORTING","Accounting policies"], ["I02","REPORTING","Statutory disclosure checklist"], ["I03","REPORTING","Trustees’ or directors’ report"],
-  ["J01","COMPLETION","Going concern"], ["J02","COMPLETION","Subsequent events"], ["J03","COMPLETION","Related parties and laws"], ["J04","COMPLETION","Final analytical review"], ["J05","COMPLETION","Management representations"], ["J06","COMPLETION","Completion and review clearance"],
+  ["J01","COMPLETION","Going concern"], ["J02","COMPLETION","Subsequent events confirmation"], ["J03","COMPLETION","Related parties and statutory compliance disclosures"], ["J04","COMPLETION","Final accounts consistency review"], ["J05","COMPLETION","Client information confirmation and accounts approval"], ["J06","COMPLETION","Completion and review clearance"],
 ];
 let demoWorkingPaperLibrary: WorkingPaperLibraryItem[] = demoLibrarySeed.map(
   ([code, categoryCode, title], index) => ({
@@ -67,6 +67,11 @@ let demoWorkingPaperLibrary: WorkingPaperLibraryItem[] = demoLibrarySeed.map(
     overrideReason: null,
     deployedWorkingPaperId: ["F01","H02"].includes(code) ? `wp-${code}` : null,
     deployedApplicability: ["F01","H02"].includes(code) ? "APPLICABLE" : null,
+    governanceStatus: "APPROVED",
+    provenanceLabel: "GOVERNED_ACCOUNTS_PRODUCTION",
+    controlledFallback: false,
+    serviceFamily: "ACCOUNTS_PRODUCTION",
+    applicabilityLayer: code.startsWith("H") ? "SECTOR" : "CORE",
   }),
 );
 let demoWorkingPapers: WorkingPaper[] = [
@@ -1736,6 +1741,11 @@ export function demoRequest(path: string, init?: RequestInit): unknown {
       overrideReason: null,
       deployedWorkingPaperId: null,
       deployedApplicability: null,
+      governanceStatus: "CUSTOM",
+      provenanceLabel: "TENANT_AUTHORED",
+      controlledFallback: false,
+      serviceFamily: "CUSTOM",
+      applicabilityLayer: "CLIENT",
     };
     demoWorkingPaperLibrary = [...demoWorkingPaperLibrary, item];
     return { item };
