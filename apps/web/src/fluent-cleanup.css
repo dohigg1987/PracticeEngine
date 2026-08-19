@@ -64,7 +64,7 @@ textarea {
   background: var(--colorNeutralBackground1);
   box-shadow: 0 10px 30px #00000029;
 }
-.global-search-results button {
+.global-search-result {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr) auto;
   align-items: center;
@@ -72,17 +72,10 @@ textarea {
   gap: 9px;
   min-height: 44px;
   padding: 5px 12px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--colorNeutralForeground1);
   text-align: left;
 }
-.global-search-results button:hover,
-.global-search-results button[aria-selected="true"] {
-  background: #f0f0f0;
-}
-.global-search-results button[aria-selected="true"] {
+.global-search-result[aria-selected="true"] {
+  background: var(--colorSubtleBackgroundSelected);
   box-shadow: inset 3px 0 var(--colorBrandStroke1);
 }
 .global-search-group {
@@ -130,7 +123,7 @@ textarea {
     monospace;
   opacity: 0;
 }
-.global-search-results button[aria-selected="true"] .global-search-enter {
+.global-search-result[aria-selected="true"] .global-search-enter {
   opacity: 1;
 }
 .global-search-results p {
@@ -265,6 +258,12 @@ pre,
   margin: 0;
 }
 
+.workspace-nav-panel,
+.production-nav-stage-panel {
+  margin: 0;
+  padding: 0;
+}
+
 .production-nav-stage {
   margin: 3px 0;
 }
@@ -369,7 +368,6 @@ select,
 textarea,
 .panel,
 .metrics > div,
-.modal,
 .setup,
 .error-state,
 .auth-card,
@@ -648,12 +646,14 @@ tbody tr:hover {
 .auth-brand .brand {
   color: var(--colorNeutralForeground1);
 }
-.auth-form input:focus {
-  border-color: var(--colorBrandStroke1);
-  box-shadow: 0 0 0 2px #0f6cbd33;
+.fluent-auth-form {
+  display: grid;
+  gap: var(--spacingVerticalM);
 }
-.auth-switch button,
-.file-card button {
+.fluent-auth-form .auth-submit {
+  width: 100%;
+}
+.auth-switch button {
   color: var(--colorBrandForeground1);
 }
 .auth-message {
@@ -716,8 +716,7 @@ tbody tr:hover {
 .panel-head {
   padding: 14px 16px;
 }
-.panel-head h2,
-.modal h2 {
+.panel-head h2 {
   font-size: 16px;
 }
 .metrics {
