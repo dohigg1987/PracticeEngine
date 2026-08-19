@@ -1684,18 +1684,6 @@ body {
 .production-spine button.attention {
   color: #424242 !important;
 }
-.stage-number {
-  border-color: #bdbdbd;
-  background: #fff !important;
-  color: #424242 !important;
-}
-.ready .stage-number {
-  border-color: #0f6cbd !important;
-  color: #0f6cbd !important;
-}
-.attention .stage-number {
-  border-color: #bdbdbd !important;
-}
 .accounts-builder-shell {
   border-color: #d6d6d6;
 }
@@ -1890,7 +1878,7 @@ body {
   display: grid !important;
   grid-column: 1 !important;
   grid-row: 1 !important;
-  grid-template-columns: 24px minmax(0, 1fr) !important;
+  grid-template-columns: max-content minmax(0, 1fr) !important;
   align-items: center;
   gap: 8px;
   width: 100%;
