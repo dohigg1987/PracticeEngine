@@ -4,6 +4,7 @@ import { LIFECYCLE_TRANSITIONS, safeCommercialConfiguration as checkedCommercial
 
 type Database = Sql<Record<string, never>>;
 type Transaction = TransactionSql<Record<string, never>>;
+type JsonMetadata = { readonly [key: string]: postgres.JSONValue | undefined };
 interface CommercialContext { tenantId: string; actorId: string; correlationId: string }
 const MAX_JSON_BYTES = 64 * 1024;
 const MAX_CLIENT_DOCUMENT_BYTES = 10 * 1024 * 1024;
@@ -121,19 +122,19 @@ async function staffEngagement(tx: Transaction, ctx: CommercialContext, engageme
     throw new ApiError(403, "FORBIDDEN", "Manager access is required");
   return { organisationId: String(rows[0]!.organisation_id), role };
 }
-async function appendStaffEvent(tx: Transaction, ctx: CommercialContext, scope: { organisationId: string | null; engagementId: string | null }, eventType: string, objectType: string, objectId: string, metadata: Record<string, unknown>): Promise<void> {
+async function appendStaffEvent(tx: Transaction, ctx: CommercialContext, scope: { organisationId: string | null; engagementId: string | null }, eventType: string, objectType: string, objectId: string, metadata: JsonMetadata): Promise<void> {
   await tx`select id from tenant where id=${ctx.tenantId} for update`;
   const prior = await tx`select event_hash from audit_event where tenant_id=${ctx.tenantId} order by occurred_at_utc desc,event_id desc limit 1`;
   const occurredAt = new Date().toISOString(), previousHash = prior[0]?.event_hash ? String(prior[0].event_hash) : null, eventId = crypto.randomUUID();
   const eventHash = await hashBytes(new TextEncoder().encode(JSON.stringify({ eventId, occurredAt, tenantId: ctx.tenantId, actorId: ctx.actorId, eventType, objectType, objectId, previousHash, metadata })).buffer as ArrayBuffer);
-  await tx`insert into audit_event(event_id,occurred_at_utc,recorded_at_utc,tenant_id,organisation_id,engagement_id,actor_type,actor_id,event_type,object_type,object_id,previous_hash,correlation_id,metadata,event_hash) values(${eventId},${occurredAt},${occurredAt},${ctx.tenantId},${scope.organisationId},${scope.engagementId},'USER',${ctx.actorId},${eventType},${objectType},${objectId},${previousHash},${ctx.correlationId},${JSON.stringify(metadata)}::jsonb,${eventHash})`;
-  await tx`insert into outbox_event(id,tenant_id,aggregate_type,aggregate_id,event_type,payload,correlation_id,idempotency_key) values(${crypto.randomUUID()},${ctx.tenantId},${objectType},${objectId},${eventType},${JSON.stringify(metadata)}::jsonb,${ctx.correlationId},${`${ctx.correlationId}:${eventType}:${objectId}`})`;
+  await tx`insert into audit_event(event_id,occurred_at_utc,recorded_at_utc,tenant_id,organisation_id,engagement_id,actor_type,actor_id,event_type,object_type,object_id,previous_hash,correlation_id,metadata,event_hash) values(${eventId},${occurredAt},${occurredAt},${ctx.tenantId},${scope.organisationId},${scope.engagementId},'USER',${ctx.actorId},${eventType},${objectType},${objectId},${previousHash},${ctx.correlationId},${tx.json(metadata)},${eventHash})`;
+  await tx`insert into outbox_event(id,tenant_id,aggregate_type,aggregate_id,event_type,payload,correlation_id,idempotency_key) values(${crypto.randomUUID()},${ctx.tenantId},${objectType},${objectId},${eventType},${tx.json(metadata)},${ctx.correlationId},${`${ctx.correlationId}:${eventType}:${objectId}`})`;
 }
-async function appendClientResponseEvent(tx: Transaction, ctx: CommercialContext, engagementId: string, responseId: string, eventType: string, metadata: Record<string, unknown>): Promise<void> {
+async function appendClientResponseEvent(tx: Transaction, ctx: CommercialContext, engagementId: string, responseId: string, eventType: string, metadata: JsonMetadata): Promise<void> {
   const occurredAt = new Date().toISOString(), eventId = crypto.randomUUID();
   const eventHash = await hashBytes(new TextEncoder().encode(JSON.stringify({ eventId, occurredAt, tenantId: ctx.tenantId, actorId: ctx.actorId, eventType, responseId, metadata })).buffer as ArrayBuffer);
-  await tx`insert into audit_event(event_id,occurred_at_utc,recorded_at_utc,tenant_id,engagement_id,actor_type,actor_id,event_type,object_type,object_id,correlation_id,metadata,event_hash) values(${eventId},${occurredAt},${occurredAt},${ctx.tenantId},${engagementId},'CLIENT',${ctx.actorId},${eventType},'CLIENT_DOCUMENT_RESPONSE',${responseId},${ctx.correlationId},${JSON.stringify(metadata)}::jsonb,${eventHash})`;
-  await tx`insert into outbox_event(id,tenant_id,aggregate_type,aggregate_id,event_type,payload,correlation_id,idempotency_key) values(${crypto.randomUUID()},${ctx.tenantId},'CLIENT_DOCUMENT_RESPONSE',${responseId},${eventType},${JSON.stringify(metadata)}::jsonb,${ctx.correlationId},${`${ctx.correlationId}:${eventType}:${responseId}`})`;
+  await tx`insert into audit_event(event_id,occurred_at_utc,recorded_at_utc,tenant_id,engagement_id,actor_type,actor_id,event_type,object_type,object_id,correlation_id,metadata,event_hash) values(${eventId},${occurredAt},${occurredAt},${ctx.tenantId},${engagementId},'CLIENT',${ctx.actorId},${eventType},'CLIENT_DOCUMENT_RESPONSE',${responseId},${ctx.correlationId},${tx.json(metadata)},${eventHash})`;
+  await tx`insert into outbox_event(id,tenant_id,aggregate_type,aggregate_id,event_type,payload,correlation_id,idempotency_key) values(${crypto.randomUUID()},${ctx.tenantId},'CLIENT_DOCUMENT_RESPONSE',${responseId},${eventType},${tx.json(metadata)},${ctx.correlationId},${`${ctx.correlationId}:${eventType}:${responseId}`})`;
 }
 
 function contactItem(row: Record<string, unknown>) {

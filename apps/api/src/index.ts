@@ -89,6 +89,7 @@ interface RequestContext {
 }
 type Database = Sql<Record<string, never>>;
 type Transaction = TransactionSql<Record<string, never>>;
+type JsonMetadata = { readonly [key: string]: postgres.JSONValue | undefined };
 const MAX_CSV_BYTES = 10 * 1024 * 1024;
 const MAX_JSON_BYTES = 64 * 1024;
 const MAX_EVIDENCE_BYTES = 10 * 1024 * 1024;
@@ -408,7 +409,7 @@ async function appendScopedEvents(
   eventType: string,
   objectType: string,
   objectId: string,
-  metadata: Record<string, unknown>,
+  metadata: JsonMetadata,
 ): Promise<void> {
   // Serialise the per-tenant ledger so concurrent writes cannot create two audit heads.
   await tx`select id from tenant where id=${ctx.tenantId} for update`;
@@ -435,10 +436,10 @@ async function appendScopedEvents(
   const eventHash = await sha256(eventBytes);
   await tx`
     insert into audit_event(event_id,occurred_at_utc,recorded_at_utc,tenant_id,organisation_id,engagement_id,actor_type,actor_id,event_type,object_type,object_id,previous_hash,correlation_id,metadata,event_hash)
-    values(${eventId},${occurredAt},${occurredAt},${ctx.tenantId},${scope.organisationId},${scope.engagementId},'USER',${ctx.actorId},${eventType},${objectType},${objectId},${previousHash},${ctx.correlationId},${JSON.stringify(metadata)}::jsonb,${eventHash})`;
+    values(${eventId},${occurredAt},${occurredAt},${ctx.tenantId},${scope.organisationId},${scope.engagementId},'USER',${ctx.actorId},${eventType},${objectType},${objectId},${previousHash},${ctx.correlationId},${tx.json(metadata)},${eventHash})`;
   const idempotencyKey = `${ctx.correlationId}:${eventType}:${objectType}:${objectId}`;
   await tx`insert into outbox_event(id,tenant_id,aggregate_type,aggregate_id,event_type,payload,correlation_id,idempotency_key)
-    values(${crypto.randomUUID()},${ctx.tenantId},${objectType},${objectId},${eventType},${JSON.stringify(metadata)}::jsonb,${ctx.correlationId},${idempotencyKey})`;
+    values(${crypto.randomUUID()},${ctx.tenantId},${objectType},${objectId},${eventType},${tx.json(metadata)},${ctx.correlationId},${idempotencyKey})`;
 }
 async function appendEvents(
   tx: Transaction,
@@ -447,7 +448,7 @@ async function appendEvents(
   eventType: string,
   objectType: string,
   objectId: string,
-  metadata: Record<string, unknown>,
+  metadata: JsonMetadata,
 ): Promise<void> {
   return appendScopedEvents(
     tx,
