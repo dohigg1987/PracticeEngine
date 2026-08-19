@@ -4,6 +4,9 @@ import { fileURLToPath } from "node:url";
 
 const allowedRadius = new Set(["0", "2px", "4px", "6px", "8px", "50%", "10000px"]);
 const sourceExtensions = new Set([".css", ".js", ".jsx", ".mjs", ".ts", ".tsx"]);
+const nativeInteractiveElements = new Set(["a", "button", "details", "input", "select", "summary", "textarea"]);
+const literalColorPattern = /#[0-9a-f]{3,8}\b|\b(?:rgb|rgba|hsl|hsla)\s*\([^)]*\)/gi;
+const statutorySelectorPattern = /\.(?:statutory-page|accounts-cover-page|reference-details-page|assurance-report-page|directors-report-page|accounting-policies-page|notes-page|detailed-income-page|fixed-asset-page|balance-sheet-page)\b/;
 
 async function filesUnder(directory) {
   const files = [];
@@ -40,6 +43,20 @@ function auditFile(relativeFile, source) {
         add(findings, "browser-dialog", relativeFile, source, match.index, match[0].replace(/\s+/g, ""), "Use a shared Fluent dialog instead of a browser confirm or prompt call");
       }
     }
+
+    if (extension === ".tsx") {
+      for (const match of source.matchAll(/<([a-z][\w-]*)\b[^>]*>/g)) {
+        const tag = match[1];
+        if (!nativeInteractiveElements.has(tag)) continue;
+        const openingElement = match[0];
+        const hiddenFileInput = tag === "input" && (
+          /\bhidden(?:\s|=|\/?>)/.test(openingElement) ||
+          /\btype\s*=\s*["']file["']/.test(openingElement)
+        );
+        if (hiddenFileInput) continue;
+        add(findings, "native-interactive", relativeFile, source, match.index, tag, `Use the Fluent ${tag} primitive instead of a native <${tag}> control`);
+      }
+    }
   }
 
   if (extension === ".css") {
@@ -58,8 +75,20 @@ function auditFile(relativeFile, source) {
 
     for (const match of source.matchAll(/([^{}]+)\{/g)) {
       const selector = match[1].trim();
-      for (const token of selector.matchAll(/\.fui-[\w-]+/g))
+      for (const token of selector.matchAll(/\.fui-[\w-]+|\.___[\w-]+|\[class(?:\^|\*|~)?=[^\]]*fui-/g))
         add(findings, "private-fluent-selector", relativeFile, source, match.index + token.index, token[0], `Private Fluent selector ${token[0]} is not a stable styling contract`);
+    }
+
+    if (path.basename(relativeFile) !== "forced-colors.css") {
+      for (const block of source.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        const selector = block[1].trim();
+        if (statutorySelectorPattern.test(selector)) continue;
+        const declarationBlock = block[2];
+        for (const color of declarationBlock.matchAll(literalColorPattern)) {
+          const index = block.index + block[0].indexOf(declarationBlock) + color.index;
+          add(findings, "literal-color", relativeFile, source, index, color[0].toLowerCase(), `Use a Fluent semantic color token instead of ${color[0]}`);
+        }
+      }
     }
   }
 

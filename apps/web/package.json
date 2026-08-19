@@ -5,13 +5,14 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:production": "npm run test:ui-quality && node scripts/security-headers.mjs && vite build",
+    "build:production": "npm run verify:ui && node scripts/security-headers.mjs && vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:ui-quality": "node --test scripts/ui-quality-guard.test.mjs scripts/forced-colors.test.mjs && node scripts/ui-quality-guard.mjs",
     "test:headers": "node --test scripts/security-headers.test.mjs",
-    "test:e2e": "playwright test",
-    "test:e2e:headed": "playwright test --headed"
+    "test:e2e": "playwright test --project=chromium",
+    "test:e2e:headed": "playwright test --headed",
+    "verify:ui": "npm run typecheck && npm test && npm run test:ui-quality && npm run test:headers && vite build && npm run test:e2e"
   },
   "dependencies": {
     "@fluentui/react-components": "^9.74.6",
