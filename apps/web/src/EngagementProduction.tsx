@@ -65,7 +65,6 @@ import { ConfirmAction, ConfirmDialog } from "./ConfirmAction";
 import {
   workingPaperArea,
   workingPaperAreas,
-  workingPaperStatusSummary,
 } from "./workingPaperGovernance";
 
 export type ProductionView =
@@ -226,6 +225,7 @@ function WorkingPapers({ context, engagementId }: EngagementProps) {
   });
   const [actionError, setActionError] = useState("");
   const [libraryOpen, setLibraryOpen] = useState(false);
+  const [openPaperGroups, setOpenPaperGroups] = useState<string[]>([]);
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -282,6 +282,14 @@ function WorkingPapers({ context, engagementId }: EngagementProps) {
   useEffect(() => {
     loadVersions(selected);
   }, [loadVersions, selected]);
+  useEffect(() => {
+    const activePaper = items.find((item) => item.id === selected);
+    if (!activePaper) return;
+    const activeArea = workingPaperArea(activePaper.category_code);
+    setOpenPaperGroups((current) =>
+      current.includes(activeArea) ? current : [...current, activeArea],
+    );
+  }, [items, selected]);
   async function create(event: React.FormEvent) {
     event.preventDefault();
     setBusy("create");
@@ -481,44 +489,102 @@ function WorkingPapers({ context, engagementId }: EngagementProps) {
       ) : (
         <div className="production-split">
           <aside className="production-list" aria-label="Working papers">
-            {paperGroups.map((group) => (
-              <section className="working-paper-group" key={group.area}>
-                <header>
-                  <h3>{group.area}</h3>
-                  <span>{workingPaperStatusSummary(group.items)}</span>
-                </header>
-                {group.items.map((item) => {
-                  const libraryItem = libraryItems.find(
-                    (candidate) =>
-                      candidate.deployedWorkingPaperId === item.id ||
-                      (candidate.templateCode === item.template_code &&
-                        candidate.templateVersion === item.template_version),
-                  );
-                  return (
-                    <Button
-                      appearance={selected === item.id ? "primary" : "subtle"}
-                      key={item.id}
-                      className={selected === item.id ? "active" : ""}
-                      onClick={() => setSelected(item.id)}
+            <Accordion
+              multiple
+              collapsible
+              className="working-paper-navigation"
+              openItems={openPaperGroups}
+              onToggle={(_, data) =>
+                setOpenPaperGroups(data.openItems.map(String))
+              }
+            >
+              {paperGroups.map((group) => {
+                const outstandingCount = group.items.filter(
+                  (item) =>
+                    item.applicability !== "NOT_APPLICABLE" &&
+                    item.status !== "REVIEWED",
+                ).length;
+                return (
+                  <AccordionItem
+                    className="working-paper-group"
+                    key={group.area}
+                    value={group.area}
+                  >
+                    <AccordionHeader
+                      button={{ className: "working-paper-group-trigger" }}
                     >
-                      <span>
-                        <b>{item.code}</b>
-                        {item.title}
+                      <span className="working-paper-group-heading">
+                        <span>{group.area}</span>
+                        <Badge
+                          appearance="tint"
+                          color={outstandingCount > 0 ? "informative" : "success"}
+                          size="small"
+                        >
+                          {outstandingCount} outstanding
+                        </Badge>
                       </span>
-                      <Badge
-                        appearance="outline"
-                        color={item.applicability === "NOT_APPLICABLE" ? "subtle" : item.status === "REVIEWED" ? "success" : "informative"}
-                      >
-                        {item.applicability === "NOT_APPLICABLE" ? "Not applicable" : pretty(item.status)}
-                      </Badge>
-                      <small>
-                        {pretty(item.category_code || "REPORTING")} · {libraryItem?.required ? "Required" : item.template_scope === "ENGAGEMENT" ? "One-off" : "Optional"} · v{item.current_version}
-                      </small>
-                    </Button>
-                  );
-                })}
-              </section>
-            ))}
+                    </AccordionHeader>
+                    <AccordionPanel className="working-paper-group-panel">
+                      <div className="working-paper-group-items">
+                        {group.items.map((item) => {
+                          const libraryItem = libraryItems.find(
+                            (candidate) =>
+                              candidate.deployedWorkingPaperId === item.id ||
+                              (candidate.templateCode === item.template_code &&
+                                candidate.templateVersion ===
+                                  item.template_version),
+                          );
+                          const selectedItem = selected === item.id;
+                          const statusLabel =
+                            item.applicability === "NOT_APPLICABLE"
+                              ? "Not applicable"
+                              : item.status === "NOT_STARTED"
+                                ? "Not started"
+                                : pretty(item.status);
+                          return (
+                            <Button
+                              appearance="subtle"
+                              key={item.id}
+                              className={`working-paper-item${selectedItem ? " active" : ""}`}
+                              aria-current={selectedItem ? "page" : undefined}
+                              onClick={() => setSelected(item.id)}
+                            >
+                              <span className="working-paper-item-copy">
+                                <b>{item.code}</b>
+                                {item.title}
+                              </span>
+                              <Badge
+                                appearance="tint"
+                                className="working-paper-status-badge"
+                                color={
+                                  item.applicability === "NOT_APPLICABLE" ||
+                                  item.status === "NOT_STARTED"
+                                    ? "subtle"
+                                    : item.status === "REVIEWED"
+                                      ? "success"
+                                      : "informative"
+                                }
+                                size="small"
+                              >
+                                {statusLabel}
+                              </Badge>
+                              <small>
+                                {pretty(item.category_code || "REPORTING")} ·{" "}
+                                {libraryItem?.required
+                                  ? "Required"
+                                  : item.template_scope === "ENGAGEMENT"
+                                    ? "One-off"
+                                    : "Optional"} · v{item.current_version}
+                              </small>
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    </AccordionPanel>
+                  </AccordionItem>
+                );
+              })}
+            </Accordion>
           </aside>
           {paper && (
             <WorkingPaperEditor
