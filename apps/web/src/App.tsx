@@ -18,6 +18,7 @@ import {
   BreadcrumbDivider,
   BreadcrumbItem,
   Button as FluentButton,
+  Card,
   Checkbox,
   createTableColumn,
   DataGrid,
@@ -3895,6 +3896,8 @@ function TasksView({
     "COMPLETE",
   ];
   const statusOptions: WorkflowTaskStatus[] = [...columns, "CANCELLED"];
+  const taskTypes = ["PREPARATION", "ACCOUNTS", "REVIEW"] as const;
+  const visibleItems = items.filter((item) => columns.includes(item.status));
   return (
     <>
       <section className="panel task-create">
@@ -3912,11 +3915,19 @@ function TasksView({
             />
           </Field>
           <Field label="Task type" required>
-            <Input
+            <Select
+              className="task-type-select"
+              select={{ className: "task-select-native" }}
               value={taskType}
               onChange={(e) => setTaskType(e.target.value)}
               required
-            />
+            >
+              {taskTypes.map((value) => (
+                <option key={value} value={value}>
+                  {title(value)}
+                </option>
+              ))}
+            </Select>
           </Field>
           <Checkbox
               className="check"
@@ -3934,50 +3945,77 @@ function TasksView({
           </MessageBar>
         )}
       </section>
-      <div className="task-board">
-        {columns.map((status) => (
-          <section key={status}>
-            <header>
-              <h3>{title(status)}</h3>
-              <span>
-                {items.filter((item) => item.status === status).length}
-              </span>
-            </header>
-            {items
-              .filter((item) => item.status === status)
-              .map((item) => (
-                <article key={item.id}>
-                  <div>
-                    {item.blocking && (
-                      <Badge color="danger" appearance="outline">
-                        Blocking
-                      </Badge>
-                    )}
-                    <h4>{item.title}</h4>
-                    <small>
-                      {item.task_type || "Task"}
-                      {item.due_at
-                        ? ` · Due ${fullDate.format(new Date(item.due_at))}`
-                        : ""}
-                    </small>
-                  </div>
-                  <Select
-                    aria-label={`Status for ${item.title}`}
-                    value={item.status}
-                    disabled={busy}
-                    onChange={(e) =>
-                      move(item, e.target.value as WorkflowTaskStatus)
-                    }
-                  >
-                    {statusOptions.map((value) => (
-                      <option key={value}>{value}</option>
-                    ))}
-                  </Select>
-                </article>
-              ))}
-          </section>
-        ))}
-      </div>
+      {!visibleItems.length ? (
+        <Card className="task-board-empty" appearance="outline">
+          <h3>No tasks yet</h3>
+          <p>Add a task above to start tracking engagement work.</p>
+        </Card>
+      ) : (
+        <div className="task-board">
+          {columns.map((status) => {
+            const columnItems = visibleItems.filter(
+              (item) => item.status === status,
+            );
+            const headingId = `task-column-${status.toLowerCase()}`;
+            return (
+              <Card
+                aria-labelledby={headingId}
+                className="task-column"
+                key={status}
+                appearance="outline"
+              >
+                <header>
+                  <h3 id={headingId}>{title(status)}</h3>
+                  <Badge appearance="tint" color="subtle" size="small">
+                    {columnItems.length}
+                  </Badge>
+                </header>
+                <div className="task-column-items">
+                  {columnItems.map((item) => (
+                    <Card
+                      aria-label={item.title}
+                      className="task-card"
+                      key={item.id}
+                      appearance="subtle"
+                    >
+                      <div>
+                        {item.blocking && (
+                          <Badge color="danger" appearance="tint" size="small">
+                            Blocking
+                          </Badge>
+                        )}
+                        <h4>{item.title}</h4>
+                        <small>
+                          {title(item.task_type || "TASK")}
+                          {item.due_at
+                            ? ` · Due ${fullDate.format(new Date(item.due_at))}`
+                            : ""}
+                        </small>
+                      </div>
+                      <Select
+                        className="task-status-select"
+                        select={{ className: "task-select-native" }}
+                        aria-label={`Status for ${item.title}`}
+                        value={item.status}
+                        disabled={busy}
+                        onChange={(e) =>
+                          move(item, e.target.value as WorkflowTaskStatus)
+                        }
+                      >
+                        {statusOptions.map((value) => (
+                          <option key={value} value={value}>
+                            {title(value)}
+                          </option>
+                        ))}
+                      </Select>
+                    </Card>
+                  ))}
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </>
   );
 }
