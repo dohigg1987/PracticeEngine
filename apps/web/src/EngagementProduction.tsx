@@ -2088,6 +2088,7 @@ function AccountsVersions({
       >
         <div className="pack-actions">
           <Field
+            className="pack-field"
             label="Reporting pack"
             hint={
               !selectedPack
@@ -2117,7 +2118,7 @@ function AccountsVersions({
               )}
             </Select>
           </Field>
-          <Field label="Comparative source">
+          <Field className="pack-field" label="Comparative source">
             <Select
               value={comparativeId}
               onChange={(event) => setComparativeId(event.target.value)}
@@ -2131,6 +2132,7 @@ function AccountsVersions({
             </Select>
           </Field>
           <Button
+            className="pack-generate-action"
             appearance="primary"
             disabled={busy === "generate" || !selectedPack}
             onClick={() =>

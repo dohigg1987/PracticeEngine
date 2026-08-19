@@ -846,20 +846,19 @@
   justify-self: start;
 }
 .pack-actions {
-  display: flex;
-  align-items: end;
-  gap: 10px;
-}
-.pack-actions label {
   display: grid;
-  gap: 5px;
-  min-width: 240px;
-  color: var(--colorNeutralForeground2);
-  font-size: 12px;
-  font-weight: 700;
+  grid-template-columns: minmax(260px, 1fr) minmax(220px, 0.8fr) max-content;
+  align-items: start;
+  gap: 10px;
+  width: min(100%, 1120px);
 }
-.pack-actions select {
-  height: 38px;
+.pack-field {
+  min-width: 0;
+}
+.pack-generate-action {
+  align-self: start;
+  margin-top: 24px;
+  white-space: nowrap;
 }
 .artefact-control {
   display: grid;
@@ -1156,11 +1155,11 @@ td {
   }
   .pack-actions {
     width: 100%;
-    align-items: stretch;
-    flex-direction: column;
+    grid-template-columns: 1fr;
   }
-  .pack-actions label {
-    min-width: 0;
+  .pack-generate-action {
+    justify-self: start;
+    margin-top: 0;
   }
   .evidence-note {
     margin-inline: 14px;
