@@ -12,6 +12,7 @@ import {
   MessageBar,
   MessageBarActions,
   MessageBarBody,
+  MessageBarTitle,
   Select,
   Skeleton,
   SkeletonItem,
@@ -2124,28 +2125,32 @@ function AccountsVersions({
         </div>
       </Head>
       {selectedPack ? (
-        <div
-          className={`pack-warning ${selectedPack.certification_status === "CERTIFIED" ? "certified" : ""}`}
-          role="note"
+        <MessageBar
+          intent={
+            selectedPack.certification_status === "CERTIFIED"
+              ? "success"
+              : "warning"
+          }
+          layout="multiline"
         >
-          <b>{selectedPack.certification_label}</b>
-          <span>
+          <MessageBarBody>
+            <MessageBarTitle>{selectedPack.certification_label}</MessageBarTitle>
             {selectedPack.provenance_label} · Effective from{" "}
             {selectedPack.effective_from}
             {selectedPack.effective_to
               ? ` to ${selectedPack.effective_to}`
               : ""}
-          </span>
-        </div>
+          </MessageBarBody>
+        </MessageBar>
       ) : (
-        <div className="pack-warning" role="alert">
-          <b>No applicable reporting pack</b>
-          <span>
+        <MessageBar intent="warning" layout="multiline">
+          <MessageBarBody>
+            <MessageBarTitle>No applicable reporting pack</MessageBarTitle>
             {framework === "FRS_101"
               ? "FRS 101 does not currently have a repository baseline. Accounts generation is unavailable."
               : "No pack matches this engagement’s framework, sector and reporting period."}
-          </span>
-        </div>
+          </MessageBarBody>
+        </MessageBar>
       )}
       {actionError && (
         <p className="form-error" role="alert">
