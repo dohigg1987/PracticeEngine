@@ -31,6 +31,7 @@ import {
   SyncRun,
   TenantSettings,
 } from "./api";
+import { ConfirmAction } from "./ConfirmAction";
 import { statutoryLabel } from "./format";
 
 export type CommercialView = "portal" | "integrations" | "inbox" | "settings";
@@ -328,13 +329,13 @@ function PortalWorkspace({
                           </Button>
                         )}
                       {item.accessStatus === "ACTIVE" && (
-                        <Button
-                          size="small"
+                        <ConfirmAction
+                          label="Suspend"
+                          title="Suspend portal access?"
+                          body={`${item.displayName} will no longer be able to access this engagement.`}
+                          confirmLabel="Suspend access"
                           appearance="subtle"
-                          onClick={() =>
-                            window.confirm(
-                              `Suspend portal access for ${item.displayName}?`,
-                            ) &&
+                          onConfirm={() =>
                             act(`suspend-${item.id}`, () =>
                               api.updatePortalAccess(
                                 context,
@@ -345,9 +346,7 @@ function PortalWorkspace({
                               ),
                             )
                           }
-                        >
-                          Suspend
-                        </Button>
+                        />
                       )}
                       {item.accessStatus === "SUSPENDED" && (
                         <Button
@@ -485,7 +484,7 @@ function PortalWorkspace({
                   </TableCell>
                   <TableCell>
                     {item.latestResponse ? (
-                      <span title={item.latestResponse.contentHash}>
+                      <span>
                         {item.latestResponse.filename} ·{" "}
                         {(item.latestResponse.byteSize / 1024).toFixed(1)} KB
                       </span>
@@ -545,11 +544,13 @@ function PortalWorkspace({
                         </>
                       )}
                       {item.status === "OPEN" && (
-                        <Button
-                          size="small"
+                        <ConfirmAction
+                          label="Cancel"
+                          title="Cancel document request?"
+                          body={`The request “${item.title}” will be cancelled and can no longer receive a response.`}
+                          confirmLabel="Cancel request"
                           appearance="subtle"
-                          onClick={() =>
-                            window.confirm("Cancel this document request?") &&
+                          onConfirm={() =>
                             act(`cancel-${item.id}`, () =>
                               api.cancelDocumentRequest(
                                 context,
@@ -559,9 +560,7 @@ function PortalWorkspace({
                               ),
                             )
                           }
-                        >
-                          Cancel
-                        </Button>
+                        />
                       )}
                     </div>
                   </TableCell>
@@ -1197,31 +1196,31 @@ function WorkspaceSettings({ context, engagements }: Props) {
           />
         </Field>
         <div className="row-actions">
-          <Button
+          <ConfirmAction
+            label="Suspend workspace"
+            title="Suspend workspace?"
+            body="Workspace access will be suspended immediately."
+            confirmLabel="Suspend workspace"
             disabled={!reason.trim() || busy === "SUSPENDED"}
-            onClick={() =>
-              window.confirm("Suspend this workspace?") &&
+            onConfirm={() =>
               act("SUSPENDED", () =>
                 api.updateTenantLifecycle(context, "SUSPENDED", reason),
               )
             }
-          >
-            Suspend workspace
-          </Button>
-          <Button
+          />
+          <ConfirmAction
+            label="Request closure"
+            title="Request workspace closure?"
+            body="This submits a controlled closure request for administrative approval."
+            confirmLabel="Request closure"
             appearance="secondary"
             disabled={!reason.trim() || busy === "CLOSURE_REQUESTED"}
-            onClick={() =>
-              window.confirm(
-                "Request closure of this workspace? This requires administrative approval.",
-              ) &&
+            onConfirm={() =>
               act("CLOSURE_REQUESTED", () =>
                 api.updateTenantLifecycle(context, "CLOSURE_REQUESTED", reason),
               )
             }
-          >
-            Request closure
-          </Button>
+          />
         </div>
       </section>
     </section>

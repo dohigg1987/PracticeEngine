@@ -9,7 +9,12 @@
     "test:core": "npm run build:core && node --test dist/packages/domain/test/*.test.js",
     "demo": "npm run build:core && node dist/scripts/demo.js",
     "verify:pilot": "node scripts/verify-pilot.mjs",
-    "verify:lockstep": "node scripts/verify-release-lockstep.mjs"
+    "verify:lockstep": "node scripts/verify-release-lockstep.mjs",
+    "test:release-guard": "node --test scripts/cloudflare-release.test.mjs",
+    "release:check:api": "node scripts/cloudflare-release.mjs api --check-only",
+    "release:check:web": "node scripts/cloudflare-release.mjs web --check-only",
+    "release:api": "node scripts/cloudflare-release.mjs api",
+    "release:web": "node scripts/cloudflare-release.mjs web"
   },
   "engines": {"node": ">=22"}
 }

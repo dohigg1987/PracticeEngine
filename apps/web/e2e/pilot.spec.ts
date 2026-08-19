@@ -419,8 +419,12 @@ test("team role changes and access removal persist in the workspace", async ({ p
   await role.selectOption("ADMIN");
   await colleague.getByRole("button", { name: "Save role" }).click();
   await expect(role).toHaveValue("ADMIN");
-  page.once("dialog", (dialog) => dialog.accept());
   await colleague.getByRole("button", { name: "Remove access" }).click();
+  const confirm = page.getByRole("alertdialog", {
+    name: "Remove workspace access?",
+  });
+  await expect(confirm).toBeVisible();
+  await confirm.getByRole("button", { name: "Remove access" }).click();
   await expect(members).not.toContainText("Team member");
 });
 

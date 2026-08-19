@@ -62,11 +62,17 @@ preview URLs, and retains observability.
 
 ## Deploy and read-only smoke test
 
-Only after the checks above succeed:
+Only after the checks above succeed, use the guarded root command. It refuses a
+dirty worktree, a non-`main` release, a commit that differs from the locally
+known `origin/main`, or an invalid production configuration. Wrangler receives
+the exact Git SHA as both the version tag and deployment message.
 
 ```powershell
-npx wrangler deploy --config apps/api/wrangler.production.jsonc
+npm run release:check:api
+npm run release:api
 ```
+
+Do not call `wrangler deploy` directly for a production release.
 
 Set the deployed API origin and a short-lived pilot user's Neon Auth token in
 process environment variables. The verification script refuses non-HTTPS URLs,

@@ -99,6 +99,8 @@ import {
   demoMode,
 } from "./auth";
 import ClientPermanentFile from "./ClientPermanentFile";
+import { ConfirmAction } from "./ConfirmAction";
+import { submissionStageState } from "./workflowState";
 import {
   permittedSectorProfiles,
   permittedFrameworks,
@@ -953,7 +955,7 @@ function AccountsWorkspace({
       label: "Submission",
       target: "filing",
       views: ["filing", "portal"],
-      state: "pending",
+      state: submissionStageState(dashboard.filingAttempts),
     },
   ];
   const activeProductionStage =
@@ -1394,7 +1396,7 @@ function AccountsWorkspace({
                       })}
                     </nav>
                     <div className="progress">
-                      <span>Period progress</span>
+                      <span>Source mapping</span>
                       <b>
                         {lines.length
                           ? Math.round((mapped / lines.length) * 100)
@@ -1408,7 +1410,7 @@ function AccountsWorkspace({
                         {unmapped
                           ? `${unmapped} mapping decisions remaining`
                           : lines.length
-                            ? "Ready for review"
+                            ? "Mapping complete"
                             : "Waiting for source data"}
                       </small>
                     </div>
@@ -1992,12 +1994,6 @@ function TeamView({
     }
   }
   async function revoke(invitation: TeamInvitation) {
-    if (
-      !window.confirm(
-        `Revoke this ${title(invitation.role)} invitation? Its link will stop working immediately.`,
-      )
-    )
-      return;
     setBusy(invitation.id);
     setActionError("");
     try {
@@ -2024,7 +2020,6 @@ function TeamView({
     }
   }
   async function removeMember(member: TeamMember) {
-    if (!window.confirm("Remove this colleague's access to the workspace?")) return;
     setBusy(`member-${member.id}`);
     setActionError("");
     try {
@@ -2128,13 +2123,14 @@ function TeamView({
                       >
                         Save role
                       </FluentButton>
-                      <FluentButton
-                        size="small"
+                      <ConfirmAction
+                        label="Remove access"
+                        title="Remove workspace access?"
+                        body="This colleague will immediately lose access to the workspace."
+                        confirmLabel="Remove access"
                         disabled={busy === `member-${member.id}`}
-                        onClick={() => removeMember(member)}
-                      >
-                        Remove access
-                      </FluentButton>
+                        onConfirm={() => removeMember(member)}
+                      />
                     </div>
                   )}
                 </TableCell>
@@ -2236,13 +2232,14 @@ function TeamView({
                   </small>
                 </div>
                 <Badge appearance="outline">Active</Badge>
-                <FluentButton
-                  appearance="secondary"
+                <ConfirmAction
+                  label="Revoke"
+                  title="Revoke invitation?"
+                  body={`The ${title(invitation.role)} invitation link will stop working immediately.`}
+                  confirmLabel="Revoke invitation"
                   disabled={busy === invitation.id}
-                  onClick={() => revoke(invitation)}
-                >
-                  {busy === invitation.id ? "Revoking…" : "Revoke"}
-                </FluentButton>
+                  onConfirm={() => revoke(invitation)}
+                />
               </article>
             ))
           )}
