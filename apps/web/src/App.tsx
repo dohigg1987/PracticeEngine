@@ -3646,6 +3646,7 @@ function ReconciliationsView({
         <FluentButton
           appearance="primary"
           size="small"
+          className="reconciliation-header-action"
           type="button"
           aria-expanded={showForm}
           aria-controls="reconciliation-editor"
