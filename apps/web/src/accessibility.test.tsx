@@ -6,29 +6,14 @@ vi.mock("./auth", () => ({
   freshAuthToken: vi.fn(),
   AuthRequiredError: class AuthRequiredError extends Error {},
 }));
-vi.mock("@fluentui/react-components", () => {
-  const Component = ({
-    children,
-    ...props
-  }: React.PropsWithChildren<Record<string, unknown>>) =>
-    React.createElement("div", props, children);
-  return {
-    Accordion: Component,
-    AccordionHeader: Component,
-    AccordionItem: Component,
-    AccordionPanel: Component,
-    Badge: Component,
-    Button: Component,
-    Field: Component,
-    Input: Component,
-    MessageBar: Component,
-    MessageBarActions: Component,
-    MessageBarBody: Component,
-    Select: Component,
-    Skeleton: Component,
-    SkeletonItem: Component,
-    Textarea: Component,
-  };
+// Node selects Tabster's CommonJS entry during SSR. Load Fluent's matching
+// CommonJS build so these assertions exercise the real components rather than
+// a div-shaped substitute.
+vi.mock("@fluentui/react-components", async () => {
+  const { createRequire } = await vi.importActual<{
+    createRequire: (url: string) => (id: string) => Record<string, unknown>;
+  }>("node:module");
+  return createRequire(import.meta.url)("@fluentui/react-components");
 });
 
 import EngagementProduction, {
@@ -46,6 +31,7 @@ describe("accessible recovery and asynchronous states", () => {
     const html = renderToStaticMarkup(<AppErrorFallback onReset={() => {}} />);
     expect(html).toContain('role="alert"');
     expect(html).toContain('aria-labelledby="fatal-error-title"');
+    expect(html).toContain("<button");
     expect(html).toContain("Reload workspace");
   });
 
@@ -69,6 +55,7 @@ describe("accessible recovery and asynchronous states", () => {
     );
     expect(html).toContain('role="status"');
     expect(html).toContain('aria-live="polite"');
+    expect(html).toContain("fui-Skeleton");
     expect(html).toContain("Loading engagement section");
   });
 
