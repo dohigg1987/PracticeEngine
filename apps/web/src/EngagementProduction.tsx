@@ -1808,31 +1808,35 @@ function AccountsReviewDetail({
           </li>
         ))}
       </ul>
-      <details className="manifest-review">
-        <summary>
-          Review generated content and provenance ({manifest.length} entries)
-        </summary>
-        {manifest.length ? (
-          <dl>
-            {manifest.map(([key, value]) => (
-              <div key={key}>
-                <dt>{pretty(key)}</dt>
-                <dd>
-                  {Array.isArray(value)
-                    ? value.join(" · ")
-                    : typeof value === "object"
-                      ? JSON.stringify(value)
-                      : String(value)}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        ) : (
-          <p className="muted">
-            No manifest evidence was returned for this version.
-          </p>
-        )}
-      </details>
+      <Accordion collapsible className="manifest-review">
+        <AccordionItem value="manifest-review">
+          <AccordionHeader>
+            Review generated content and provenance ({manifest.length} entries)
+          </AccordionHeader>
+          <AccordionPanel>
+            {manifest.length ? (
+              <dl>
+                {manifest.map(([key, value]) => (
+                  <div key={key}>
+                    <dt>{pretty(key)}</dt>
+                    <dd>
+                      {Array.isArray(value)
+                        ? value.join(" · ")
+                        : typeof value === "object"
+                          ? JSON.stringify(value)
+                          : String(value)}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            ) : (
+              <p className="muted">
+                No manifest evidence was returned for this version.
+              </p>
+            )}
+          </AccordionPanel>
+        </AccordionItem>
+      </Accordion>
       {previous && (
         <div className="version-comparison" role="note">
           <b>Compared with version {previous.version}</b>
