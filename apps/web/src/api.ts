@@ -102,7 +102,7 @@ export type Journal = {
   journal_no?: number;
   journal_type?: string;
   description: string;
-  status: string;
+  status: JournalStatus;
   version?: number;
   prepared_by?: string | null;
   approved_by?: string | null;
@@ -110,28 +110,46 @@ export type Journal = {
   lines?: JournalLine[];
   created_at?: string;
 };
+export type JournalStatus =
+  | "DRAFT"
+  | "PREPARED"
+  | "APPROVED"
+  | "POSTED"
+  | "VOIDED";
 export type Reconciliation = {
   id: string;
   reconciliation_type?: string;
   title?: string;
-  status: string;
+  status: ReconciliationStatus;
   trial_balance_id?: string | null;
   ledger_balance?: string | number;
   supporting_balance?: string | number;
   tolerance?: string | number;
   updated_at?: string;
 };
+export type ReconciliationStatus =
+  | "NOT_STARTED"
+  | "IN_PROGRESS"
+  | "RECONCILED"
+  | "EXCEPTION"
+  | "REVIEWED";
 export type WorkflowTask = {
   id: string;
   task_type?: string;
   title: string;
-  status: string;
+  status: WorkflowTaskStatus;
   blocking?: boolean;
   assigned_to?: string | null;
   due_at?: string | null;
   dependency_type?: string | null;
   dependency_id?: string | null;
 };
+export type WorkflowTaskStatus =
+  | "OPEN"
+  | "IN_PROGRESS"
+  | "BLOCKED"
+  | "COMPLETE"
+  | "CANCELLED";
 export type ReviewPoint = {
   id: string;
   object_type?: string;
