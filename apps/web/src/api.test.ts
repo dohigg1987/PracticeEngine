@@ -294,6 +294,8 @@ describe("authenticated API boundary", () => {
     await api.createWorkingPaper(context, engagement, {
       code: "A1",
       title: "Cash",
+      categoryCode: "ASSETS",
+      objective: "Verify cash balances and presentation.",
       content: { narrative: "Evidence" },
     });
     await api.createWorkingPaperVersion(context, engagement, object, {
@@ -331,7 +333,13 @@ describe("authenticated API boundary", () => {
     ).toBe(true);
     expect(call(0)).toMatchObject({
       url: "/v1/engagements/engagement%2F1/working-papers",
-      body: { code: "A1", title: "Cash", content: { narrative: "Evidence" } },
+      body: {
+        code: "A1",
+        title: "Cash",
+        categoryCode: "ASSETS",
+        objective: "Verify cash balances and presentation.",
+        content: { narrative: "Evidence" },
+      },
     });
     expect(call(1)).toMatchObject({
       url: "/v1/engagements/engagement%2F1/working-papers/paper%2F1/versions",
@@ -378,6 +386,114 @@ describe("authenticated API boundary", () => {
       },
     });
     expect(call(0).init.method).toBe("POST");
+  });
+
+  it("keeps working-paper governance and evidence behind authenticated tenant routes", async () => {
+    const context = { tenantId: "tenant-1" };
+    const engagement = "engagement/1";
+    const paper = "paper/1";
+    await api.workingPaperGovernanceCatalogue(context, engagement);
+    await api.workingPaperGovernance(context, engagement, paper);
+    await api.workingPaperRisks(context, engagement);
+    await api.linkWorkingPaperReportLine(
+      context,
+      engagement,
+      paper,
+      "line/1",
+      "SUPPORTING",
+    );
+    await api.linkWorkingPaperAssertion(
+      context,
+      engagement,
+      paper,
+      "COMPLETENESS",
+    );
+    await api.linkWorkingPaperRisk(context, engagement, paper, "risk/1");
+    await api.linkWorkingPaperTheme(
+      context,
+      engagement,
+      paper,
+      "INTERNAL_CONTROLS",
+      true,
+    );
+    await api.workingPaperAttachments(context, engagement, paper);
+    const form = new FormData();
+    form.append("file", new Blob(["evidence"], { type: "text/plain" }), "evidence.txt");
+    form.append("workingPaperVersion", "2");
+    form.append("evidenceType", "SOURCE_DOCUMENT");
+    await api.uploadWorkingPaperAttachment(context, engagement, paper, form);
+    await api.workingPaperAttachmentBlob(
+      context,
+      "/v1/engagements/engagement%2F1/working-papers/paper%2F1/attachments/attachment%2F1/content",
+      true,
+    );
+
+    expect(call(0).url).toContain("/working-paper-governance/catalogue");
+    expect(call(1).url).toContain("/paper%2F1/governance");
+    expect(call(3)).toMatchObject({
+      url: "/v1/engagements/engagement%2F1/working-papers/paper%2F1/report-line-links/line%2F1",
+      body: { linkPurpose: "SUPPORTING" },
+    });
+    expect(call(4).body).toEqual({});
+    expect(call(6).body).toEqual({ isPrimary: true });
+    expect(call(8).init.body).toBe(form);
+    expect(call(8).headers["content-type"]).toBeUndefined();
+    expect(call(9).url).toContain("/content?download=1");
+    expect(
+      fetchMock.mock.calls.every(
+        (_, index) => call(index).headers["x-tenant-id"] === "tenant-1",
+      ),
+    ).toBe(true);
+  });
+
+  it("replaces each working-paper governance link through an audited route", async () => {
+    const context = { tenantId: "tenant-1" };
+    const engagement = "engagement/1";
+    const paper = "paper/1";
+    await api.replaceWorkingPaperReportLine(
+      context,
+      engagement,
+      paper,
+      "line-link/1",
+      "line/2",
+      "Corrected statement classification",
+    );
+    await api.replaceWorkingPaperAssertion(
+      context,
+      engagement,
+      paper,
+      "assertion-link/1",
+      "ACCURACY",
+      "Corrected assertion",
+    );
+    await api.replaceWorkingPaperRisk(
+      context,
+      engagement,
+      paper,
+      "risk-link/1",
+      "risk/2",
+      "Linked to the applicable risk",
+    );
+    await api.replaceWorkingPaperTheme(
+      context,
+      engagement,
+      paper,
+      "theme-link/1",
+      "GRANT_INCOME",
+      "Corrected work theme",
+    );
+
+    expect(call(0)).toMatchObject({
+      url: "/v1/engagements/engagement%2F1/working-papers/paper%2F1/report-line-links/line-link%2F1/replace",
+      body: { reportLineId: "line/2", reason: "Corrected statement classification" },
+    });
+    expect(call(1).body).toEqual({ assertionCode: "ACCURACY", reason: "Corrected assertion" });
+    expect(call(2).body).toEqual({ riskId: "risk/2", reason: "Linked to the applicable risk" });
+    expect(call(3)).toMatchObject({
+      url: "/v1/engagements/engagement%2F1/working-papers/paper%2F1/theme-links/theme-link%2F1/replace",
+      body: { themeCode: "GRANT_INCOME", reason: "Corrected work theme" },
+    });
+    expect(fetchMock.mock.calls.every((_, index) => call(index).init.method === "POST")).toBe(true);
   });
 
   it("keeps commercial workspaces tenant scoped and preserves locked request bodies", async () => {

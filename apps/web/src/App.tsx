@@ -4976,6 +4976,8 @@ function AccountsView({
           const result = await api.createWorkingPaper(context, engagement.id, {
             code: editingNarrative.code,
             title: editingNarrative.title,
+            categoryCode: "REPORTING",
+            objective: `Document and support ${editingNarrative.title.toLowerCase()}.`,
             content,
           });
           setWorkingPapers((items) => [

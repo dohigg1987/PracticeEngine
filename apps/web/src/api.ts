@@ -301,6 +301,120 @@ export type WorkingPaperLibraryItem = {
   deployedWorkingPaperId: string | null;
   deployedApplicability: string | null;
 };
+export type WorkingPaperRisk = {
+  id: string;
+  riskCode: string;
+  title: string;
+  description: string;
+  riskLevel: "LOW" | "MEDIUM" | "HIGH" | "SIGNIFICANT";
+  response: string;
+  status: "OPEN" | "MITIGATED" | "ACCEPTED" | "CLOSED";
+  createdAt: string;
+  updatedAt: string;
+};
+export type WorkingPaperAttachment = {
+  id: string;
+  workingPaperId: string;
+  workingPaperVersion: number;
+  filename: string;
+  mediaType: string;
+  byteSize: number;
+  contentHash: string;
+  evidenceType:
+    | "SOURCE_DOCUMENT"
+    | "CALCULATION"
+    | "CONFIRMATION"
+    | "CORRESPONDENCE"
+    | "REPORT"
+    | "OTHER";
+  description: string;
+  uploadedAt: string;
+  contentPath: string;
+};
+export type WorkingPaperGovernanceCatalogue = {
+  workAreas: {
+    code: WorkingPaperCategory;
+    title: string;
+    sequenceNo: number;
+    status: string;
+    provenanceLabel: string;
+  }[];
+  themes: {
+    code: string;
+    title: string;
+    description: string;
+    status: string;
+    provenanceLabel: string;
+  }[];
+  templateThemes: {
+    templateCode: string;
+    templateVersion: number;
+    themeCode: string;
+    isPrimary: boolean;
+  }[];
+  assertions: string[];
+  reportLines: {
+    id: string;
+    taxonomyVersion: string;
+    lineCode: string;
+    caption: string;
+    statementCode: string;
+    displayOrder: number;
+  }[];
+  evidence: {
+    uploadAvailable: boolean;
+    maxBytes: number;
+    mediaTypes: string[];
+    evidenceTypes: WorkingPaperAttachment["evidenceType"][];
+  };
+};
+export type WorkingPaperGovernance = {
+  workingPaper: {
+    id: string;
+    code: string;
+    title: string;
+    categoryCode: WorkingPaperCategory;
+    objective: string | null;
+    status: string;
+    currentVersion: number;
+    templateCode: string | null;
+    templateVersion: number | null;
+    templateScope: string;
+    applicability: string;
+  };
+  reportLines: {
+    id: string;
+    reportLineId: string;
+    lineCode: string;
+    caption: string;
+    statementCode: string;
+    linkPurpose: "PRIMARY" | "SUPPORTING" | "DISCLOSURE";
+    createdAt: string;
+  }[];
+  assertions: { id: string; assertionCode: string; createdAt: string }[];
+  risks: {
+    id: string;
+    riskId: string;
+    riskCode: string;
+    title: string;
+    riskLevel: WorkingPaperRisk["riskLevel"];
+    status: WorkingPaperRisk["status"];
+    createdAt: string;
+  }[];
+  themes: {
+    id: string;
+    themeCode: string;
+    title: string;
+    isPrimary: boolean;
+    createdAt: string;
+  }[];
+  attachments: WorkingPaperAttachment[];
+};
+export type WorkingPaperLinkReplacement<T> = {
+  item: T;
+  supersededLinkId: string;
+  reason: string;
+};
 export type DisclosureVersion = {
   id: string;
   version: number;
@@ -1145,12 +1259,173 @@ export const api = {
       context,
       { method: "PATCH", body: JSON.stringify(body) },
     ),
+  workingPaperGovernanceCatalogue: (context: ApiContext, id: string) =>
+    request<{ item: WorkingPaperGovernanceCatalogue }>(
+      `/v1/engagements/${encodeURIComponent(id)}/working-paper-governance/catalogue`,
+      context,
+    ),
+  workingPaperRisks: (context: ApiContext, id: string) =>
+    request<{ items: WorkingPaperRisk[] }>(
+      `/v1/engagements/${encodeURIComponent(id)}/risks`,
+      context,
+    ),
+  createWorkingPaperRisk: (
+    context: ApiContext,
+    id: string,
+    body: {
+      riskCode: string;
+      title: string;
+      description?: string;
+      riskLevel: WorkingPaperRisk["riskLevel"];
+      response?: string;
+      status?: WorkingPaperRisk["status"];
+    },
+  ) =>
+    request<{ item: WorkingPaperRisk }>(
+      `/v1/engagements/${encodeURIComponent(id)}/risks`,
+      context,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+  workingPaperGovernance: (
+    context: ApiContext,
+    id: string,
+    paperId: string,
+  ) =>
+    request<{ item: WorkingPaperGovernance }>(
+      `/v1/engagements/${encodeURIComponent(id)}/working-papers/${encodeURIComponent(paperId)}/governance`,
+      context,
+    ),
+  linkWorkingPaperReportLine: (
+    context: ApiContext,
+    id: string,
+    paperId: string,
+    reportLineId: string,
+    linkPurpose: "PRIMARY" | "SUPPORTING" | "DISCLOSURE",
+  ) =>
+    request<{ created: boolean; item: Record<string, unknown> }>(
+      `/v1/engagements/${encodeURIComponent(id)}/working-papers/${encodeURIComponent(paperId)}/report-line-links/${encodeURIComponent(reportLineId)}`,
+      context,
+      { method: "PUT", body: JSON.stringify({ linkPurpose }) },
+    ),
+  linkWorkingPaperAssertion: (
+    context: ApiContext,
+    id: string,
+    paperId: string,
+    assertionCode: string,
+  ) =>
+    request<{ created: boolean; item: Record<string, unknown> }>(
+      `/v1/engagements/${encodeURIComponent(id)}/working-papers/${encodeURIComponent(paperId)}/assertion-links/${encodeURIComponent(assertionCode)}`,
+      context,
+      { method: "PUT", body: JSON.stringify({}) },
+    ),
+  linkWorkingPaperRisk: (
+    context: ApiContext,
+    id: string,
+    paperId: string,
+    riskId: string,
+  ) =>
+    request<{ created: boolean; item: Record<string, unknown> }>(
+      `/v1/engagements/${encodeURIComponent(id)}/working-papers/${encodeURIComponent(paperId)}/risk-links/${encodeURIComponent(riskId)}`,
+      context,
+      { method: "PUT", body: JSON.stringify({}) },
+    ),
+  linkWorkingPaperTheme: (
+    context: ApiContext,
+    id: string,
+    paperId: string,
+    themeCode: string,
+    isPrimary = false,
+  ) =>
+    request<{ created: boolean; item: Record<string, unknown> }>(
+      `/v1/engagements/${encodeURIComponent(id)}/working-papers/${encodeURIComponent(paperId)}/theme-links/${encodeURIComponent(themeCode)}`,
+      context,
+      { method: "PUT", body: JSON.stringify({ isPrimary }) },
+    ),
+  replaceWorkingPaperReportLine: (
+    context: ApiContext,
+    id: string,
+    paperId: string,
+    linkId: string,
+    reportLineId: string,
+    reason: string,
+  ) =>
+    request<WorkingPaperLinkReplacement<WorkingPaperGovernance["reportLines"][number]>>(
+      `/v1/engagements/${encodeURIComponent(id)}/working-papers/${encodeURIComponent(paperId)}/report-line-links/${encodeURIComponent(linkId)}/replace`,
+      context,
+      { method: "POST", body: JSON.stringify({ reportLineId, reason }) },
+    ),
+  replaceWorkingPaperAssertion: (
+    context: ApiContext,
+    id: string,
+    paperId: string,
+    linkId: string,
+    assertionCode: string,
+    reason: string,
+  ) =>
+    request<WorkingPaperLinkReplacement<WorkingPaperGovernance["assertions"][number]>>(
+      `/v1/engagements/${encodeURIComponent(id)}/working-papers/${encodeURIComponent(paperId)}/assertion-links/${encodeURIComponent(linkId)}/replace`,
+      context,
+      { method: "POST", body: JSON.stringify({ assertionCode, reason }) },
+    ),
+  replaceWorkingPaperRisk: (
+    context: ApiContext,
+    id: string,
+    paperId: string,
+    linkId: string,
+    riskId: string,
+    reason: string,
+  ) =>
+    request<WorkingPaperLinkReplacement<WorkingPaperGovernance["risks"][number]>>(
+      `/v1/engagements/${encodeURIComponent(id)}/working-papers/${encodeURIComponent(paperId)}/risk-links/${encodeURIComponent(linkId)}/replace`,
+      context,
+      { method: "POST", body: JSON.stringify({ riskId, reason }) },
+    ),
+  replaceWorkingPaperTheme: (
+    context: ApiContext,
+    id: string,
+    paperId: string,
+    linkId: string,
+    themeCode: string,
+    reason: string,
+  ) =>
+    request<WorkingPaperLinkReplacement<WorkingPaperGovernance["themes"][number]>>(
+      `/v1/engagements/${encodeURIComponent(id)}/working-papers/${encodeURIComponent(paperId)}/theme-links/${encodeURIComponent(linkId)}/replace`,
+      context,
+      { method: "POST", body: JSON.stringify({ themeCode, reason }) },
+    ),
+  workingPaperAttachments: (
+    context: ApiContext,
+    id: string,
+    paperId: string,
+  ) =>
+    request<{ items: WorkingPaperAttachment[] }>(
+      `/v1/engagements/${encodeURIComponent(id)}/working-papers/${encodeURIComponent(paperId)}/attachments`,
+      context,
+    ),
+  uploadWorkingPaperAttachment: (
+    context: ApiContext,
+    id: string,
+    paperId: string,
+    form: FormData,
+  ) =>
+    request<{ created: boolean; item: WorkingPaperAttachment }>(
+      `/v1/engagements/${encodeURIComponent(id)}/working-papers/${encodeURIComponent(paperId)}/attachments`,
+      context,
+      { method: "POST", body: form },
+    ),
+  workingPaperAttachmentBlob: (
+    context: ApiContext,
+    contentPath: string,
+    download = false,
+  ) => requestBlob(`${contentPath}${download ? "?download=1" : ""}`, context),
   createWorkingPaper: (
     context: ApiContext,
     id: string,
     body: {
       code: string;
       title: string;
+      categoryCode: WorkingPaperCategory;
+      objective: string;
       reportLineId?: string;
       content: Record<string, unknown>;
     },

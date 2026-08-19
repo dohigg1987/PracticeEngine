@@ -23,6 +23,15 @@ import { authenticateRequest, neonAccessTokenVerifier } from "./auth.js";
 import { handleCommercialRoute } from "./commercial.js";
 import { handlePermanentFileRoute } from "./permanent-file.js";
 import {
+  MAX_WORKING_PAPER_EVIDENCE_BYTES,
+  WORKING_PAPER_ASSERTIONS,
+  WORKING_PAPER_EVIDENCE_MEDIA_TYPES,
+  WORKING_PAPER_EVIDENCE_TYPES,
+  safeWorkingPaperEvidenceFilename,
+  workingPaperEvidenceSignatureMatches,
+} from "./working-paper-evidence.js";
+import { workingPaperReadinessBlocks } from "./working-paper-controls.js";
+import {
   SERVICE_NAME,
   readinessReport,
   requestCorrelationId,
@@ -56,6 +65,7 @@ import {
   REVIEW_POINT_STATUSES,
   SIGNOFF_TYPES,
   TASK_STATUSES,
+  WORKING_PAPER_CATEGORIES,
   WORKING_PAPER_STATUSES,
   assertAccountsVersionTransition,
   assertDisclosureTransition,
@@ -94,6 +104,8 @@ const MAX_CSV_BYTES = 10 * 1024 * 1024;
 const MAX_JSON_BYTES = 64 * 1024;
 const MAX_EVIDENCE_BYTES = 10 * 1024 * 1024;
 const MAX_EVIDENCE_MULTIPART_BYTES = MAX_EVIDENCE_BYTES + 64 * 1024;
+const MAX_WORKING_PAPER_MULTIPART_BYTES =
+  MAX_WORKING_PAPER_EVIDENCE_BYTES + 128 * 1024;
 const WRITE_ROLES = ["PARTNER", "MANAGER", "PREPARER"] as const;
 const REVIEW_ROLES = ["PARTNER", "MANAGER", "REVIEWER"] as const;
 const WORKFLOW_ROLES = ["PARTNER", "MANAGER", "REVIEWER", "PREPARER"] as const;
@@ -2091,10 +2103,12 @@ async function workingPaperItems(
   engagementId: string,
   workingPaperId?: string,
 ) {
-  return tx`select wp.*,v.content,v.content_hash,v.created_by as version_created_by,v.created_at as version_created_at
+  const rows=await tx`select wp.*,coalesce(primary_link.report_line_id,wp.report_line_id) as authoritative_report_line_id,v.content,v.content_hash,v.created_by as version_created_by,v.created_at as version_created_at
     from working_paper wp join working_paper_version v on v.working_paper_id=wp.id and v.tenant_id=wp.tenant_id and v.version=wp.current_version
+    left join lateral(select report_line_id from working_paper_report_line_link link where link.tenant_id=wp.tenant_id and link.working_paper_id=wp.id and link.link_purpose='PRIMARY' and not exists(select 1 from working_paper_report_line_link successor where successor.tenant_id=link.tenant_id and successor.supersedes_link_id=link.id) order by link.created_at,link.id limit 1)primary_link on true
     where wp.tenant_id=${ctx.tenantId} and wp.engagement_id=${engagementId}
       and (${workingPaperId ?? null}::uuid is null or wp.id=${workingPaperId ?? null}) order by wp.code`;
+  return rows.map(row=>{const{authoritative_report_line_id,...item}=row;return{...item,report_line_id:authoritative_report_line_id};});
 }
 async function listWorkingPapers(
   request: Request,
@@ -2123,7 +2137,13 @@ async function createWorkingPaper(
     body = await jsonBody(request),
     sql = db(env),
     code = boundedRequiredString(body, "code", 80),
-    title = boundedRequiredString(body, "title", 255);
+    title = boundedRequiredString(body, "title", 255),
+    categoryCode = enumValue(
+      body,
+      "categoryCode",
+      WORKING_PAPER_CATEGORIES,
+    ),
+    objective = boundedRequiredString(body, "objective", 2000);
   const reportLineId = optionalString(body, "reportLineId") ?? null,
     content = body.content === undefined ? {} : requireObject(body.content),
     contentHash = await canonicalHash(content);
@@ -2137,18 +2157,20 @@ async function createWorkingPaper(
       );
       await lockEngagement(tx, ctx, engagementId);
       if (reportLineId) {
-        const line =
-          await tx`select id from canonical_report_line where id=${reportLineId}`;
-        if (!line.length)
+        const scope=await workingPaperReportingScope(tx,ctx,engagementId);
+        if(scope.reason)
+          throw new ApiError(409,scope.reason,"The engagement does not have one unambiguous applicable reporting pack and taxonomy");
+        if(!scope.lines.some(line=>String(line.id)===reportLineId))
           throw new ApiError(
             400,
-            "INVALID_REPORT_LINE",
-            "reportLineId is invalid",
+            "IMPERMISSIBLE_REPORT_LINE",
+            "reportLineId is not permitted by the engagement reporting pack and taxonomy",
           );
       }
       const id = crypto.randomUUID();
-      await tx`insert into working_paper(id,tenant_id,engagement_id,code,title,report_line_id)
-      values(${id},${ctx.tenantId},${engagementId},${code},${title},${reportLineId})`;
+      await tx`insert into working_paper(id,tenant_id,engagement_id,code,title,report_line_id,category_code,objective)
+      values(${id},${ctx.tenantId},${engagementId},${code},${title},null,${categoryCode},${objective})`;
+      if(reportLineId)await tx`insert into working_paper_report_line_link(id,tenant_id,engagement_id,working_paper_id,report_line_id,link_purpose,created_by) values(${crypto.randomUUID()},${ctx.tenantId},${engagementId},${id},${reportLineId},'PRIMARY',${ctx.actorId})`;
       await tx`insert into working_paper_version(id,tenant_id,working_paper_id,version,content,content_hash,created_by)
       values(${crypto.randomUUID()},${ctx.tenantId},${id},1,${canonicalJson(content)}::jsonb,${contentHash},${ctx.actorId})`;
       await appendEvents(
@@ -2158,7 +2180,15 @@ async function createWorkingPaper(
         "WORKING_PAPER_CREATED",
         "WORKING_PAPER",
         id,
-        { code, title, version: 1, contentHash },
+        {
+          code,
+          title,
+          categoryCode,
+          objective,
+          reportLineId,
+          version: 1,
+          contentHash,
+        },
       );
       return (await workingPaperItems(tx, ctx, engagementId, id))[0]!;
     });
@@ -2281,6 +2311,10 @@ async function transitionWorkingPaper(
       if (!rows.length)
         throw new ApiError(404, "NOT_FOUND", "Working paper not found");
       const current = String(rows[0]!.status) as WorkingPaperStatus;
+      if(next==="PREPARED"||next==="REVIEWED"){
+        const readiness=await workingPaperReadiness(tx,ctx,engagementId,rows[0]!);
+        if(!readiness.ready)throw new ApiError(409,"WORKING_PAPER_NOT_READY",`Working paper is not ready: ${readiness.blocks.join(", ")}`);
+      }
       assertWorkingPaperTransition(
         current,
         next,
@@ -2324,6 +2358,9 @@ type WorkingPaperLibraryItem = {
   overrideReason: string | null;
   deployedWorkingPaperId: string | null;
   deployedApplicability: string | null;
+  governanceStatus: "APPROVED" | "BASELINE" | "CUSTOM";
+  provenanceLabel: string;
+  controlledFallback: boolean;
 };
 function stringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.map(String) : [];
@@ -2349,7 +2386,7 @@ async function effectiveWorkingPaperLibrary(
   engagementId: string,
   organisationId: string,
 ): Promise<WorkingPaperLibraryItem[]> {
-  const profiles = await tx`select e.framework,e.sector_profile,o.legal_form
+  const profiles = await tx`select e.framework,e.sector_profile,e.period_start,e.period_end,o.legal_form
     from engagement e join organisation o on o.tenant_id=e.tenant_id and o.id=e.organisation_id
     where e.tenant_id=${ctx.tenantId} and e.id=${engagementId}`;
   if (!profiles.length)
@@ -2357,10 +2394,19 @@ async function effectiveWorkingPaperLibrary(
   const profile = profiles[0]!,
     legalForm = String(profile.legal_form),
     framework = String(profile.framework),
-    sector = profile.sector_profile ? String(profile.sector_profile) : null;
+    sector = profile.sector_profile ? String(profile.sector_profile) : null,
+    periodStart = String(profile.period_start),
+    periodEnd = String(profile.period_end);
   const [templates, tenantOverrides, organisationOverrides, customTemplates, deployed] =
     await Promise.all([
-      tx`select * from working_paper_template where status='ACTIVE' order by sequence_no,template_code`,
+      tx`select distinct on(template_code) * from working_paper_template
+        where status='ACTIVE' and (
+          (governance_status='APPROVED' and effective_from<=${periodStart}::date and (effective_to is null or effective_to>=${periodEnd}::date))
+          or (governance_status='BASELINE' and provenance_label='REPOSITORY_BASELINE_NOT_CERTIFIED')
+        )
+        order by template_code,
+          case governance_status when 'APPROVED' then 0 else 1 end,
+          version desc`,
       tx`select * from tenant_working_paper_override where tenant_id=${ctx.tenantId}`,
       tx`select * from organisation_working_paper_override where tenant_id=${ctx.tenantId} and organisation_id=${organisationId}`,
       tx`select * from custom_working_paper_template where tenant_id=${ctx.tenantId} and enabled and (organisation_id is null or organisation_id=${organisationId}) order by category_code,sequence_no,code`,
@@ -2415,6 +2461,9 @@ async function effectiveWorkingPaperLibrary(
       deployedApplicability: deployedPaper
         ? String(deployedPaper.applicability)
         : null,
+      governanceStatus: String(template.governance_status) as "APPROVED" | "BASELINE",
+      provenanceLabel: String(template.provenance_label),
+      controlledFallback: String(template.governance_status) === "BASELINE",
     };
   });
   for (const custom of customTemplates) {
@@ -2439,6 +2488,9 @@ async function effectiveWorkingPaperLibrary(
       deployedApplicability: deployedPaper
         ? String(deployedPaper.applicability)
         : null,
+      governanceStatus: "CUSTOM",
+      provenanceLabel: "TENANT_AUTHORED",
+      controlledFallback: false,
     });
   }
   return items.sort(
@@ -2548,7 +2600,7 @@ async function createCustomWorkingPaperTemplate(
     body = await jsonBody(request),
     scope = enumValue(body, "scope", ["PRACTICE", "CLIENT"] as const),
     code = boundedRequiredString(body, "code", 80).toUpperCase(),
-    categoryCode = enumValue(body, "categoryCode", ["ACCEPTANCE","PLANNING","RECORDS","INCOME","EXPENDITURE","ASSETS","LIABILITIES","FUNDS","REPORTING","COMPLETION"] as const),
+    categoryCode = enumValue(body, "categoryCode", WORKING_PAPER_CATEGORIES),
     title = boundedRequiredString(body, "title", 255),
     objective = boundedRequiredString(body, "objective", 2000),
     guidance = optionalString(body, "guidance") ?? "",
@@ -2591,7 +2643,7 @@ async function deployWorkingPaperLibrary(
       const engagement = await engagementAccess(tx,ctx,engagementId,["PARTNER","MANAGER"]);
       await lockEngagement(tx,ctx,engagementId);
       const library = await effectiveWorkingPaperLibrary(tx,ctx,engagementId,engagement.organisationId);
-      let created = 0, skipped = 0;
+      let created = 0, skipped = 0, controlledFallbacks = 0;
       for (const template of library) {
         if (template.disposition !== "INCLUDE" || template.deployedWorkingPaperId || (requested && !requested.has(template.templateCode))) { skipped++; continue; }
         const id = crypto.randomUUID(), contentHash = await canonicalHash(template.defaultContent);
@@ -2599,10 +2651,15 @@ async function deployWorkingPaperLibrary(
           values(${id},${ctx.tenantId},${engagementId},${template.code},${template.title},'NOT_STARTED',1,${template.customTemplateId ? null : template.templateCode},${template.templateVersion},${template.sourceScope},${template.categoryCode},${template.objective})`;
         await tx`insert into working_paper_version(id,tenant_id,working_paper_id,version,content,content_hash,created_by)
           values(${crypto.randomUUID()},${ctx.tenantId},${id},1,${canonicalJson(template.defaultContent)}::jsonb,${contentHash},${ctx.actorId})`;
+        if (!template.customTemplateId)
+          await tx`insert into working_paper_theme_link(id,tenant_id,engagement_id,working_paper_id,theme_code,is_primary,created_by)
+            select gen_random_uuid(),${ctx.tenantId},${engagementId},${id},theme_code,is_primary,${ctx.actorId}
+            from working_paper_template_theme where template_code=${template.templateCode} and template_version=${template.templateVersion}`;
+        if (template.controlledFallback) controlledFallbacks++;
         created++;
       }
-      await appendEvents(tx,ctx,engagement,"WORKING_PAPER_LIBRARY_DEPLOYED","ENGAGEMENT",engagementId,{created,skipped,requested:requested ? requested.size : null});
-      return { created, skipped, items: await workingPaperItems(tx,ctx,engagementId) };
+      await appendEvents(tx,ctx,engagement,"WORKING_PAPER_LIBRARY_DEPLOYED","ENGAGEMENT",engagementId,{created,skipped,controlledFallbacks,requested:requested ? requested.size : null});
+      return { created, skipped, controlledFallbacks, items: await workingPaperItems(tx,ctx,engagementId) };
     });
     return json(result, result.created ? 201 : 200);
   } finally { await sql.end(); }
@@ -2627,6 +2684,137 @@ async function setWorkingPaperApplicability(
     });
     return json({item});
   } finally { await sql.end(); }
+}
+
+function wpRiskItem(row: Record<string, unknown>) {
+  return { id:String(row.id),riskCode:String(row.risk_code),title:String(row.title),description:String(row.description),riskLevel:String(row.risk_level),response:String(row.response),status:String(row.status),createdAt:String(row.created_at),updatedAt:String(row.updated_at) };
+}
+function wpAttachmentItem(engagementId:string,workingPaperId:string,row:Record<string,unknown>) {
+  const id=String(row.id);
+  return { id,workingPaperId,workingPaperVersion:Number(row.working_paper_version),filename:String(row.filename),mediaType:String(row.media_type),byteSize:Number(row.byte_size),contentHash:String(row.content_hash),evidenceType:String(row.evidence_type),description:String(row.description),uploadedAt:String(row.uploaded_at),contentPath:`/v1/engagements/${encodeURIComponent(engagementId)}/working-papers/${encodeURIComponent(workingPaperId)}/attachments/${encodeURIComponent(id)}/content` };
+}
+function wpOptionalBounded(body:Record<string,unknown>,field:string,maximum:number):string|null {
+  const raw=body[field];
+  if(raw===undefined||raw===null||raw==="") return null;
+  if(typeof raw!=="string") throw new ApiError(400,"INVALID_REQUEST",`${field} must be a string`);
+  const value=raw.trim();
+  if(value.length>maximum||/[\u0000-\u001f\u007f]/.test(value)) throw new ApiError(400,"INVALID_REQUEST",`${field} must be at most ${maximum} characters without control characters`);
+  return value;
+}
+function wpDatabaseCode(error:unknown):string|null {
+  return typeof error==="object"&&error!==null&&"code" in error?String((error as {code?:unknown}).code??""):null;
+}
+async function requireWorkingPaper(tx:Transaction,ctx:RequestContext,engagementId:string,workingPaperId:string,lock=false) {
+  const rows=lock
+    ?await tx`select * from working_paper where tenant_id=${ctx.tenantId} and engagement_id=${engagementId} and id=${workingPaperId} for update`
+    :await tx`select * from working_paper where tenant_id=${ctx.tenantId} and engagement_id=${engagementId} and id=${workingPaperId}`;
+  if(!rows.length) throw new ApiError(404,"NOT_FOUND","Working paper not found");
+  return rows[0]!;
+}
+async function workingPaperReadiness(tx:Transaction,ctx:RequestContext,engagementId:string,paper:Record<string,unknown>){
+  const versions=await tx`select content from working_paper_version where tenant_id=${ctx.tenantId} and working_paper_id=${String(paper.id)} and version=${Number(paper.current_version)}`;
+  const content=(versions[0]?.content??{}) as Record<string,unknown>,requirements=(typeof content.governanceRequirements==="object"&&content.governanceRequirements!==null&&!Array.isArray(content.governanceRequirements)?content.governanceRequirements:{}) as Record<string,unknown>,templateCode=paper.template_code?String(paper.template_code):null,templateVersion=paper.template_version===null||paper.template_version===undefined?null:Number(paper.template_version);
+  const counts=(await tx`select
+    (select count(*)::int from working_paper_report_line_link link where tenant_id=${ctx.tenantId} and engagement_id=${engagementId} and working_paper_id=${String(paper.id)} and not exists(select 1 from working_paper_report_line_link successor where successor.tenant_id=link.tenant_id and successor.supersedes_link_id=link.id)) report_lines,
+    (select count(*)::int from working_paper_assertion_link link where tenant_id=${ctx.tenantId} and engagement_id=${engagementId} and working_paper_id=${String(paper.id)} and not exists(select 1 from working_paper_assertion_link successor where successor.tenant_id=link.tenant_id and successor.supersedes_link_id=link.id)) assertions,
+    (select count(*)::int from working_paper_risk_link link where tenant_id=${ctx.tenantId} and engagement_id=${engagementId} and working_paper_id=${String(paper.id)} and not exists(select 1 from working_paper_risk_link successor where successor.tenant_id=link.tenant_id and successor.supersedes_link_id=link.id)) risks,
+    (select count(*)::int from working_paper_theme_link link where tenant_id=${ctx.tenantId} and engagement_id=${engagementId} and working_paper_id=${String(paper.id)} and not exists(select 1 from working_paper_theme_link successor where successor.tenant_id=link.tenant_id and successor.supersedes_link_id=link.id)) themes,
+    (select count(*)::int from working_paper_attachment where tenant_id=${ctx.tenantId} and engagement_id=${engagementId} and working_paper_id=${String(paper.id)} and working_paper_version=${Number(paper.current_version)}) evidence,
+    (select count(*)::int from working_paper_template_theme where template_code=${templateCode} and template_version=${templateVersion}) configured_themes`)[0]!;
+  const configured={reportLineRequired:requirements.reportLineRequired===true,assertionRequired:requirements.assertionRequired===true,riskRequired:requirements.riskRequired===true,themeRequired:requirements.themeRequired===true||Number(counts.configured_themes)>0,evidenceRequired:requirements.evidenceRequired===true},blocks=workingPaperReadinessBlocks({applicability:String(paper.applicability),objective:paper.objective?String(paper.objective):null,narrative:content.narrative,requirements:configured,counts:{reportLines:Number(counts.report_lines),assertions:Number(counts.assertions),risks:Number(counts.risks),themes:Number(counts.themes),evidence:Number(counts.evidence)}});
+  return{ready:blocks.length===0,blocks,requirements:configured};
+}
+async function workingPaperReportingScope(tx:Transaction,ctx:RequestContext,engagementId:string){
+  const pinned=await tx`select p.id,p.pack_code,p.version_no,p.title from accounts_version av join reporting_framework_pack p on p.pack_code=av.framework_pack_id and p.version_no=av.framework_pack_version_no where av.tenant_id=${ctx.tenantId} and av.engagement_id=${engagementId} and av.status<>'SUPERSEDED' order by av.version desc limit 1`;
+  const packs=pinned.length?pinned:await tx`select p.id,p.pack_code,p.version_no,p.title from engagement e join reporting_framework_pack p on p.framework_code=e.framework and p.sector_code=coalesce(e.sector_profile,'NONE') and p.lifecycle_status<>'RETIRED' and p.effective_from<=e.period_start and (p.effective_to is null or p.effective_to>=e.period_end) where e.tenant_id=${ctx.tenantId} and e.id=${engagementId} order by p.version_no desc,p.pack_code limit 1`;
+  if(!packs.length)return{pack:null,taxonomyVersion:null,lines:[],reason:"REPORTING_PACK_UNAVAILABLE" as const};
+  const pack=packs[0]!,lines=await tx`select distinct r.id,r.taxonomy_version,r.line_code,r.caption,r.statement_code,r.display_order from statement_definition s join statement_definition_line l on l.statement_definition_id=s.id cross join lateral unnest(l.canonical_codes) code join canonical_account a on a.canonical_code=code join canonical_report_line r on r.id=a.report_line_id and r.taxonomy_version=a.taxonomy_version where s.framework_pack_id=${pack.id} order by r.taxonomy_version,r.statement_code,r.display_order,r.line_code`,versions=new Set(lines.map(r=>String(r.taxonomy_version)));
+  if(versions.size!==1)return{pack,taxonomyVersion:null,lines:[],reason:versions.size?"REPORTING_TAXONOMY_AMBIGUOUS" as const:"REPORTING_LINES_UNAVAILABLE" as const};
+  return{pack,taxonomyVersion:[...versions][0]!,lines,reason:null};
+}
+async function workingPaperGovernanceCatalogue(request:Request,env:Env,actorId:string,engagementId:string):Promise<Response> {
+  const ctx=context(request,actorId),sql=db(env);
+  try{return await withTenantTransaction(sql,ctx,async(tx)=>{
+    await engagementAccess(tx,ctx,engagementId);
+    const [areas,themes,templateThemes,reportingScope]=await Promise.all([
+      tx`select work_area_code,title,sequence_no,status,provenance_label from working_paper_work_area where status='ACTIVE' order by sequence_no,work_area_code`,
+      tx`select theme_code,title,description,status,provenance_label from working_paper_theme where status='ACTIVE' order by title,theme_code`,
+      tx`select template_code,template_version,theme_code,is_primary from working_paper_template_theme order by template_code,template_version,theme_code`,
+      workingPaperReportingScope(tx,ctx,engagementId)
+    ]);
+    return json({item:{
+      workAreas:areas.map(r=>({code:String(r.work_area_code),title:String(r.title),sequenceNo:Number(r.sequence_no),status:String(r.status),provenanceLabel:String(r.provenance_label)})),
+      themes:themes.map(r=>({code:String(r.theme_code),title:String(r.title),description:String(r.description),status:String(r.status),provenanceLabel:String(r.provenance_label)})),
+      templateThemes:templateThemes.map(r=>({templateCode:String(r.template_code),templateVersion:Number(r.template_version),themeCode:String(r.theme_code),isPrimary:Boolean(r.is_primary)})),
+      assertions:[...WORKING_PAPER_ASSERTIONS],
+      reportingScope:{available:reportingScope.reason===null,reason:reportingScope.reason,pack:reportingScope.pack?{packCode:String(reportingScope.pack.pack_code),versionNo:Number(reportingScope.pack.version_no),title:String(reportingScope.pack.title)}:null,taxonomyVersion:reportingScope.taxonomyVersion},
+      reportLines:reportingScope.lines.map(r=>({id:String(r.id),taxonomyVersion:String(r.taxonomy_version),lineCode:String(r.line_code),caption:String(r.caption),statementCode:String(r.statement_code),displayOrder:Number(r.display_order)})),
+      evidence:{uploadAvailable:true,maxBytes:MAX_WORKING_PAPER_EVIDENCE_BYTES,mediaTypes:[...WORKING_PAPER_EVIDENCE_MEDIA_TYPES],evidenceTypes:[...WORKING_PAPER_EVIDENCE_TYPES]}
+    }});
+  });}finally{await sql.end();}
+}
+async function listWorkingPaperRisks(request:Request,env:Env,actorId:string,engagementId:string):Promise<Response>{
+  const ctx=context(request,actorId),sql=db(env);
+  try{return await withTenantTransaction(sql,ctx,async(tx)=>{await engagementAccess(tx,ctx,engagementId);const rows=await tx`select * from engagement_risk where tenant_id=${ctx.tenantId} and engagement_id=${engagementId} order by case risk_level when 'SIGNIFICANT' then 1 when 'HIGH' then 2 when 'MEDIUM' then 3 else 4 end,risk_code,id`;return json({items:rows.map(wpRiskItem)});});}finally{await sql.end();}
+}
+async function createWorkingPaperRisk(request:Request,env:Env,actorId:string,engagementId:string):Promise<Response>{
+  const ctx=context(request,actorId),body=await jsonBody(request),sql=db(env),id=crypto.randomUUID(),riskCode=boundedRequiredString(body,"riskCode",80).toUpperCase(),title=boundedRequiredString(body,"title",255),description=wpOptionalBounded(body,"description",4000)??"",riskLevel=enumValue(body,"riskLevel",["LOW","MEDIUM","HIGH","SIGNIFICANT"] as const),response=wpOptionalBounded(body,"response",4000)??"",status=body.status===undefined?"OPEN":enumValue(body,"status",["OPEN","MITIGATED","ACCEPTED","CLOSED"] as const);
+  if(!/^[A-Z][A-Z0-9_.-]{1,79}$/.test(riskCode))throw new ApiError(400,"INVALID_REQUEST","riskCode is invalid");
+  try{const row=await withTenantTransaction(sql,ctx,async(tx)=>{const engagement=await engagementAccess(tx,ctx,engagementId,WRITE_ROLES);const rows=await tx`insert into engagement_risk(id,tenant_id,engagement_id,risk_code,title,description,risk_level,response,status,created_by,updated_by) values(${id},${ctx.tenantId},${engagementId},${riskCode},${title},${description},${riskLevel},${response},${status},${ctx.actorId},${ctx.actorId}) returning *`;await appendEvents(tx,ctx,engagement,"ENGAGEMENT_RISK_CREATED","ENGAGEMENT_RISK",id,{riskCode,riskLevel,status});return rows[0]!;});return json({item:wpRiskItem(row)},201);}finally{await sql.end();}
+}
+async function patchWorkingPaperRisk(request:Request,env:Env,actorId:string,engagementId:string,riskId:string):Promise<Response>{
+  const ctx=context(request,actorId),body=await jsonBody(request),sql=db(env),changes:Record<string,string>={};
+  if(body.title!==undefined)changes.title=boundedRequiredString(body,"title",255);if(body.description!==undefined)changes.description=wpOptionalBounded(body,"description",4000)??"";if(body.riskLevel!==undefined)changes.risk_level=enumValue(body,"riskLevel",["LOW","MEDIUM","HIGH","SIGNIFICANT"] as const);if(body.response!==undefined)changes.response=wpOptionalBounded(body,"response",4000)??"";if(body.status!==undefined)changes.status=enumValue(body,"status",["OPEN","MITIGATED","ACCEPTED","CLOSED"] as const);
+  if(!Object.keys(changes).length)throw new ApiError(400,"INVALID_REQUEST","At least one mutable risk field is required");
+  try{const row=await withTenantTransaction(sql,ctx,async(tx)=>{const engagement=await engagementAccess(tx,ctx,engagementId,WRITE_ROLES);const rows=await tx`update engagement_risk set ${tx(changes,...Object.keys(changes))},updated_by=${ctx.actorId},updated_at=now() where tenant_id=${ctx.tenantId} and engagement_id=${engagementId} and id=${riskId} returning *`;if(!rows.length)throw new ApiError(404,"NOT_FOUND","Risk not found");await appendEvents(tx,ctx,engagement,"ENGAGEMENT_RISK_UPDATED","ENGAGEMENT_RISK",riskId,{changedFields:Object.keys(body)});return rows[0]!;});return json({item:wpRiskItem(row)});}finally{await sql.end();}
+}
+async function getWorkingPaperGovernance(request:Request,env:Env,actorId:string,engagementId:string,workingPaperId:string):Promise<Response>{
+  const ctx=context(request,actorId),sql=db(env);
+  try{return await withTenantTransaction(sql,ctx,async(tx)=>{await engagementAccess(tx,ctx,engagementId);const paper=await requireWorkingPaper(tx,ctx,engagementId,workingPaperId);const [lines,assertions,risks,themes,attachments]=await Promise.all([
+    tx`select l.id,l.report_line_id,l.link_purpose,l.created_at,r.line_code,r.caption,r.statement_code from working_paper_report_line_link l join canonical_report_line r on r.id=l.report_line_id where l.tenant_id=${ctx.tenantId} and l.engagement_id=${engagementId} and l.working_paper_id=${workingPaperId} and not exists(select 1 from working_paper_report_line_link successor where successor.tenant_id=l.tenant_id and successor.supersedes_link_id=l.id) order by case l.link_purpose when 'PRIMARY' then 1 when 'SUPPORTING' then 2 else 3 end,r.display_order,l.id`,
+    tx`select l.id,l.assertion_code,l.created_at from working_paper_assertion_link l where l.tenant_id=${ctx.tenantId} and l.engagement_id=${engagementId} and l.working_paper_id=${workingPaperId} and not exists(select 1 from working_paper_assertion_link successor where successor.tenant_id=l.tenant_id and successor.supersedes_link_id=l.id) order by l.assertion_code,l.id`,
+    tx`select l.id,l.risk_id,l.created_at,r.risk_code,r.title,r.risk_level,r.status from working_paper_risk_link l join engagement_risk r on r.tenant_id=l.tenant_id and r.engagement_id=l.engagement_id and r.id=l.risk_id where l.tenant_id=${ctx.tenantId} and l.engagement_id=${engagementId} and l.working_paper_id=${workingPaperId} and not exists(select 1 from working_paper_risk_link successor where successor.tenant_id=l.tenant_id and successor.supersedes_link_id=l.id) order by r.risk_code,l.id`,
+    tx`select l.id,l.theme_code,l.is_primary,l.created_at,t.title from working_paper_theme_link l join working_paper_theme t on t.theme_code=l.theme_code where l.tenant_id=${ctx.tenantId} and l.engagement_id=${engagementId} and l.working_paper_id=${workingPaperId} and not exists(select 1 from working_paper_theme_link successor where successor.tenant_id=l.tenant_id and successor.supersedes_link_id=l.id) order by l.is_primary desc,t.title,l.id`,
+    tx`select * from working_paper_attachment where tenant_id=${ctx.tenantId} and engagement_id=${engagementId} and working_paper_id=${workingPaperId} order by working_paper_version desc,uploaded_at desc,id`
+  ]),readiness=await workingPaperReadiness(tx,ctx,engagementId,paper);return json({item:{workingPaper:{id:String(paper.id),code:String(paper.code),title:String(paper.title),categoryCode:String(paper.category_code),objective:paper.objective?String(paper.objective):null,status:String(paper.status),currentVersion:Number(paper.current_version),templateCode:paper.template_code?String(paper.template_code):null,templateVersion:paper.template_version===null?null:Number(paper.template_version),templateScope:String(paper.template_scope),applicability:String(paper.applicability)},readiness,reportLines:lines.map(r=>({id:String(r.id),reportLineId:String(r.report_line_id),lineCode:String(r.line_code),caption:String(r.caption),statementCode:String(r.statement_code),linkPurpose:String(r.link_purpose),createdAt:String(r.created_at)})),assertions:assertions.map(r=>({id:String(r.id),assertionCode:String(r.assertion_code),createdAt:String(r.created_at)})),risks:risks.map(r=>({id:String(r.id),riskId:String(r.risk_id),riskCode:String(r.risk_code),title:String(r.title),riskLevel:String(r.risk_level),status:String(r.status),createdAt:String(r.created_at)})),themes:themes.map(r=>({id:String(r.id),themeCode:String(r.theme_code),title:String(r.title),isPrimary:Boolean(r.is_primary),createdAt:String(r.created_at)})),attachments:attachments.map(r=>wpAttachmentItem(engagementId,workingPaperId,r))}});});}finally{await sql.end();}
+}
+type WpLinkKind="report-line"|"assertion"|"risk"|"theme";
+async function putWorkingPaperGovernanceLink(request:Request,env:Env,actorId:string,engagementId:string,workingPaperId:string,kind:WpLinkKind,value:string):Promise<Response>{
+  const ctx=context(request,actorId),body=(kind==="report-line"||kind==="theme")?await jsonBody(request):{},sql=db(env),id=crypto.randomUUID();
+  try{const result=await withTenantTransaction(sql,ctx,async(tx)=>{const engagement=await engagementAccess(tx,ctx,engagementId,WRITE_ROLES);await requireWorkingPaper(tx,ctx,engagementId,workingPaperId,true);let rows:Record<string,unknown>[]=[],existing:Record<string,unknown>[]=[],eventType="",metadata:JsonMetadata={};
+    if(kind==="report-line"){const purpose=enumValue(body,"linkPurpose",["PRIMARY","SUPPORTING","DISCLOSURE"] as const),scope=await workingPaperReportingScope(tx,ctx,engagementId);if(scope.reason)throw new ApiError(409,scope.reason,"The engagement does not have one unambiguous applicable reporting pack and taxonomy");if(!scope.lines.some(line=>String(line.id)===value))throw new ApiError(400,"IMPERMISSIBLE_REPORT_LINE","reportLineId is not permitted by the engagement reporting pack and taxonomy");existing=await tx`select l.*,not exists(select 1 from working_paper_report_line_link successor where successor.tenant_id=l.tenant_id and successor.supersedes_link_id=l.id) as is_current from working_paper_report_line_link l where l.tenant_id=${ctx.tenantId} and l.working_paper_id=${workingPaperId} and l.report_line_id=${value}`;if(existing.length&&!Boolean(existing[0]!.is_current))throw new ApiError(409,"LINK_TARGET_PREVIOUSLY_USED","The report line was previously linked and superseded");if(existing.length&&String(existing[0]!.link_purpose)!==purpose)throw new ApiError(409,"IMMUTABLE_LINK_CONFLICT","The report line is already linked with a different purpose");if(!existing.length)rows=await tx`insert into working_paper_report_line_link(id,tenant_id,engagement_id,working_paper_id,report_line_id,link_purpose,created_by) values(${id},${ctx.tenantId},${engagementId},${workingPaperId},${value},${purpose},${ctx.actorId}) returning *`;eventType="WORKING_PAPER_REPORT_LINE_LINKED";metadata={reportLineId:value,linkPurpose:purpose,packCode:String(scope.pack!.pack_code),packVersion:Number(scope.pack!.version_no),taxonomyVersion:scope.taxonomyVersion};}
+    else if(kind==="assertion"){if(!WORKING_PAPER_ASSERTIONS.includes(value as (typeof WORKING_PAPER_ASSERTIONS)[number]))throw new ApiError(400,"INVALID_ASSERTION","assertionCode is invalid");existing=await tx`select l.*,not exists(select 1 from working_paper_assertion_link successor where successor.tenant_id=l.tenant_id and successor.supersedes_link_id=l.id) as is_current from working_paper_assertion_link l where l.tenant_id=${ctx.tenantId} and l.working_paper_id=${workingPaperId} and l.assertion_code=${value}`;if(existing.length&&!Boolean(existing[0]!.is_current))throw new ApiError(409,"LINK_TARGET_PREVIOUSLY_USED","The assertion was previously linked and superseded");if(!existing.length)rows=await tx`insert into working_paper_assertion_link(id,tenant_id,engagement_id,working_paper_id,assertion_code,created_by) values(${id},${ctx.tenantId},${engagementId},${workingPaperId},${value},${ctx.actorId}) returning *`;eventType="WORKING_PAPER_ASSERTION_LINKED";metadata={assertionCode:value};}
+    else if(kind==="risk"){if(!(await tx`select id from engagement_risk where tenant_id=${ctx.tenantId} and engagement_id=${engagementId} and id=${value}`).length)throw new ApiError(400,"INVALID_RISK","riskId is invalid");existing=await tx`select l.*,not exists(select 1 from working_paper_risk_link successor where successor.tenant_id=l.tenant_id and successor.supersedes_link_id=l.id) as is_current from working_paper_risk_link l where l.tenant_id=${ctx.tenantId} and l.working_paper_id=${workingPaperId} and l.risk_id=${value}`;if(existing.length&&!Boolean(existing[0]!.is_current))throw new ApiError(409,"LINK_TARGET_PREVIOUSLY_USED","The risk was previously linked and superseded");if(!existing.length)rows=await tx`insert into working_paper_risk_link(id,tenant_id,engagement_id,working_paper_id,risk_id,created_by) values(${id},${ctx.tenantId},${engagementId},${workingPaperId},${value},${ctx.actorId}) returning *`;eventType="WORKING_PAPER_RISK_LINKED";metadata={riskId:value};}
+    else{const isPrimary=body.isPrimary===true;if(!(await tx`select theme_code from working_paper_theme where theme_code=${value} and status='ACTIVE'`).length)throw new ApiError(400,"INVALID_THEME","themeCode is invalid or retired");existing=await tx`select l.*,not exists(select 1 from working_paper_theme_link successor where successor.tenant_id=l.tenant_id and successor.supersedes_link_id=l.id) as is_current from working_paper_theme_link l where l.tenant_id=${ctx.tenantId} and l.working_paper_id=${workingPaperId} and l.theme_code=${value}`;if(existing.length&&!Boolean(existing[0]!.is_current))throw new ApiError(409,"LINK_TARGET_PREVIOUSLY_USED","The theme was previously linked and superseded");if(existing.length&&Boolean(existing[0]!.is_primary)!==isPrimary)throw new ApiError(409,"IMMUTABLE_LINK_CONFLICT","The theme is already linked with a different primary setting");if(!existing.length)rows=await tx`insert into working_paper_theme_link(id,tenant_id,engagement_id,working_paper_id,theme_code,is_primary,created_by) values(${id},${ctx.tenantId},${engagementId},${workingPaperId},${value},${isPrimary},${ctx.actorId}) returning *`;eventType="WORKING_PAPER_THEME_LINKED";metadata={themeCode:value,isPrimary};}
+    const created=rows.length>0,row=(rows[0]??existing[0])!;if(created)await appendEvents(tx,ctx,engagement,eventType,"WORKING_PAPER",workingPaperId,metadata);return{created,row};});
+    const row=result.row,item=kind==="report-line"?{id:String(row.id),reportLineId:String(row.report_line_id),linkPurpose:String(row.link_purpose),createdAt:String(row.created_at)}:kind==="assertion"?{id:String(row.id),assertionCode:String(row.assertion_code),createdAt:String(row.created_at)}:kind==="risk"?{id:String(row.id),riskId:String(row.risk_id),createdAt:String(row.created_at)}:{id:String(row.id),themeCode:String(row.theme_code),isPrimary:Boolean(row.is_primary),createdAt:String(row.created_at)};
+    return json({created:result.created,item},result.created?201:200);
+  }catch(error){if(wpDatabaseCode(error)==="23505"&&(kind==="report-line"||kind==="theme"))throw new ApiError(409,"PRIMARY_LINK_EXISTS",`This working paper already has a primary ${kind==="theme"?"theme":"report line"}`);throw error;}finally{await sql.end();}
+}
+async function replaceWorkingPaperGovernanceLink(request:Request,env:Env,actorId:string,engagementId:string,workingPaperId:string,kind:WpLinkKind,linkId:string):Promise<Response>{
+  const ctx=context(request,actorId),body=await jsonBody(request),reason=boundedRequiredString(body,"reason",1000),sql=db(env),replacementId=crypto.randomUUID();
+  try{const result=await withTenantTransaction(sql,ctx,async(tx)=>{const engagement=await engagementAccess(tx,ctx,engagementId,WRITE_ROLES);await requireWorkingPaper(tx,ctx,engagementId,workingPaperId,true);let old:Record<string,unknown>|undefined,newRows:Record<string,unknown>[]=[],eventType="",metadata:JsonMetadata={supersededLinkId:linkId,replacementLinkId:replacementId,reason};
+    if(kind==="report-line"){const reportLineId=boundedRequiredString(body,"reportLineId",80),scope=await workingPaperReportingScope(tx,ctx,engagementId);if(scope.reason)throw new ApiError(409,scope.reason,"The engagement does not have one unambiguous applicable reporting pack and taxonomy");if(!scope.lines.some(line=>String(line.id)===reportLineId))throw new ApiError(400,"IMPERMISSIBLE_REPORT_LINE","reportLineId is not permitted by the engagement reporting pack and taxonomy");old=(await tx`select l.* from working_paper_report_line_link l where l.tenant_id=${ctx.tenantId} and l.working_paper_id=${workingPaperId} and l.id=${linkId} and not exists(select 1 from working_paper_report_line_link successor where successor.tenant_id=l.tenant_id and successor.supersedes_link_id=l.id) for update`)[0];if((await tx`select 1 from working_paper_report_line_link where tenant_id=${ctx.tenantId} and working_paper_id=${workingPaperId} and report_line_id=${reportLineId}`).length)throw new ApiError(409,"LINK_TARGET_PREVIOUSLY_USED","The replacement report line was already linked to this paper");const linkPurpose=old?String(old.link_purpose):"";if(old)newRows=await tx`insert into working_paper_report_line_link(id,tenant_id,engagement_id,working_paper_id,report_line_id,link_purpose,supersedes_link_id,supersession_reason,created_by) values(${replacementId},${ctx.tenantId},${engagementId},${workingPaperId},${reportLineId},${linkPurpose},${linkId},${reason},${ctx.actorId}) returning *`;eventType="WORKING_PAPER_REPORT_LINE_REPLACED";metadata={...metadata,reportLineId,linkPurpose,packCode:String(scope.pack!.pack_code),packVersion:Number(scope.pack!.version_no),taxonomyVersion:scope.taxonomyVersion};}
+    else if(kind==="assertion"){const assertionCode=enumValue(body,"assertionCode",WORKING_PAPER_ASSERTIONS);old=(await tx`select l.* from working_paper_assertion_link l where l.tenant_id=${ctx.tenantId} and l.working_paper_id=${workingPaperId} and l.id=${linkId} and not exists(select 1 from working_paper_assertion_link successor where successor.tenant_id=l.tenant_id and successor.supersedes_link_id=l.id) for update`)[0];if((await tx`select 1 from working_paper_assertion_link where tenant_id=${ctx.tenantId} and working_paper_id=${workingPaperId} and assertion_code=${assertionCode}`).length)throw new ApiError(409,"LINK_TARGET_PREVIOUSLY_USED","The replacement assertion was already linked to this paper");if(old)newRows=await tx`insert into working_paper_assertion_link(id,tenant_id,engagement_id,working_paper_id,assertion_code,supersedes_link_id,supersession_reason,created_by) values(${replacementId},${ctx.tenantId},${engagementId},${workingPaperId},${assertionCode},${linkId},${reason},${ctx.actorId}) returning *`;eventType="WORKING_PAPER_ASSERTION_REPLACED";metadata={...metadata,assertionCode};}
+    else if(kind==="risk"){const riskId=boundedRequiredString(body,"riskId",80);if(!(await tx`select id from engagement_risk where tenant_id=${ctx.tenantId} and engagement_id=${engagementId} and id=${riskId}`).length)throw new ApiError(400,"INVALID_RISK","riskId is invalid");old=(await tx`select l.* from working_paper_risk_link l where l.tenant_id=${ctx.tenantId} and l.working_paper_id=${workingPaperId} and l.id=${linkId} and not exists(select 1 from working_paper_risk_link successor where successor.tenant_id=l.tenant_id and successor.supersedes_link_id=l.id) for update`)[0];if((await tx`select 1 from working_paper_risk_link where tenant_id=${ctx.tenantId} and working_paper_id=${workingPaperId} and risk_id=${riskId}`).length)throw new ApiError(409,"LINK_TARGET_PREVIOUSLY_USED","The replacement risk was already linked to this paper");if(old)newRows=await tx`insert into working_paper_risk_link(id,tenant_id,engagement_id,working_paper_id,risk_id,supersedes_link_id,supersession_reason,created_by) values(${replacementId},${ctx.tenantId},${engagementId},${workingPaperId},${riskId},${linkId},${reason},${ctx.actorId}) returning *`;eventType="WORKING_PAPER_RISK_REPLACED";metadata={...metadata,riskId};}
+    else{const themeCode=boundedRequiredString(body,"themeCode",80);if(!(await tx`select theme_code from working_paper_theme where theme_code=${themeCode} and status='ACTIVE'`).length)throw new ApiError(400,"INVALID_THEME","themeCode is invalid or retired");old=(await tx`select l.* from working_paper_theme_link l where l.tenant_id=${ctx.tenantId} and l.working_paper_id=${workingPaperId} and l.id=${linkId} and not exists(select 1 from working_paper_theme_link successor where successor.tenant_id=l.tenant_id and successor.supersedes_link_id=l.id) for update`)[0];if((await tx`select 1 from working_paper_theme_link where tenant_id=${ctx.tenantId} and working_paper_id=${workingPaperId} and theme_code=${themeCode}`).length)throw new ApiError(409,"LINK_TARGET_PREVIOUSLY_USED","The replacement theme was already linked to this paper");const isPrimary=old?Boolean(old.is_primary):false;if(old)newRows=await tx`insert into working_paper_theme_link(id,tenant_id,engagement_id,working_paper_id,theme_code,is_primary,supersedes_link_id,supersession_reason,created_by) values(${replacementId},${ctx.tenantId},${engagementId},${workingPaperId},${themeCode},${isPrimary},${linkId},${reason},${ctx.actorId}) returning *`;eventType="WORKING_PAPER_THEME_REPLACED";metadata={...metadata,themeCode,isPrimary};}
+    if(!old)throw new ApiError(404,"CURRENT_LINK_NOT_FOUND","Current governance link not found");await appendEvents(tx,ctx,engagement,eventType,"WORKING_PAPER",workingPaperId,metadata);return newRows[0]!;});const item=kind==="report-line"?{id:String(result.id),reportLineId:String(result.report_line_id),linkPurpose:String(result.link_purpose),createdAt:String(result.created_at)}:kind==="assertion"?{id:String(result.id),assertionCode:String(result.assertion_code),createdAt:String(result.created_at)}:kind==="risk"?{id:String(result.id),riskId:String(result.risk_id),createdAt:String(result.created_at)}:{id:String(result.id),themeCode:String(result.theme_code),isPrimary:Boolean(result.is_primary),createdAt:String(result.created_at)};return json({item,supersededLinkId:linkId,reason},201);
+  }catch(error){if(wpDatabaseCode(error)==="23505")throw new ApiError(409,"LINK_REPLACEMENT_CONFLICT","The replacement would violate current-link governance");throw error;}finally{await sql.end();}
+}
+async function parseWorkingPaperAttachment(request:Request){
+  const contentType=request.headers.get("content-type")??"";if(!contentType.toLowerCase().startsWith("multipart/form-data;"))throw new ApiError(415,"UNSUPPORTED_MEDIA_TYPE","multipart/form-data is required");let form:FormData;try{form=await new Response(await readBodyBounded(request,MAX_WORKING_PAPER_MULTIPART_BYTES,"Working paper evidence upload"),{headers:{"content-type":contentType}}).formData();}catch(error){if(error instanceof ApiError)throw error;throw new ApiError(400,"INVALID_MULTIPART","The multipart request could not be parsed");}
+  const files=form.getAll("file");if(files.length!==1||!(files[0] instanceof File))throw new ApiError(400,"FILE_REQUIRED","Exactly one evidence file is required");const file=files[0],bytes=await file.arrayBuffer(),mediaType=file.type.toLowerCase();if(!bytes.byteLength||bytes.byteLength>MAX_WORKING_PAPER_EVIDENCE_BYTES)throw new ApiError(413,"PAYLOAD_TOO_LARGE","Evidence file must be between 1 byte and 10 MiB");if(!WORKING_PAPER_EVIDENCE_MEDIA_TYPES.includes(mediaType as (typeof WORKING_PAPER_EVIDENCE_MEDIA_TYPES)[number]))throw new ApiError(415,"UNSUPPORTED_MEDIA_TYPE","Evidence file type is not supported");if(!workingPaperEvidenceSignatureMatches(mediaType,bytes))throw new ApiError(400,"FILE_SIGNATURE_MISMATCH","Evidence bytes do not match the declared file type");const versionValue=form.get("workingPaperVersion"),version=typeof versionValue==="string"?Number(versionValue):NaN;if(!Number.isSafeInteger(version)||version<1)throw new ApiError(400,"INVALID_REQUEST","workingPaperVersion must be a positive integer");const typeValue=form.get("evidenceType");if(typeof typeValue!=="string"||!WORKING_PAPER_EVIDENCE_TYPES.includes(typeValue as (typeof WORKING_PAPER_EVIDENCE_TYPES)[number]))throw new ApiError(400,"INVALID_REQUEST",`evidenceType must be one of ${WORKING_PAPER_EVIDENCE_TYPES.join(", ")}`);const descriptionValue=form.get("description"),description=typeof descriptionValue==="string"?wpOptionalBounded({description:descriptionValue},"description",2000)??"":"";let filename:string;try{filename=safeWorkingPaperEvidenceFilename(file.name);}catch{throw new ApiError(400,"INVALID_FILENAME","Evidence filename is invalid");}return{bytes,filename,mediaType,version,evidenceType:typeValue,description};
+}
+async function listWorkingPaperAttachments(request:Request,env:Env,actorId:string,engagementId:string,workingPaperId:string):Promise<Response>{const ctx=context(request,actorId),sql=db(env);try{return await withTenantTransaction(sql,ctx,async(tx)=>{await engagementAccess(tx,ctx,engagementId);await requireWorkingPaper(tx,ctx,engagementId,workingPaperId);const rows=await tx`select * from working_paper_attachment where tenant_id=${ctx.tenantId} and engagement_id=${engagementId} and working_paper_id=${workingPaperId} order by working_paper_version desc,uploaded_at desc,id`;return json({items:rows.map(r=>wpAttachmentItem(engagementId,workingPaperId,r))});});}finally{await sql.end();}}
+async function uploadWorkingPaperAttachment(request:Request,env:Env,actorId:string,engagementId:string,workingPaperId:string):Promise<Response>{
+  const ctx=context(request,actorId),upload=await parseWorkingPaperAttachment(request),contentHash=await sha256(upload.bytes),sql=db(env),attachmentId=crypto.randomUUID();let uploadedKey:string|null=null;
+  try{const existing=await withTenantTransaction(sql,ctx,async(tx)=>{await engagementAccess(tx,ctx,engagementId,WRITE_ROLES);await requireWorkingPaper(tx,ctx,engagementId,workingPaperId,true);if(!(await tx`select id from working_paper_version where tenant_id=${ctx.tenantId} and working_paper_id=${workingPaperId} and version=${upload.version}`).length)throw new ApiError(400,"INVALID_WORKING_PAPER_VERSION","workingPaperVersion does not exist");return(await tx`select * from working_paper_attachment where tenant_id=${ctx.tenantId} and working_paper_id=${workingPaperId} and working_paper_version=${upload.version} and content_hash=${contentHash}`)[0]??null;});if(existing){const object=await env.ARTEFACTS.head(String(existing.storage_key));if(!object||object.size!==Number(existing.byte_size)||object.customMetadata?.sha256!==contentHash)throw new ApiError(503,"EVIDENCE_INTEGRITY_FAILED","Existing evidence storage could not be verified");return json({created:false,item:wpAttachmentItem(engagementId,workingPaperId,existing)});}
+    uploadedKey=`tenants/${ctx.tenantId}/engagements/${engagementId}/working-papers/${workingPaperId}/versions/${upload.version}/attachments/${attachmentId}`;await env.ARTEFACTS.put(uploadedKey,upload.bytes,{sha256:contentHash,httpMetadata:{contentType:upload.mediaType},customMetadata:{sha256:contentHash,tenantId:ctx.tenantId,engagementId,workingPaperId,workingPaperVersion:String(upload.version),attachmentId}});
+    const result=await withTenantTransaction(sql,ctx,async(tx)=>{const engagement=await engagementAccess(tx,ctx,engagementId,WRITE_ROLES);await requireWorkingPaper(tx,ctx,engagementId,workingPaperId,true);const duplicate=await tx`select * from working_paper_attachment where tenant_id=${ctx.tenantId} and working_paper_id=${workingPaperId} and working_paper_version=${upload.version} and content_hash=${contentHash}`;if(duplicate.length)return{created:false,row:duplicate[0]!};const rows=await tx`insert into working_paper_attachment(id,tenant_id,engagement_id,working_paper_id,working_paper_version,storage_key,content_hash,filename,media_type,byte_size,evidence_type,description,uploaded_by) values(${attachmentId},${ctx.tenantId},${engagementId},${workingPaperId},${upload.version},${uploadedKey},${contentHash},${upload.filename},${upload.mediaType},${upload.bytes.byteLength},${upload.evidenceType},${upload.description},${ctx.actorId}) returning *`;await appendEvents(tx,ctx,engagement,"WORKING_PAPER_ATTACHMENT_ADDED","WORKING_PAPER_ATTACHMENT",attachmentId,{workingPaperId,workingPaperVersion:upload.version,contentHash,filename:upload.filename,mediaType:upload.mediaType,byteSize:upload.bytes.byteLength,evidenceType:upload.evidenceType,description:upload.description});return{created:true,row:rows[0]!};});if(!result.created)await deleteUploadedObject(env,uploadedKey,"concurrent working paper evidence winner");uploadedKey=null;return json({created:result.created,item:wpAttachmentItem(engagementId,workingPaperId,result.row)},result.created?201:200);
+  }catch(error){if(uploadedKey)await deleteUploadedObject(env,uploadedKey,"working paper evidence transaction failed");throw error;}finally{await sql.end();}
+}
+async function downloadWorkingPaperAttachment(request:Request,env:Env,actorId:string,engagementId:string,workingPaperId:string,attachmentId:string):Promise<Response>{
+  const ctx=context(request,actorId),sql=db(env);try{const row=await withTenantTransaction(sql,ctx,async(tx)=>{await engagementAccess(tx,ctx,engagementId);await requireWorkingPaper(tx,ctx,engagementId,workingPaperId);const rows=await tx`select * from working_paper_attachment where tenant_id=${ctx.tenantId} and engagement_id=${engagementId} and working_paper_id=${workingPaperId} and id=${attachmentId}`;if(!rows.length)throw new ApiError(404,"NOT_FOUND","Working paper evidence not found");return rows[0]!;});const key=String(row.storage_key),prefix=`tenants/${ctx.tenantId}/engagements/${engagementId}/working-papers/${workingPaperId}/`;if(!key.startsWith(prefix))throw new ApiError(503,"EVIDENCE_INTEGRITY_FAILED","Evidence storage scope is invalid");const object=await env.ARTEFACTS.get(key);if(!object||object.size!==Number(row.byte_size)||object.size>MAX_WORKING_PAPER_EVIDENCE_BYTES||object.customMetadata?.sha256!==String(row.content_hash))throw new ApiError(503,"EVIDENCE_INTEGRITY_FAILED","Stored evidence could not be verified");const bytes=await object.arrayBuffer();if(await sha256(bytes)!==String(row.content_hash))throw new ApiError(503,"EVIDENCE_INTEGRITY_FAILED","Stored evidence hash does not match its immutable record");const mediaType=String(row.media_type),download=new URL(request.url).searchParams.get("download")==="1"||!(mediaType==="application/pdf"||mediaType==="text/plain"||mediaType.startsWith("image/")),filename=String(row.filename).replace(/["\r\n\\/]/g,"_");return new Response(bytes,{headers:{"content-type":mediaType,"content-length":String(bytes.byteLength),"content-disposition":`${download?"attachment":"inline"}; filename="${filename}"`,"cache-control":"private, no-store","x-content-type-options":"nosniff","x-content-sha256":String(row.content_hash),etag:object.httpEtag}});}finally{await sql.end();}
 }
 
 async function disclosureItems(
@@ -5331,6 +5519,7 @@ export default {
             "journals",
             "reconciliations",
             "working-papers",
+            "governed-working-paper-evidence",
             "workflow-tasks",
             "review-points",
             "disclosures",
@@ -5452,6 +5641,48 @@ export default {
         );
         const workingPapersRoute = url.pathname.match(
           /^\/v1\/engagements\/([^/]+)\/working-papers$/,
+        );
+        const workingPaperGovernanceCatalogueRoute = url.pathname.match(
+          /^\/v1\/engagements\/([^/]+)\/working-paper-governance\/catalogue$/,
+        );
+        const workingPaperRisksRoute = url.pathname.match(
+          /^\/v1\/engagements\/([^/]+)\/risks$/,
+        );
+        const workingPaperRiskItemRoute = url.pathname.match(
+          /^\/v1\/engagements\/([^/]+)\/risks\/([^/]+)$/,
+        );
+        const workingPaperGovernanceRoute = url.pathname.match(
+          /^\/v1\/engagements\/([^/]+)\/working-papers\/([^/]+)\/governance$/,
+        );
+        const workingPaperReportLineLinkRoute = url.pathname.match(
+          /^\/v1\/engagements\/([^/]+)\/working-papers\/([^/]+)\/report-line-links\/([^/]+)$/,
+        );
+        const workingPaperAssertionLinkRoute = url.pathname.match(
+          /^\/v1\/engagements\/([^/]+)\/working-papers\/([^/]+)\/assertion-links\/([^/]+)$/,
+        );
+        const workingPaperRiskLinkRoute = url.pathname.match(
+          /^\/v1\/engagements\/([^/]+)\/working-papers\/([^/]+)\/risk-links\/([^/]+)$/,
+        );
+        const workingPaperThemeLinkRoute = url.pathname.match(
+          /^\/v1\/engagements\/([^/]+)\/working-papers\/([^/]+)\/theme-links\/([^/]+)$/,
+        );
+        const workingPaperReportLineReplaceRoute = url.pathname.match(
+          /^\/v1\/engagements\/([^/]+)\/working-papers\/([^/]+)\/report-line-links\/([^/]+)\/replace$/,
+        );
+        const workingPaperAssertionReplaceRoute = url.pathname.match(
+          /^\/v1\/engagements\/([^/]+)\/working-papers\/([^/]+)\/assertion-links\/([^/]+)\/replace$/,
+        );
+        const workingPaperRiskReplaceRoute = url.pathname.match(
+          /^\/v1\/engagements\/([^/]+)\/working-papers\/([^/]+)\/risk-links\/([^/]+)\/replace$/,
+        );
+        const workingPaperThemeReplaceRoute = url.pathname.match(
+          /^\/v1\/engagements\/([^/]+)\/working-papers\/([^/]+)\/theme-links\/([^/]+)\/replace$/,
+        );
+        const workingPaperAttachmentsRoute = url.pathname.match(
+          /^\/v1\/engagements\/([^/]+)\/working-papers\/([^/]+)\/attachments$/,
+        );
+        const workingPaperAttachmentContentRoute = url.pathname.match(
+          /^\/v1\/engagements\/([^/]+)\/working-papers\/([^/]+)\/attachments\/([^/]+)\/content$/,
         );
         const workingPaperLibraryRoute = url.pathname.match(
           /^\/v1\/engagements\/([^/]+)\/working-paper-library$/,
@@ -5643,6 +5874,38 @@ export default {
             actorId,
             workingPapersRoute[1]!,
           );
+        else if (request.method === "GET" && workingPaperGovernanceCatalogueRoute)
+          response = await workingPaperGovernanceCatalogue(request,env,actorId,workingPaperGovernanceCatalogueRoute[1]!);
+        else if (request.method === "GET" && workingPaperRisksRoute)
+          response = await listWorkingPaperRisks(request,env,actorId,workingPaperRisksRoute[1]!);
+        else if (request.method === "POST" && workingPaperRisksRoute)
+          response = await createWorkingPaperRisk(request,env,actorId,workingPaperRisksRoute[1]!);
+        else if (request.method === "PATCH" && workingPaperRiskItemRoute)
+          response = await patchWorkingPaperRisk(request,env,actorId,workingPaperRiskItemRoute[1]!,workingPaperRiskItemRoute[2]!);
+        else if (request.method === "GET" && workingPaperGovernanceRoute)
+          response = await getWorkingPaperGovernance(request,env,actorId,workingPaperGovernanceRoute[1]!,workingPaperGovernanceRoute[2]!);
+        else if (request.method === "PUT" && workingPaperReportLineLinkRoute)
+          response = await putWorkingPaperGovernanceLink(request,env,actorId,workingPaperReportLineLinkRoute[1]!,workingPaperReportLineLinkRoute[2]!,"report-line",workingPaperReportLineLinkRoute[3]!);
+        else if (request.method === "PUT" && workingPaperAssertionLinkRoute)
+          response = await putWorkingPaperGovernanceLink(request,env,actorId,workingPaperAssertionLinkRoute[1]!,workingPaperAssertionLinkRoute[2]!,"assertion",workingPaperAssertionLinkRoute[3]!);
+        else if (request.method === "PUT" && workingPaperRiskLinkRoute)
+          response = await putWorkingPaperGovernanceLink(request,env,actorId,workingPaperRiskLinkRoute[1]!,workingPaperRiskLinkRoute[2]!,"risk",workingPaperRiskLinkRoute[3]!);
+        else if (request.method === "PUT" && workingPaperThemeLinkRoute)
+          response = await putWorkingPaperGovernanceLink(request,env,actorId,workingPaperThemeLinkRoute[1]!,workingPaperThemeLinkRoute[2]!,"theme",workingPaperThemeLinkRoute[3]!);
+        else if (request.method === "POST" && workingPaperReportLineReplaceRoute)
+          response = await replaceWorkingPaperGovernanceLink(request,env,actorId,workingPaperReportLineReplaceRoute[1]!,workingPaperReportLineReplaceRoute[2]!,"report-line",workingPaperReportLineReplaceRoute[3]!);
+        else if (request.method === "POST" && workingPaperAssertionReplaceRoute)
+          response = await replaceWorkingPaperGovernanceLink(request,env,actorId,workingPaperAssertionReplaceRoute[1]!,workingPaperAssertionReplaceRoute[2]!,"assertion",workingPaperAssertionReplaceRoute[3]!);
+        else if (request.method === "POST" && workingPaperRiskReplaceRoute)
+          response = await replaceWorkingPaperGovernanceLink(request,env,actorId,workingPaperRiskReplaceRoute[1]!,workingPaperRiskReplaceRoute[2]!,"risk",workingPaperRiskReplaceRoute[3]!);
+        else if (request.method === "POST" && workingPaperThemeReplaceRoute)
+          response = await replaceWorkingPaperGovernanceLink(request,env,actorId,workingPaperThemeReplaceRoute[1]!,workingPaperThemeReplaceRoute[2]!,"theme",workingPaperThemeReplaceRoute[3]!);
+        else if (request.method === "GET" && workingPaperAttachmentsRoute)
+          response = await listWorkingPaperAttachments(request,env,actorId,workingPaperAttachmentsRoute[1]!,workingPaperAttachmentsRoute[2]!);
+        else if (request.method === "POST" && workingPaperAttachmentsRoute)
+          response = await uploadWorkingPaperAttachment(request,env,actorId,workingPaperAttachmentsRoute[1]!,workingPaperAttachmentsRoute[2]!);
+        else if (request.method === "GET" && workingPaperAttachmentContentRoute)
+          response = await downloadWorkingPaperAttachment(request,env,actorId,workingPaperAttachmentContentRoute[1]!,workingPaperAttachmentContentRoute[2]!,workingPaperAttachmentContentRoute[3]!);
         else if (request.method === "GET" && workingPaperLibraryRoute)
           response = await listWorkingPaperLibrary(
             request,

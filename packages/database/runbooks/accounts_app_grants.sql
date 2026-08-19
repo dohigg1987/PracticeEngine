@@ -78,7 +78,16 @@ GRANT SELECT ON TABLE
   working_paper_template,
   tenant_working_paper_override,
   organisation_working_paper_override,
-  custom_working_paper_template
+  custom_working_paper_template,
+  working_paper_work_area,
+  working_paper_theme,
+  working_paper_template_theme,
+  engagement_risk,
+  working_paper_report_line_link,
+  working_paper_assertion_link,
+  working_paper_risk_link,
+  working_paper_theme_link,
+  working_paper_attachment
 TO accounts_app;
 
 GRANT UPDATE(legal_form) ON organisation TO accounts_app;
@@ -132,6 +141,19 @@ GRANT INSERT ON TABLE
   custom_working_paper_template
 TO accounts_app;
 
+GRANT INSERT(id,tenant_id,engagement_id,risk_code,title,description,risk_level,response,status,created_by,updated_by)
+  ON engagement_risk TO accounts_app;
+GRANT INSERT(id,tenant_id,engagement_id,working_paper_id,report_line_id,link_purpose,supersedes_link_id,supersession_reason,created_by)
+  ON working_paper_report_line_link TO accounts_app;
+GRANT INSERT(id,tenant_id,engagement_id,working_paper_id,assertion_code,supersedes_link_id,supersession_reason,created_by)
+  ON working_paper_assertion_link TO accounts_app;
+GRANT INSERT(id,tenant_id,engagement_id,working_paper_id,risk_id,supersedes_link_id,supersession_reason,created_by)
+  ON working_paper_risk_link TO accounts_app;
+GRANT INSERT(id,tenant_id,engagement_id,working_paper_id,theme_code,is_primary,supersedes_link_id,supersession_reason,created_by)
+  ON working_paper_theme_link TO accounts_app;
+GRANT INSERT(id,tenant_id,engagement_id,working_paper_id,working_paper_version,storage_key,content_hash,filename,media_type,byte_size,evidence_type,description,uploaded_by)
+  ON working_paper_attachment TO accounts_app;
+
 GRANT INSERT(tenant_id,organisation_id,trading_name,company_registration_number,charity_registration_number,registered_office_line1,registered_office_line2,registered_office_locality,registered_office_region,registered_office_postal_code,registered_office_country_code,accounting_reference_month,accounting_reference_day,principal_activity,website,telephone,notes,created_by,updated_by)
   ON organisation_permanent_profile TO accounts_app;
 GRANT UPDATE(trading_name,company_registration_number,charity_registration_number,registered_office_line1,registered_office_line2,registered_office_locality,registered_office_region,registered_office_postal_code,registered_office_country_code,accounting_reference_month,accounting_reference_day,principal_activity,website,telephone,notes,officer_name_style,updated_by,updated_at)
@@ -164,6 +186,8 @@ GRANT UPDATE(disposition,code_override,title_override,objective_override,guidanc
   ON tenant_working_paper_override,organisation_working_paper_override TO accounts_app;
 GRANT UPDATE(code,category_code,sequence_no,title,objective,guidance,default_content,legal_forms,framework_codes,sector_codes,required_by_default,enabled,updated_by,updated_at)
   ON custom_working_paper_template TO accounts_app;
+GRANT UPDATE(title,description,risk_level,response,status,updated_by,updated_at)
+  ON engagement_risk TO accounts_app;
 
 GRANT UPDATE(name) ON tenant TO accounts_app;
 

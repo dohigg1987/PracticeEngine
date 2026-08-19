@@ -57,6 +57,18 @@ export const WORKING_PAPER_STATUSES = [
   "REVIEWED",
   "SUPERSEDED",
 ] as const;
+export const WORKING_PAPER_CATEGORIES = [
+  "ACCEPTANCE",
+  "PLANNING",
+  "RECORDS",
+  "INCOME",
+  "EXPENDITURE",
+  "ASSETS",
+  "LIABILITIES",
+  "FUNDS",
+  "REPORTING",
+  "COMPLETION",
+] as const;
 export const DISCLOSURE_APPLICABILITY = [
   "UNASSESSED",
   "REQUIRED",

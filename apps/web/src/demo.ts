@@ -4,7 +4,12 @@ import type {
   PermanentFileAdviser,
   PermanentFileOfficer,
   WorkingPaper,
+  WorkingPaperAttachment,
+  WorkingPaperCategory,
+  WorkingPaperGovernance,
+  WorkingPaperGovernanceCatalogue,
   WorkingPaperLibraryItem,
+  WorkingPaperRisk,
 } from "./api";
 
 const now = "2027-03-18T09:30:00.000Z";
@@ -107,6 +112,95 @@ let demoWorkingPapers: WorkingPaper[] = [
     updated_at: now,
   },
 ];
+const demoWorkingPaperCatalogue: WorkingPaperGovernanceCatalogue = {
+  workAreas: [
+    ["ACCEPTANCE", "Acceptance and continuance"],
+    ["PLANNING", "Planning"],
+    ["RECORDS", "Accounting records and controls"],
+    ["INCOME", "Income"],
+    ["EXPENDITURE", "Expenditure"],
+    ["ASSETS", "Assets"],
+    ["LIABILITIES", "Liabilities"],
+    ["FUNDS", "Funds"],
+    ["REPORTING", "Financial statements and reporting"],
+    ["COMPLETION", "Completion"],
+  ].map(([code, title], index) => ({
+    code: code as WorkingPaperCategory,
+    title,
+    sequenceNo: (index + 1) * 10,
+    status: "ACTIVE",
+    provenanceLabel: "REPOSITORY_BASELINE_NOT_CERTIFIED",
+  })),
+  themes: [
+    { code: "COMPLETENESS", title: "Completeness", description: "Completeness of records and balances" },
+    { code: "INTERNAL_CONTROLS", title: "Internal controls", description: "Design and operation of relevant controls" },
+    { code: "FINANCIAL_STATEMENT_DISCLOSURE", title: "Financial statement disclosure", description: "Presentation and disclosure support" },
+  ].map((theme) => ({ ...theme, status: "ACTIVE", provenanceLabel: "REPOSITORY_BASELINE_NOT_CERTIFIED" })),
+  templateThemes: [
+    { templateCode: "F01", templateVersion: 1, themeCode: "COMPLETENESS", isPrimary: true },
+  ],
+  assertions: ["EXISTENCE", "OCCURRENCE", "RIGHTS_AND_OBLIGATIONS", "COMPLETENESS", "ACCURACY", "VALUATION", "ALLOCATION", "CUTOFF", "CLASSIFICATION", "PRESENTATION", "DISCLOSURE"],
+  reportLines: [
+    { id: "line-cash", taxonomyVersion: "UK-CANONICAL-2026", lineCode: "BS.CASH", caption: "Cash at bank and in hand", statementCode: "BS", displayOrder: 30 },
+    { id: "line-funds", taxonomyVersion: "UK-CANONICAL-2026", lineCode: "BS.FUNDS", caption: "Charity funds", statementCode: "BS", displayOrder: 70 },
+  ],
+  evidence: {
+    uploadAvailable: true,
+    maxBytes: 10 * 1024 * 1024,
+    mediaTypes: ["application/pdf", "text/plain", "text/csv", "application/csv", "image/png", "image/jpeg", "application/msword", "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],
+    evidenceTypes: ["SOURCE_DOCUMENT", "CALCULATION", "CONFIRMATION", "CORRESPONDENCE", "REPORT", "OTHER"],
+  },
+};
+let demoWorkingPaperRisks: WorkingPaperRisk[] = [
+  { id: "risk-cash", riskCode: "R.CASH.01", title: "Unrecorded bank accounts", description: "Bank accounts may be omitted from the ledger.", riskLevel: "HIGH", response: "Obtain independent bank evidence and reconcile all known accounts.", status: "OPEN", createdAt: now, updatedAt: now },
+];
+let demoWorkingPaperAttachments: WorkingPaperAttachment[] = [
+  { id: "attachment-bank", workingPaperId: "wp-F01", workingPaperVersion: 2, filename: "bank-confirmation.pdf", mediaType: "application/pdf", byteSize: 48210, contentHash: "demo-bank-confirmation-hash", evidenceType: "CONFIRMATION", description: "Independent year-end bank confirmation", uploadedAt: now, contentPath: "/v1/engagements/demo-engagement/working-papers/wp-F01/attachments/attachment-bank/content" },
+];
+const demoWorkingPaperGovernance = new Map<string, Omit<WorkingPaperGovernance, "workingPaper" | "attachments">>([
+  ["wp-F01", {
+    reportLines: [{ id: "link-line-cash", reportLineId: "line-cash", lineCode: "BS.CASH", caption: "Cash at bank and in hand", statementCode: "BS", linkPurpose: "PRIMARY", createdAt: now }],
+    assertions: [{ id: "link-assertion-existence", assertionCode: "EXISTENCE", createdAt: now }],
+    risks: [{ id: "link-risk-cash", riskId: "risk-cash", riskCode: "R.CASH.01", title: "Unrecorded bank accounts", riskLevel: "HIGH", status: "OPEN", createdAt: now }],
+    themes: [{ id: "link-theme-completeness", themeCode: "COMPLETENESS", title: "Completeness", isPrimary: true, createdAt: now }],
+  }],
+]);
+function demoWorkingPaperGovernanceItem(paperId: string): WorkingPaperGovernance {
+  const paper = demoWorkingPapers.find((item) => item.id === paperId) || demoWorkingPapers[0];
+  const links = demoWorkingPaperGovernance.get(paperId) || {
+    reportLines: [], assertions: [], risks: [], themes: [],
+  };
+  return {
+    workingPaper: {
+      id: paper.id,
+      code: paper.code,
+      title: paper.title,
+      categoryCode: paper.category_code || "REPORTING",
+      objective: paper.objective || null,
+      status: paper.status,
+      currentVersion: paper.current_version,
+      templateCode: paper.template_code || null,
+      templateVersion: paper.template_version || null,
+      templateScope: paper.template_scope || "ENGAGEMENT",
+      applicability: paper.applicability || "APPLICABLE",
+    },
+    ...links,
+    attachments: demoWorkingPaperAttachments.filter(
+      (attachment) => attachment.workingPaperId === paperId,
+    ),
+  };
+}
+function demoWorkingPaperLinks(
+  paperId: string,
+): Omit<WorkingPaperGovernance, "workingPaper" | "attachments"> {
+  const existing = demoWorkingPaperGovernance.get(paperId);
+  if (existing) return existing;
+  const created: Omit<WorkingPaperGovernance, "workingPaper" | "attachments"> = {
+    reportLines: [], assertions: [], risks: [], themes: [],
+  };
+  demoWorkingPaperGovernance.set(paperId, created);
+  return created;
+}
 const accountsVersion: AccountsVersion = {
   id: "demo-accounts-v3",
   version: 3,
@@ -1287,6 +1381,24 @@ export function demoRequest(path: string, init?: RequestInit): unknown {
         progress: { completedTasks: 4, totalTasks: 6, percent: 67 },
         blockingItems: 1,
       };
+    if (path.endsWith("/working-paper-governance/catalogue"))
+      return { item: structuredClone(demoWorkingPaperCatalogue) };
+    if (path.endsWith("/risks"))
+      return { items: structuredClone(demoWorkingPaperRisks) };
+    if (/\/working-papers\/[^/]+\/governance$/.test(path)) {
+      const paperId = decodeURIComponent(path.split("/working-papers/")[1].split("/")[0]);
+      return { item: structuredClone(demoWorkingPaperGovernanceItem(paperId)) };
+    }
+    if (/\/working-papers\/[^/]+\/attachments$/.test(path)) {
+      const paperId = decodeURIComponent(path.split("/working-papers/")[1].split("/")[0]);
+      return {
+        items: structuredClone(
+          demoWorkingPaperAttachments.filter(
+            (attachment) => attachment.workingPaperId === paperId,
+          ),
+        ),
+      };
+    }
     if (path.endsWith("/working-paper-library"))
       return { items: structuredClone(demoWorkingPaperLibrary) };
     if (path.endsWith("/working-papers"))
@@ -1378,6 +1490,159 @@ export function demoRequest(path: string, init?: RequestInit): unknown {
       accepted: true,
       memberCreated: true,
     };
+  if (method === "POST" && path.endsWith("/risks")) {
+    const body = JSON.parse(String(init?.body || "{}"));
+    const item: WorkingPaperRisk = {
+      id: `demo-risk-${Date.now()}`,
+      riskCode: body.riskCode,
+      title: body.title,
+      description: body.description || "",
+      riskLevel: body.riskLevel,
+      response: body.response || "",
+      status: body.status || "OPEN",
+      createdAt: now,
+      updatedAt: now,
+    };
+    demoWorkingPaperRisks = [...demoWorkingPaperRisks, item];
+    return { item };
+  }
+  if (method === "PUT" && /\/working-papers\/[^/]+\/(?:report-line|assertion|risk|theme)-links\/[^/]+$/.test(path)) {
+    const [, tail] = path.split("/working-papers/");
+    const [paperPart, linkKind, valuePart] = tail.split("/");
+    const paperId = decodeURIComponent(paperPart);
+    const value = decodeURIComponent(valuePart);
+    const links = demoWorkingPaperLinks(paperId);
+    const body = JSON.parse(String(init?.body || "{}"));
+    if (linkKind === "report-line-links") {
+      const line = demoWorkingPaperCatalogue.reportLines.find((item) => item.id === value)!;
+      const existing = links.reportLines.find((item) => item.reportLineId === value);
+      if (existing) return { created: false, item: existing };
+      const item: WorkingPaperGovernance["reportLines"][number] = {
+        id: `demo-line-link-${Date.now()}`,
+        reportLineId: value,
+        lineCode: line.lineCode,
+        caption: line.caption,
+        statementCode: line.statementCode,
+        linkPurpose: body.linkPurpose,
+        createdAt: now,
+      };
+      links.reportLines.push(item);
+      return { created: true, item };
+    }
+    if (linkKind === "assertion-links") {
+      const existing = links.assertions.find((item) => item.assertionCode === value);
+      if (existing) return { created: false, item: existing };
+      const item = { id: `demo-assertion-link-${Date.now()}`, assertionCode: value, createdAt: now };
+      links.assertions.push(item);
+      return { created: true, item };
+    }
+    if (linkKind === "risk-links") {
+      const risk = demoWorkingPaperRisks.find((item) => item.id === value)!;
+      const existing = links.risks.find((item) => item.riskId === value);
+      if (existing) return { created: false, item: existing };
+      const item: WorkingPaperGovernance["risks"][number] = {
+        id: `demo-risk-link-${Date.now()}`,
+        riskId: value,
+        riskCode: risk.riskCode,
+        title: risk.title,
+        riskLevel: risk.riskLevel,
+        status: risk.status,
+        createdAt: now,
+      };
+      links.risks.push(item);
+      return { created: true, item };
+    }
+    const theme = demoWorkingPaperCatalogue.themes.find((item) => item.code === value)!;
+    const existing = links.themes.find((item) => item.themeCode === value);
+    if (existing) return { created: false, item: existing };
+    const item: WorkingPaperGovernance["themes"][number] = {
+      id: `demo-theme-link-${Date.now()}`,
+      themeCode: value,
+      title: theme.title,
+      isPrimary: body.isPrimary === true,
+      createdAt: now,
+    };
+    links.themes.push(item);
+    return { created: true, item };
+  }
+  if (method === "POST" && /\/working-papers\/[^/]+\/(?:report-line|assertion|risk|theme)-links\/[^/]+\/replace$/.test(path)) {
+    const [, tail] = path.split("/working-papers/");
+    const [paperPart, linkKind, linkPart] = tail.split("/");
+    const paperId = decodeURIComponent(paperPart);
+    const linkId = decodeURIComponent(linkPart);
+    const links = demoWorkingPaperLinks(paperId);
+    const body = JSON.parse(String(init?.body || "{}"));
+    if (linkKind === "report-line-links") {
+      const index = links.reportLines.findIndex((item) => item.id === linkId);
+      const previous = links.reportLines[index];
+      const line = demoWorkingPaperCatalogue.reportLines.find((item) => item.id === body.reportLineId)!;
+      const item: WorkingPaperGovernance["reportLines"][number] = {
+        id: `demo-line-link-${Date.now()}`,
+        reportLineId: line.id,
+        lineCode: line.lineCode,
+        caption: line.caption,
+        statementCode: line.statementCode,
+        linkPurpose: previous.linkPurpose,
+        createdAt: now,
+      };
+      links.reportLines.splice(index, 1, item);
+      return { item, supersededLinkId: linkId, reason: body.reason };
+    }
+    if (linkKind === "assertion-links") {
+      const index = links.assertions.findIndex((item) => item.id === linkId);
+      const item = { id: `demo-assertion-link-${Date.now()}`, assertionCode: body.assertionCode, createdAt: now };
+      links.assertions.splice(index, 1, item);
+      return { item, supersededLinkId: linkId, reason: body.reason };
+    }
+    if (linkKind === "risk-links") {
+      const index = links.risks.findIndex((item) => item.id === linkId);
+      const risk = demoWorkingPaperRisks.find((item) => item.id === body.riskId)!;
+      const item: WorkingPaperGovernance["risks"][number] = {
+        id: `demo-risk-link-${Date.now()}`,
+        riskId: risk.id,
+        riskCode: risk.riskCode,
+        title: risk.title,
+        riskLevel: risk.riskLevel,
+        status: risk.status,
+        createdAt: now,
+      };
+      links.risks.splice(index, 1, item);
+      return { item, supersededLinkId: linkId, reason: body.reason };
+    }
+    const index = links.themes.findIndex((item) => item.id === linkId);
+    const previous = links.themes[index];
+    const theme = demoWorkingPaperCatalogue.themes.find((item) => item.code === body.themeCode)!;
+    const item: WorkingPaperGovernance["themes"][number] = {
+      id: `demo-theme-link-${Date.now()}`,
+      themeCode: theme.code,
+      title: theme.title,
+      isPrimary: previous.isPrimary,
+      createdAt: now,
+    };
+    links.themes.splice(index, 1, item);
+    return { item, supersededLinkId: linkId, reason: body.reason };
+  }
+  if (method === "POST" && /\/working-papers\/[^/]+\/attachments$/.test(path)) {
+    const paperId = decodeURIComponent(path.split("/working-papers/")[1].split("/")[0]);
+    const form = init?.body instanceof FormData ? init.body : new FormData();
+    const upload = form.get("file");
+    if (!(upload instanceof File)) throw new Error("Choose an evidence file.");
+    const item: WorkingPaperAttachment = {
+      id: `demo-attachment-${Date.now()}`,
+      workingPaperId: paperId,
+      workingPaperVersion: Number(form.get("workingPaperVersion") || 1),
+      filename: upload.name,
+      mediaType: upload.type,
+      byteSize: upload.size,
+      contentHash: `demo-evidence-${Date.now()}`,
+      evidenceType: String(form.get("evidenceType")) as WorkingPaperAttachment["evidenceType"],
+      description: String(form.get("description") || ""),
+      uploadedAt: now,
+      contentPath: `/v1/engagements/demo-engagement/working-papers/${paperId}/attachments/demo-attachment/content`,
+    };
+    demoWorkingPaperAttachments = [item, ...demoWorkingPaperAttachments];
+    return { created: true, item };
+  }
   if (method === "POST" && path.endsWith("/working-papers")) {
     const body = JSON.parse(String(init?.body || "{}"));
     const item: WorkingPaper = {
@@ -1387,6 +1652,8 @@ export function demoRequest(path: string, init?: RequestInit): unknown {
         status: "IN_PROGRESS",
         current_version: 1,
         template_scope: "ENGAGEMENT",
+        category_code: body.categoryCode,
+        objective: body.objective,
         applicability: "APPLICABLE",
         content: body.content || {},
         created_at: now,
@@ -1611,6 +1878,11 @@ export function demoRequest(path: string, init?: RequestInit): unknown {
 }
 
 export async function demoBlob(path: string): Promise<Blob> {
+  if (path.includes("/working-papers/") && path.includes("/attachments/")) {
+    return new Blob(["Ledgerly DEV showcase working-paper evidence"], {
+      type: "text/plain",
+    });
+  }
   if (path.includes("evidence-bundle.zip")) {
     return new Blob(["Ledgerly DEV showcase evidence bundle"], {
       type: "application/zip",

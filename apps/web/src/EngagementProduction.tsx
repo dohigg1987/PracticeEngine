@@ -6,6 +6,7 @@ import {
   AccordionPanel,
   Badge,
   Button,
+  Checkbox,
   Field,
   Input,
   MessageBar,
@@ -41,8 +42,12 @@ import {
   ReportingPack,
   TrialBalanceLine,
   WorkingPaper,
+  WorkingPaperAttachment,
   WorkingPaperCategory,
+  WorkingPaperGovernance,
+  WorkingPaperGovernanceCatalogue,
   WorkingPaperLibraryItem,
+  WorkingPaperRisk,
   WorkingPaperVersion,
 } from "./api";
 import { statutoryLabel } from "./format";
@@ -53,6 +58,11 @@ import {
   unresolvedDisclosurePlaceholders,
 } from "./disclosureScope";
 import { ConfirmAction, ConfirmDialog } from "./ConfirmAction";
+import {
+  workingPaperArea,
+  workingPaperAreas,
+  workingPaperStatusSummary,
+} from "./workingPaperGovernance";
 
 export type ProductionView =
   | "working-papers"
@@ -195,6 +205,7 @@ export default function EngagementProduction({
 
 function WorkingPapers({ context, engagementId }: EngagementProps) {
   const [items, setItems] = useState<WorkingPaper[]>([]);
+  const [libraryItems, setLibraryItems] = useState<WorkingPaperLibraryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
@@ -202,15 +213,25 @@ function WorkingPapers({ context, engagementId }: EngagementProps) {
   const [versions, setVersions] = useState<WorkingPaperVersion[]>([]);
   const [versionsError, setVersionsError] = useState("");
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ code: "", title: "", content: "" });
+  const [form, setForm] = useState({
+    code: "",
+    title: "",
+    categoryCode: "PLANNING" as WorkingPaperCategory,
+    objective: "",
+    content: "",
+  });
   const [actionError, setActionError] = useState("");
   const [libraryOpen, setLibraryOpen] = useState(false);
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const data = await api.workingPapers(context, engagementId);
+      const [data, library] = await Promise.all([
+        api.workingPapers(context, engagementId),
+        api.workingPaperLibrary(context, engagementId),
+      ]);
       setItems(data.items);
+      setLibraryItems(library.items);
       setSelected((current) =>
         data.items.some((item) => item.id === current)
           ? current
@@ -254,9 +275,17 @@ function WorkingPapers({ context, engagementId }: EngagementProps) {
       await api.createWorkingPaper(context, engagementId, {
         code: form.code,
         title: form.title,
+        categoryCode: form.categoryCode,
+        objective: form.objective,
         content: { narrative: form.content },
       });
-      setForm({ code: "", title: "", content: "" });
+      setForm({
+        code: "",
+        title: "",
+        categoryCode: "PLANNING",
+        objective: "",
+        content: "",
+      });
       setCreating(false);
       await load();
     } catch (e) {
@@ -327,6 +356,22 @@ function WorkingPapers({ context, engagementId }: EngagementProps) {
     versions[0]?.content ?? paper?.content ?? versions.at(-1)?.content;
   const narrative =
     typeof latest?.narrative === "string" ? latest.narrative : "";
+  const paperGroups = workingPaperAreas
+    .map((area) => ({
+      area,
+      items: items.filter(
+        (item) => workingPaperArea(item.category_code) === area,
+      ),
+    }))
+    .filter((group) => group.items.length);
+  const selectedLibraryItem = paper
+    ? libraryItems.find(
+        (item) =>
+          item.deployedWorkingPaperId === paper.id ||
+          (item.templateCode === paper.template_code &&
+            item.templateVersion === paper.template_version),
+      )
+    : undefined;
   return (
     <section className="panel production-panel">
       <Head
@@ -334,14 +379,14 @@ function WorkingPapers({ context, engagementId }: EngagementProps) {
         body="Engagement evidence, preparation and independent review."
       >
         <div className="working-paper-head-actions">
-          <Button appearance="secondary" onClick={() => setLibraryOpen(true)}>
-            Working paper library
+          <Button appearance="primary" onClick={() => setLibraryOpen(true)}>
+            Set up standard file
           </Button>
           <Button
-            appearance="primary"
+            appearance="secondary"
             onClick={() => setCreating((value) => !value)}
           >
-            {creating ? "Close" : "Add working paper"}
+            {creating ? "Close one-off form" : "Add one-off paper"}
           </Button>
         </div>
       </Head>
@@ -351,7 +396,11 @@ function WorkingPapers({ context, engagementId }: EngagementProps) {
         </MessageBar>
       )}
       {creating && (
-        <form className="production-form" onSubmit={create}>
+        <form className="production-form one-off-paper-form" onSubmit={create}>
+          <div className="one-off-paper-guidance wide">
+            <b>One-off engagement paper</b>
+            <span>Use this only when the governed library has no suitable paper.</span>
+          </div>
           <Field label="Reference" required>
             <Input
               value={form.code}
@@ -365,6 +414,32 @@ function WorkingPapers({ context, engagementId }: EngagementProps) {
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
               required
+            />
+          </Field>
+          <Field label="Work area" required>
+            <Select
+              value={form.categoryCode}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  categoryCode: e.target.value as WorkingPaperCategory,
+                })
+              }
+            >
+              {workingPaperCategories.map((category) => (
+                <option key={category} value={category}>
+                  {pretty(category)}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field className="wide" label="Objective" required>
+            <Textarea
+              required
+              maxLength={2000}
+              rows={3}
+              value={form.objective}
+              onChange={(e) => setForm({ ...form, objective: e.target.value })}
             />
           </Field>
           <Field className="wide" label="Initial evidence">
@@ -386,36 +461,57 @@ function WorkingPapers({ context, engagementId }: EngagementProps) {
       {!items.length ? (
         <Blank
           title="No working papers"
-          body="Create the first paper to document preparation evidence."
+          body="Set up the governed standard file before adding any exceptional one-off papers."
         />
       ) : (
         <div className="production-split">
           <aside className="production-list" aria-label="Working papers">
-            {items.map((item) => (
-              <Button
-                appearance={selected === item.id ? "primary" : "subtle"}
-                key={item.id}
-                className={selected === item.id ? "active" : ""}
-                onClick={() => setSelected(item.id)}
-              >
-                <span>
-                  <b>{item.code}</b>
-                  {item.title}
-                </span>
-                <Badge
-                  appearance="outline"
-                  color={item.applicability === "NOT_APPLICABLE" ? "subtle" : item.status === "REVIEWED" ? "success" : "informative"}
-                >
-                  {item.applicability === "NOT_APPLICABLE" ? "Not applicable" : pretty(item.status)}
-                </Badge>
-                <small>Version {item.current_version}</small>
-              </Button>
+            {paperGroups.map((group) => (
+              <section className="working-paper-group" key={group.area}>
+                <header>
+                  <h3>{group.area}</h3>
+                  <span>{workingPaperStatusSummary(group.items)}</span>
+                </header>
+                {group.items.map((item) => {
+                  const libraryItem = libraryItems.find(
+                    (candidate) =>
+                      candidate.deployedWorkingPaperId === item.id ||
+                      (candidate.templateCode === item.template_code &&
+                        candidate.templateVersion === item.template_version),
+                  );
+                  return (
+                    <Button
+                      appearance={selected === item.id ? "primary" : "subtle"}
+                      key={item.id}
+                      className={selected === item.id ? "active" : ""}
+                      onClick={() => setSelected(item.id)}
+                    >
+                      <span>
+                        <b>{item.code}</b>
+                        {item.title}
+                      </span>
+                      <Badge
+                        appearance="outline"
+                        color={item.applicability === "NOT_APPLICABLE" ? "subtle" : item.status === "REVIEWED" ? "success" : "informative"}
+                      >
+                        {item.applicability === "NOT_APPLICABLE" ? "Not applicable" : pretty(item.status)}
+                      </Badge>
+                      <small>
+                        {pretty(item.category_code || "REPORTING")} · {libraryItem?.required ? "Required" : item.template_scope === "ENGAGEMENT" ? "One-off" : "Optional"} · v{item.current_version}
+                      </small>
+                    </Button>
+                  );
+                })}
+              </section>
             ))}
           </aside>
           {paper && (
             <WorkingPaperEditor
               key={`${paper.id}-${paper.current_version}-${narrative}`}
+              context={context}
+              engagementId={engagementId}
               paper={paper}
+              libraryItem={selectedLibraryItem}
               initialNarrative={narrative}
               versions={versions}
               versionsError={versionsError}
@@ -512,6 +608,12 @@ function WorkingPaperLibraryPanel({
   }
   if (loading) return <Loading />;
   const visible = mode === "included" ? items.filter((item) => item.disposition === "INCLUDE") : items;
+  const visibleGroups = workingPaperAreas
+    .map((area) => ({
+      area,
+      items: visible.filter((item) => workingPaperArea(item.categoryCode) === area),
+    }))
+    .filter((group) => group.items.length);
   return (
     <section className="panel production-panel working-paper-library">
       <Head title="Working paper library" body="Standard papers inherited through practice and client-specific settings.">
@@ -533,12 +635,14 @@ function WorkingPaperLibraryPanel({
           <Field label="Apply to"><Select value={(editing ? override : custom).scope} onChange={(e) => editing ? setOverride({...override,scope:e.target.value as "PRACTICE"|"CLIENT"}) : setCustom({...custom,scope:e.target.value as "PRACTICE"|"CLIENT"})}><option value="CLIENT">This client</option><option value="PRACTICE">Practice standard</option></Select></Field>
           {editing ? <>
             <Field label="Set membership"><Select value={override.disposition} onChange={(e)=>setOverride({...override,disposition:e.target.value as "INCLUDE"|"EXCLUDE"})}><option value="INCLUDE">Include</option><option value="EXCLUDE">Exclude</option></Select></Field>
+            <Field label="Requirement"><Checkbox label="Required in the standard set" checked={override.required} onChange={(_,data)=>setOverride({...override,required:data.checked === true})}/></Field>
             <Field label="Title"><Input value={override.title} onChange={(e)=>setOverride({...override,title:e.target.value})}/></Field>
             <Field className="wide" label="Objective"><Textarea rows={2} value={override.objective} onChange={(e)=>setOverride({...override,objective:e.target.value})}/></Field>
             <Field className="wide" label="Reason" required><Input required value={override.reason} onChange={(e)=>setOverride({...override,reason:e.target.value})}/></Field>
           </> : <>
             <Field label="Reference" required><Input required value={custom.code} onChange={(e)=>setCustom({...custom,code:e.target.value.toUpperCase()})}/></Field>
             <Field label="Category"><Select value={custom.categoryCode} onChange={(e)=>setCustom({...custom,categoryCode:e.target.value as WorkingPaperCategory})}>{workingPaperCategories.map((category)=><option key={category} value={category}>{pretty(category)}</option>)}</Select></Field>
+            <Field label="Requirement"><Checkbox label="Required in the standard set" checked={custom.required} onChange={(_,data)=>setCustom({...custom,required:data.checked === true})}/></Field>
             <Field label="Title" required><Input required value={custom.title} onChange={(e)=>setCustom({...custom,title:e.target.value})}/></Field>
             <Field className="wide" label="Objective" required><Textarea required rows={2} value={custom.objective} onChange={(e)=>setCustom({...custom,objective:e.target.value})}/></Field>
           </>}
@@ -546,16 +650,76 @@ function WorkingPaperLibraryPanel({
         </form>
       )}
       <div className="table-wrap">
-        <Table size="small" aria-label="Working paper library"><TableHeader><TableRow><TableHeaderCell>Reference</TableHeaderCell><TableHeaderCell>Working paper</TableHeaderCell><TableHeaderCell>Category</TableHeaderCell><TableHeaderCell>Source</TableHeaderCell><TableHeaderCell>Set status</TableHeaderCell><TableHeaderCell>Action</TableHeaderCell></TableRow></TableHeader><TableBody>
-          {visible.map((item)=><TableRow key={item.templateCode}><TableCell>{item.code}</TableCell><TableCell><b>{item.title}</b><span className="library-objective">{item.objective}</span></TableCell><TableCell>{pretty(item.categoryCode)}</TableCell><TableCell>{pretty(item.sourceScope)}</TableCell><TableCell><Badge appearance="outline" color={item.disposition === "EXCLUDE" ? "subtle" : item.deployedWorkingPaperId ? "success" : "informative"}>{item.disposition === "EXCLUDE" ? "Excluded" : item.deployedWorkingPaperId ? "Deployed" : item.required ? "Required" : "Optional"}</Badge></TableCell><TableCell>{item.templateVersion ? <Button size="small" appearance="secondary" onClick={()=>startEdit(item)}>Customise</Button> : <span>Custom</span>}</TableCell></TableRow>)}
-        </TableBody></Table>
+        <Table size="small" aria-label="Working paper library">
+          <TableHeader>
+            <TableRow>
+              <TableHeaderCell>Reference</TableHeaderCell>
+              <TableHeaderCell>Working paper</TableHeaderCell>
+              <TableHeaderCell>Theme</TableHeaderCell>
+              <TableHeaderCell>Source and version</TableHeaderCell>
+              <TableHeaderCell>Requirement</TableHeaderCell>
+              <TableHeaderCell>Applicability</TableHeaderCell>
+              <TableHeaderCell>Action</TableHeaderCell>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {visibleGroups.map((group) => (
+              <React.Fragment key={group.area}>
+                <TableRow className="library-group-row">
+                  <TableCell colSpan={7}>
+                    <b>{group.area}</b>
+                    <span>{group.items.length} papers</span>
+                  </TableCell>
+                </TableRow>
+                {group.items.map((item) => (
+                  <TableRow key={item.templateCode}>
+                    <TableCell>{item.code}</TableCell>
+                    <TableCell>
+                      <b>{item.title}</b>
+                      <span className="library-objective">{item.objective}</span>
+                    </TableCell>
+                    <TableCell>{pretty(item.categoryCode)}</TableCell>
+                    <TableCell>
+                      {pretty(item.sourceScope)} · {item.templateVersion ? `v${item.templateVersion}` : "Custom"}
+                    </TableCell>
+                    <TableCell>{item.required ? "Required" : "Optional"}</TableCell>
+                    <TableCell>
+                      <Badge
+                        appearance="outline"
+                        color={item.disposition === "EXCLUDE" ? "subtle" : item.deployedWorkingPaperId ? "success" : "informative"}
+                      >
+                        {item.disposition === "EXCLUDE"
+                          ? "Excluded"
+                          : item.deployedWorkingPaperId
+                            ? pretty(item.deployedApplicability || "APPLICABLE")
+                            : "Not deployed"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {item.templateVersion ? (
+                        <Button size="small" appearance="secondary" onClick={() => startEdit(item)}>
+                          Customise
+                        </Button>
+                      ) : (
+                        <span>Custom</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </React.Fragment>
+            ))}
+          </TableBody>
+        </Table>
       </div>
     </section>
   );
 }
 
 function WorkingPaperEditor({
+  context,
+  engagementId,
   paper,
+  libraryItem,
   initialNarrative,
   versions,
   versionsError,
@@ -565,7 +729,10 @@ function WorkingPaperEditor({
   setApplicability,
   retryVersions,
 }: {
+  context: ApiContext;
+  engagementId: string;
   paper: WorkingPaper;
+  libraryItem?: WorkingPaperLibraryItem;
   initialNarrative: string;
   versions: WorkingPaperVersion[];
   versionsError: string;
@@ -598,6 +765,50 @@ function WorkingPaperEditor({
           {pretty(paper.status)}
         </Badge>
       </header>
+      <dl className="working-paper-metadata">
+        <div>
+          <dt>Work area</dt>
+          <dd>{workingPaperArea(paper.category_code)}</dd>
+        </div>
+        <div>
+          <dt>Theme</dt>
+          <dd>{pretty(paper.category_code || "REPORTING")}</dd>
+        </div>
+        <div>
+          <dt>Source</dt>
+          <dd>
+            {paper.template_scope === "ENGAGEMENT"
+              ? "One-off engagement paper"
+              : `${pretty(paper.template_scope || libraryItem?.sourceScope || "STANDARD")} library`}
+          </dd>
+        </div>
+        <div>
+          <dt>Template version</dt>
+          <dd>{paper.template_version ? `Version ${paper.template_version}` : "Not template based"}</dd>
+        </div>
+        <div>
+          <dt>Requirement</dt>
+          <dd>{libraryItem?.required ? "Required" : paper.template_scope === "ENGAGEMENT" ? "One-off" : "Optional"}</dd>
+        </div>
+        <div>
+          <dt>Applicability</dt>
+          <dd>{pretty(paper.applicability || "APPLICABLE")}</dd>
+        </div>
+        <div>
+          <dt>Preparer</dt>
+          <dd>{paper.prepared_by ? "Sign-off recorded" : "Not recorded"}</dd>
+        </div>
+        <div>
+          <dt>Reviewer</dt>
+          <dd>{paper.reviewed_by ? "Sign-off recorded" : "Not recorded"}</dd>
+        </div>
+      </dl>
+      {paper.objective && (
+        <section className="working-paper-objective" aria-label="Working paper objective">
+          <b>Objective</b>
+          <p>{paper.objective}</p>
+        </section>
+      )}
       <Field label="Evidence narrative">
         <Textarea
           rows={10}
@@ -655,6 +866,11 @@ function WorkingPaperEditor({
           </Button>
         )}
       </div>
+      <WorkingPaperGovernancePanel
+        context={context}
+        engagementId={engagementId}
+        paper={paper}
+      />
       <details className="version-history" open>
         <summary>Immutable version history ({versions.length})</summary>
         {versionsError ? (
@@ -669,9 +885,7 @@ function WorkingPaperEditor({
                 <li key={version.id}>
                   <div>
                     <b>Version {version.version}</b>
-                    <small>
-                      {when(version.created_at)} · {version.created_by}
-                    </small>
+                    <small>{when(version.created_at)}</small>
                   </div>
                   <span>Integrity recorded</span>
                 </li>
@@ -681,6 +895,479 @@ function WorkingPaperEditor({
       </details>
     </div>
   );
+}
+
+function WorkingPaperGovernancePanel({
+  context,
+  engagementId,
+  paper,
+}: EngagementProps & { paper: WorkingPaper }) {
+  const [catalogue, setCatalogue] =
+    useState<WorkingPaperGovernanceCatalogue | null>(null);
+  const [governance, setGovernance] =
+    useState<WorkingPaperGovernance | null>(null);
+  const [risks, setRisks] = useState<WorkingPaperRisk[]>([]);
+  const [attachments, setAttachments] = useState<WorkingPaperAttachment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [busy, setBusy] = useState("");
+  const [themeCode, setThemeCode] = useState("");
+  const [themePrimary, setThemePrimary] = useState(false);
+  const [assertionCode, setAssertionCode] = useState("");
+  const [riskId, setRiskId] = useState("");
+  const [reportLineId, setReportLineId] = useState("");
+  const [linkPurpose, setLinkPurpose] =
+    useState<"PRIMARY" | "SUPPORTING" | "DISCLOSURE">("SUPPORTING");
+  const [linksVerified, setLinksVerified] = useState(false);
+  const [correction, setCorrection] = useState<{
+    kind: "theme" | "assertion" | "risk" | "report-line";
+    linkId: string;
+    currentValue: string;
+    label: string;
+  } | null>(null);
+  const [correctionValue, setCorrectionValue] = useState("");
+  const [correctionReason, setCorrectionReason] = useState("");
+  const [creatingRisk, setCreatingRisk] = useState(false);
+  const [riskForm, setRiskForm] = useState({
+    riskCode: "",
+    title: "",
+    riskLevel: "MEDIUM" as WorkingPaperRisk["riskLevel"],
+    description: "",
+    response: "",
+  });
+  const [file, setFile] = useState<File | null>(null);
+  const [evidenceType, setEvidenceType] =
+    useState<WorkingPaperAttachment["evidenceType"]>("SOURCE_DOCUMENT");
+  const [description, setDescription] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const [catalogueData, governanceData, riskData, attachmentData] =
+        await Promise.all([
+          api.workingPaperGovernanceCatalogue(context, engagementId),
+          api.workingPaperGovernance(context, engagementId, paper.id),
+          api.workingPaperRisks(context, engagementId),
+          api.workingPaperAttachments(context, engagementId, paper.id),
+        ]);
+      setCatalogue(catalogueData.item);
+      setGovernance(governanceData.item);
+      setRisks(riskData.items);
+      setAttachments(attachmentData.items);
+      setThemeCode((current) => current || catalogueData.item.themes[0]?.code || "");
+      setAssertionCode(
+        (current) => current || catalogueData.item.assertions[0] || "",
+      );
+      setRiskId((current) => current || riskData.items[0]?.id || "");
+      setReportLineId(
+        (current) => current || catalogueData.item.reportLines[0]?.id || "",
+      );
+      setEvidenceType(
+        (current) =>
+          catalogueData.item.evidence.evidenceTypes.includes(current)
+            ? current
+            : catalogueData.item.evidence.evidenceTypes[0] || "OTHER",
+      );
+    } catch (cause) {
+      setError(errorText(cause));
+    } finally {
+      setLoading(false);
+    }
+  }, [context, engagementId, paper.id]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function act(label: string, action: () => Promise<unknown>) {
+    setBusy(label);
+    setError("");
+    setNotice("");
+    try {
+      await action();
+      setNotice(label);
+      await load();
+      return true;
+    } catch (cause) {
+      setError(errorText(cause));
+      return false;
+    } finally {
+      setBusy("");
+    }
+  }
+
+  function beginCorrection(
+    kind: "theme" | "assertion" | "risk" | "report-line",
+    linkId: string,
+    currentValue: string,
+    label: string,
+  ) {
+    setCorrection({ kind, linkId, currentValue, label });
+    setCorrectionValue("");
+    setCorrectionReason("");
+  }
+
+  async function replaceLink(event: React.FormEvent) {
+    event.preventDefault();
+    if (!correction || !correctionValue || !correctionReason.trim()) return;
+    const reason = correctionReason.trim();
+    const replaced = await act("Governance link corrected", () => {
+      if (correction.kind === "theme")
+        return api.replaceWorkingPaperTheme(context, engagementId, paper.id, correction.linkId, correctionValue, reason);
+      if (correction.kind === "assertion")
+        return api.replaceWorkingPaperAssertion(context, engagementId, paper.id, correction.linkId, correctionValue, reason);
+      if (correction.kind === "risk")
+        return api.replaceWorkingPaperRisk(context, engagementId, paper.id, correction.linkId, correctionValue, reason);
+      return api.replaceWorkingPaperReportLine(context, engagementId, paper.id, correction.linkId, correctionValue, reason);
+    });
+    if (replaced) {
+      setCorrection(null);
+      setCorrectionValue("");
+      setCorrectionReason("");
+    }
+  }
+
+  async function addPermanentLink(
+    label: string,
+    action: () => Promise<unknown>,
+  ) {
+    setLinksVerified(false);
+    await act(label, action);
+  }
+
+  async function createRisk(event: React.FormEvent) {
+    event.preventDefault();
+    await act("Risk added", async () => {
+      const result = await api.createWorkingPaperRisk(context, engagementId, {
+        ...riskForm,
+        riskCode: riskForm.riskCode.trim().toUpperCase(),
+        title: riskForm.title.trim(),
+      });
+      setRiskId(result.item.id);
+      setRiskForm({
+        riskCode: "",
+        title: "",
+        riskLevel: "MEDIUM",
+        description: "",
+        response: "",
+      });
+      setCreatingRisk(false);
+    });
+  }
+
+  async function upload(event: React.FormEvent) {
+    event.preventDefault();
+    if (!file || !catalogue) return;
+    if (file.size === 0 || file.size > catalogue.evidence.maxBytes) {
+      setError("Choose a non-empty evidence file no larger than 10 MiB.");
+      return;
+    }
+    if (!catalogue.evidence.mediaTypes.includes(file.type)) {
+      setError("This evidence file type is not supported.");
+      return;
+    }
+    const form = new FormData();
+    form.append("file", file);
+    form.append("workingPaperVersion", String(paper.current_version));
+    form.append("evidenceType", evidenceType);
+    if (description.trim()) form.append("description", description.trim());
+    await act("Evidence uploaded", async () => {
+      await api.uploadWorkingPaperAttachment(
+        context,
+        engagementId,
+        paper.id,
+        form,
+      );
+      setFile(null);
+      setDescription("");
+    });
+  }
+
+  async function download(attachment: WorkingPaperAttachment) {
+    await act("Evidence download prepared", async () => {
+      const blob = await api.workingPaperAttachmentBlob(
+        context,
+        attachment.contentPath,
+        true,
+      );
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = attachment.filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    });
+  }
+
+  if (loading)
+    return (
+      <div className="working-paper-governance-loading" role="status">
+        Loading governance and evidence…
+      </div>
+    );
+  if (!catalogue || !governance)
+    return (
+      <MessageBar intent="warning">
+        <MessageBarBody>
+          <b>Governed links and evidence are unavailable.</b> {error}
+        </MessageBarBody>
+        <MessageBarActions>
+          <Button appearance="transparent" onClick={load}>
+            Retry
+          </Button>
+        </MessageBarActions>
+      </MessageBar>
+    );
+
+  return (
+    <section className="working-paper-governance" aria-label="Governance and evidence">
+      {error && (
+        <MessageBar intent="error">
+          <MessageBarBody>{error}</MessageBarBody>
+        </MessageBar>
+      )}
+      {notice && (
+        <div className="sr-only" role="status" aria-live="polite">
+          {notice}
+        </div>
+      )}
+      <Accordion multiple collapsible defaultOpenItems={["governance", "evidence"]}>
+        <AccordionItem value="governance">
+          <AccordionHeader>Governance links</AccordionHeader>
+          <AccordionPanel>
+            <p className="governance-note" id={`permanent-link-guidance-${paper.id}`}>
+              Links form part of the audit trail. If a selection is wrong, replace
+              it with an audited correction and record the reason.
+            </p>
+            <Checkbox
+              label="I have verified this governance link"
+              checked={linksVerified}
+              onChange={(_, data) => setLinksVerified(data.checked === true)}
+            />
+            <div className="governance-link-grid">
+              <Field label="Theme">
+                <Select value={themeCode} onChange={(e) => setThemeCode(e.target.value)}>
+                  {catalogue.themes.map((theme) => (
+                    <option key={theme.code} value={theme.code}>{theme.title}</option>
+                  ))}
+                </Select>
+              </Field>
+              <Checkbox
+                label="Primary theme"
+                checked={themePrimary}
+                onChange={(_, data) => setThemePrimary(data.checked === true)}
+              />
+              <Button
+                appearance="secondary"
+                disabled={!themeCode || !linksVerified || !!busy}
+                aria-describedby={`permanent-link-guidance-${paper.id}`}
+                onClick={() => addPermanentLink("Theme linked", () => api.linkWorkingPaperTheme(context, engagementId, paper.id, themeCode, themePrimary))}
+              >
+                Link theme
+              </Button>
+              <Field label="Assertion">
+                <Select value={assertionCode} onChange={(e) => setAssertionCode(e.target.value)}>
+                  {catalogue.assertions.map((assertion) => (
+                    <option key={assertion} value={assertion}>{pretty(assertion)}</option>
+                  ))}
+                </Select>
+              </Field>
+              <Button
+                appearance="secondary"
+                disabled={!assertionCode || !linksVerified || !!busy}
+                aria-describedby={`permanent-link-guidance-${paper.id}`}
+                onClick={() => addPermanentLink("Assertion linked", () => api.linkWorkingPaperAssertion(context, engagementId, paper.id, assertionCode))}
+              >
+                Link assertion
+              </Button>
+              <Field label="Engagement risk">
+                <Select value={riskId} onChange={(e) => setRiskId(e.target.value)}>
+                  <option value="">Select a risk</option>
+                  {risks.map((risk) => (
+                    <option key={risk.id} value={risk.id}>{risk.riskCode} · {risk.title}</option>
+                  ))}
+                </Select>
+              </Field>
+              <Button
+                appearance="secondary"
+                disabled={!riskId || !linksVerified || !!busy}
+                aria-describedby={`permanent-link-guidance-${paper.id}`}
+                onClick={() => addPermanentLink("Risk linked", () => api.linkWorkingPaperRisk(context, engagementId, paper.id, riskId))}
+              >
+                Link risk
+              </Button>
+              <Button appearance="subtle" onClick={() => setCreatingRisk((value) => !value)}>
+                {creatingRisk ? "Close risk form" : "Add engagement risk"}
+              </Button>
+              <Field label="Statement line">
+                <Select value={reportLineId} onChange={(e) => setReportLineId(e.target.value)}>
+                  {catalogue.reportLines.map((line) => (
+                    <option key={line.id} value={line.id}>{line.statementCode} · {line.caption}</option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Link purpose">
+                <Select value={linkPurpose} onChange={(e) => setLinkPurpose(e.target.value as typeof linkPurpose)}>
+                  <option value="PRIMARY">Primary</option>
+                  <option value="SUPPORTING">Supporting</option>
+                  <option value="DISCLOSURE">Disclosure</option>
+                </Select>
+              </Field>
+              <Button
+                appearance="secondary"
+                disabled={!reportLineId || !linksVerified || !!busy}
+                aria-describedby={`permanent-link-guidance-${paper.id}`}
+                onClick={() => addPermanentLink("Statement line linked", () => api.linkWorkingPaperReportLine(context, engagementId, paper.id, reportLineId, linkPurpose))}
+              >
+                Link statement line
+              </Button>
+            </div>
+            {creatingRisk && (
+              <form className="risk-create-form" onSubmit={createRisk}>
+                <Field label="Risk reference" required>
+                  <Input required maxLength={80} value={riskForm.riskCode} onChange={(e) => setRiskForm({ ...riskForm, riskCode: e.target.value })} />
+                </Field>
+                <Field label="Risk title" required>
+                  <Input required maxLength={255} value={riskForm.title} onChange={(e) => setRiskForm({ ...riskForm, title: e.target.value })} />
+                </Field>
+                <Field label="Risk level">
+                  <Select value={riskForm.riskLevel} onChange={(e) => setRiskForm({ ...riskForm, riskLevel: e.target.value as WorkingPaperRisk["riskLevel"] })}>
+                    {(["LOW", "MEDIUM", "HIGH", "SIGNIFICANT"] as const).map((level) => <option key={level} value={level}>{pretty(level)}</option>)}
+                  </Select>
+                </Field>
+                <Field className="wide" label="Description">
+                  <Textarea rows={2} maxLength={4000} value={riskForm.description} onChange={(e) => setRiskForm({ ...riskForm, description: e.target.value })} />
+                </Field>
+                <Field className="wide" label="Planned response">
+                  <Textarea rows={2} maxLength={4000} value={riskForm.response} onChange={(e) => setRiskForm({ ...riskForm, response: e.target.value })} />
+                </Field>
+                <Button appearance="primary" type="submit" disabled={!!busy}>Add risk</Button>
+              </form>
+            )}
+            <div className="governance-registers">
+              <GovernanceRegister title="Themes" items={governance.themes.map((item) => ({ id: item.id, label: `${item.title}${item.isPrimary ? " · Primary" : ""}`, value: item.themeCode }))} onCorrect={(item) => beginCorrection("theme", item.id, item.value, item.label)} />
+              <GovernanceRegister title="Assertions" items={governance.assertions.map((item) => ({ id: item.id, label: pretty(item.assertionCode), value: item.assertionCode }))} onCorrect={(item) => beginCorrection("assertion", item.id, item.value, item.label)} />
+              <GovernanceRegister title="Risks" items={governance.risks.map((item) => ({ id: item.id, label: `${item.riskCode} · ${item.title} · ${pretty(item.riskLevel)}`, value: item.riskId }))} onCorrect={(item) => beginCorrection("risk", item.id, item.value, item.label)} />
+              <GovernanceRegister title="Statement lines" items={governance.reportLines.map((item) => ({ id: item.id, label: `${item.statementCode} · ${item.caption} · ${pretty(item.linkPurpose)}`, value: item.reportLineId }))} onCorrect={(item) => beginCorrection("report-line", item.id, item.value, item.label)} />
+            </div>
+            {correction && (
+              <form className="risk-create-form" onSubmit={replaceLink} aria-label={`Correct ${correction.label}`}>
+                <div className="wide">
+                  <b>Correct governance link</b>
+                  <p>Replacing: {correction.label}</p>
+                </div>
+                <Field label="Replacement" required>
+                  <Select required value={correctionValue} onChange={(event) => setCorrectionValue(event.target.value)}>
+                    <option value="">Select a replacement</option>
+                    {correction.kind === "theme" && catalogue.themes.filter((item) => item.code !== correction.currentValue).map((item) => <option key={item.code} value={item.code}>{item.title}</option>)}
+                    {correction.kind === "assertion" && catalogue.assertions.filter((item) => item !== correction.currentValue).map((item) => <option key={item} value={item}>{pretty(item)}</option>)}
+                    {correction.kind === "risk" && risks.filter((item) => item.id !== correction.currentValue).map((item) => <option key={item.id} value={item.id}>{item.riskCode} · {item.title}</option>)}
+                    {correction.kind === "report-line" && catalogue.reportLines.filter((item) => item.id !== correction.currentValue).map((item) => <option key={item.id} value={item.id}>{item.statementCode} · {item.caption}</option>)}
+                  </Select>
+                </Field>
+                <Field className="wide" label="Correction reason" required hint="Recorded in the audit trail.">
+                  <Textarea required rows={2} maxLength={2000} value={correctionReason} onChange={(event) => setCorrectionReason(event.target.value)} />
+                </Field>
+                <Button appearance="primary" type="submit" disabled={!correctionValue || !correctionReason.trim() || !!busy}>Replace link</Button>
+                <Button appearance="secondary" type="button" disabled={!!busy} onClick={() => setCorrection(null)}>Cancel</Button>
+              </form>
+            )}
+          </AccordionPanel>
+        </AccordionItem>
+        <AccordionItem value="evidence">
+          <AccordionHeader>Evidence attachments ({attachments.length})</AccordionHeader>
+          <AccordionPanel>
+            <form className="evidence-upload-form" onSubmit={upload}>
+              <Field label="Evidence file" required>
+                {(fieldProps) => (
+                  <input
+                    {...fieldProps}
+                    className="evidence-file-input"
+                    type="file"
+                    required
+                    accept={catalogue.evidence.mediaTypes.join(",")}
+                    onChange={(e) => setFile(e.target.files?.[0] || null)}
+                  />
+                )}
+              </Field>
+              <Field label="Evidence type">
+                <Select value={evidenceType} onChange={(e) => setEvidenceType(e.target.value as WorkingPaperAttachment["evidenceType"])}>
+                  {catalogue.evidence.evidenceTypes.map((type) => <option key={type} value={type}>{pretty(type)}</option>)}
+                </Select>
+              </Field>
+              <Field className="wide" label="Description">
+                <Input maxLength={2000} value={description} onChange={(e) => setDescription(e.target.value)} />
+              </Field>
+              <Button appearance="primary" type="submit" disabled={!file || !!busy || !catalogue.evidence.uploadAvailable}>
+                {busy === "Evidence uploaded" ? "Uploading…" : "Upload evidence"}
+              </Button>
+            </form>
+            {!attachments.length ? (
+              <p className="governance-empty">No evidence attachments have been recorded.</p>
+            ) : (
+              <div className="table-wrap evidence-attachment-table">
+                <Table size="small" aria-label="Working paper evidence attachments">
+                  <TableHeader><TableRow><TableHeaderCell>File</TableHeaderCell><TableHeaderCell>Type</TableHeaderCell><TableHeaderCell>Version</TableHeaderCell><TableHeaderCell>Size</TableHeaderCell><TableHeaderCell>Recorded</TableHeaderCell><TableHeaderCell>Action</TableHeaderCell></TableRow></TableHeader>
+                  <TableBody>
+                    {attachments.map((attachment) => (
+                      <TableRow key={attachment.id}>
+                        <TableCell><b>{attachment.filename}</b>{attachment.description && <span className="attachment-description">{attachment.description}</span>}</TableCell>
+                        <TableCell>{pretty(attachment.evidenceType)}</TableCell>
+                        <TableCell>{attachment.workingPaperVersion}</TableCell>
+                        <TableCell>{formatEvidenceBytes(attachment.byteSize)}</TableCell>
+                        <TableCell>{when(attachment.uploadedAt)}</TableCell>
+                        <TableCell><Button size="small" appearance="secondary" disabled={!!busy} onClick={() => download(attachment)}>Download</Button></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </AccordionPanel>
+        </AccordionItem>
+      </Accordion>
+    </section>
+  );
+}
+
+type GovernanceRegisterItem = { id: string; label: string; value: string };
+
+function GovernanceRegister({
+  title,
+  items,
+  onCorrect,
+}: {
+  title: string;
+  items: GovernanceRegisterItem[];
+  onCorrect: (item: GovernanceRegisterItem) => void;
+}) {
+  return (
+    <section>
+      <h4>{title}</h4>
+      {items.length ? (
+        <ul>
+          {items.map((item) => (
+            <li key={item.id}>
+              <span>{item.label}</span>{" "}
+              <Button size="small" appearance="subtle" onClick={() => onCorrect(item)}>
+                Correct
+              </Button>
+            </li>
+          ))}
+        </ul>
+      ) : <p>None linked</p>}
+    </section>
+  );
+}
+
+function formatEvidenceBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function Disclosures({
