@@ -2947,18 +2947,12 @@ function FilingEvidence({
     <section className="panel production-panel filing-panel">
       <Head
         title="Regulator filing record"
-        body="Prepare filing payloads and retain evidence received from external filing portals."
+        body="Prepare manual filing payloads and retain evidence received from external portals. This page does not contact a regulator or retrieve a regulator decision."
       >
         <Button appearance="secondary" size="small" onClick={load}>
           Refresh
         </Button>
       </Head>
-      <MessageBar className="filing-message" intent="info">
-        <MessageBarBody>
-          <b>Manual evidence record.</b> No action on this page contacts a
-          regulator or retrieves a regulator decision.
-        </MessageBarBody>
-      </MessageBar>
       <form className="filing-prepare" onSubmit={prepare}>
         <fieldset>
           <legend>Prepare a filing record</legend>
