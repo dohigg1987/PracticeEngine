@@ -2933,7 +2933,17 @@ function FilingEvidence({
       <form className="filing-prepare" onSubmit={prepare}>
         <fieldset>
           <legend>Prepare a filing record</legend>
-        <Field label="Final accounts version" required>
+        <Field
+          label="Final accounts version"
+          hint={
+            !eligible.length
+              ? unsignedFinal
+                ? `${unsignedFinal} FINAL version${unsignedFinal === 1 ? " is" : "s are"} missing an active Filing authorised sign-off.`
+                : "Move an accounts version to FINAL and record its Filing authorised sign-off first."
+              : undefined
+          }
+          required
+        >
           <Select
             value={accountsVersionId}
             onChange={(event) => setAccountsVersionId(event.target.value)}
@@ -2970,28 +2980,11 @@ function FilingEvidence({
           type="submit"
           disabled={!accountsVersionId || busy === "prepare"}
           disabledFocusable={!accountsVersionId && busy !== "prepare"}
-          aria-describedby={
-            !accountsVersionId ? "filing-prepare-reason" : undefined
-          }
         >
           {busy === "prepare" ? "Preparing…" : "Prepare filing payload"}
         </Button>
         </fieldset>
       </form>
-      {!eligible.length && (
-        <MessageBar
-          id="filing-prepare-reason"
-          className="filing-message"
-          intent="warning"
-        >
-          <MessageBarBody>
-            <b>No eligible accounts version.</b>{" "}
-            {unsignedFinal
-              ? `${unsignedFinal} FINAL version${unsignedFinal === 1 ? " is" : "s are"} missing an active Filing authorised sign-off.`
-              : "Move an accounts version to FINAL and record its Filing authorised sign-off first."}
-          </MessageBarBody>
-        </MessageBar>
-      )}
       {actionError && (
         <MessageBar className="filing-message" intent="error">
           <MessageBarBody>{actionError}</MessageBarBody>
