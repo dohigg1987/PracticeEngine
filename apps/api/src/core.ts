@@ -24,6 +24,19 @@ export class ApiError extends Error {
   }
 }
 
+export function trialBalanceReadiness(
+  accountCount: number,
+  unmappedCount: number,
+  debitTotal: string | number,
+  creditTotal: string | number,
+): { balanced: boolean; fullyMapped: boolean } {
+  const hasAccounts = Number.isInteger(accountCount) && accountCount > 0;
+  return {
+    balanced: hasAccounts && String(debitTotal) === String(creditTotal),
+    fullyMapped: hasAccounts && unmappedCount === 0,
+  };
+}
+
 export function reportingRegimeError(
   framework: string,
   sectorProfile: string | null,
