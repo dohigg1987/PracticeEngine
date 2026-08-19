@@ -309,40 +309,37 @@
   font-weight: 400;
 }
 .engagement-dialog {
-  width: min(580px, 100%);
+  width: min(640px, calc(100vw - 32px));
+  max-width: 640px;
 }
 .engagement-form {
-  padding: 22px;
   display: grid;
-  gap: 15px;
-}
-.engagement-form > div:not(.modal-actions) {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-.engagement-form label {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--colorNeutralForeground2);
-}
-.engagement-form input,
-.engagement-form select {
-  display: block;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   width: 100%;
-  height: 40px;
-  margin-top: 6px;
-  border: 1px solid var(--colorNeutralStroke1);
-  border-radius: var(--borderRadiusMedium);
-  background: var(--colorNeutralBackground1);
-  padding: 0 10px;
-  font-size: 12px;
+  gap: 16px 20px;
+}
+.engagement-field,
+.engagement-control {
+  min-width: 0;
+  width: 100%;
+}
+.engagement-client-field,
+.engagement-period-fields,
+.engagement-form .form-error,
+.engagement-dialog-actions {
+  grid-column: 1 / -1;
+}
+.engagement-period-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 .engagement-form .form-error {
   margin: 0;
 }
-.engagement-form .modal-actions {
-  margin: 5px -22px -22px;
+.engagement-dialog-actions {
+  flex-wrap: wrap;
+  margin-top: 4px;
 }
 @media (max-width: 900px) {
   .client-nav {
@@ -353,12 +350,15 @@
     margin-left: auto;
   }
 }
+@media (max-width: 700px) {
+  .engagement-form,
+  .engagement-period-fields {
+    grid-template-columns: 1fr;
+  }
+}
 @media (max-width: 620px) {
   .page-actions {
     flex-wrap: wrap;
-  }
-  .engagement-form > div:not(.modal-actions) {
-    grid-template-columns: 1fr;
   }
   .permanent-file-register {
     grid-template-columns: 1fr;

@@ -2757,8 +2757,13 @@ function EngagementSetup({
           </>
         ) : (
           <form className="engagement-form" onSubmit={create}>
-            <Field label="Client" required>
+            <Field
+              className="engagement-field engagement-client-field"
+              label="Client"
+              required
+            >
               <Select
+                className="engagement-control"
                 value={form.organisationId}
                 onChange={(event) => {
                   const organisationId = event.target.value;
@@ -2783,9 +2788,14 @@ function EngagementSetup({
                 ))}
               </Select>
             </Field>
-            <div>
-              <Field label="Period start" required>
+            <div className="engagement-period-fields">
+              <Field
+                className="engagement-field"
+                label="Period start"
+                required
+              >
                 <Input
+                  className="engagement-control"
                   type="date"
                   value={form.periodStart}
                   onChange={(event) =>
@@ -2793,8 +2803,13 @@ function EngagementSetup({
                   }
                 />
               </Field>
-              <Field label="Period end" required>
+              <Field
+                className="engagement-field"
+                label="Period end"
+                required
+              >
                 <Input
+                  className="engagement-control"
                   type="date"
                   value={form.periodEnd}
                   onChange={(event) =>
@@ -2803,8 +2818,13 @@ function EngagementSetup({
                 />
               </Field>
             </div>
-            <Field label="Reporting framework" required>
+            <Field
+              className="engagement-field"
+              label="Reporting framework"
+              required
+            >
               <Select
+                className="engagement-control"
                 value={form.framework}
                 onChange={(event) => {
                   const framework = event.target.value;
@@ -2826,6 +2846,7 @@ function EngagementSetup({
               </Select>
             </Field>
             <Field
+              className="engagement-field"
               label="Sector profile"
               required
               hint={
@@ -2837,6 +2858,7 @@ function EngagementSetup({
               }
             >
               <Select
+                className="engagement-control"
                 value={form.sectorProfile}
                 onChange={(event) =>
                   setForm({ ...form, sectorProfile: event.target.value })
@@ -2854,7 +2876,7 @@ function EngagementSetup({
                 {error}
               </p>
             )}
-            <DialogActions>
+            <DialogActions className="engagement-dialog-actions">
               <FluentButton appearance="primary" type="submit" disabled={busy}>
                 {busy ? "Creating…" : "Create engagement"}
               </FluentButton>
