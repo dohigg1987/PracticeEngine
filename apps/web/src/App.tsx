@@ -60,6 +60,7 @@ import {
   TableHeader,
   TableHeaderCell,
   TableRow,
+  Text,
   Textarea,
   Toolbar,
   Tooltip,
@@ -73,6 +74,7 @@ import {
   DismissRegular,
   DocumentRegular,
   ErrorCircleRegular,
+  InfoRegular,
   NavigationRegular,
   OpenRegular,
   PeopleTeamRegular,
@@ -4698,24 +4700,40 @@ function MappingView({
           </div>
         )}
       </section>
-      <aside className="guidance">
-        <i aria-hidden="true">i</i>
-        <h3>Mapping control</h3>
-        <p>
-          Every source account must be mapped before this period can move to
-          review.
-        </p>
-        <dl>
-          <div>
-            <dt>Mapped</dt>
-            <dd>{mapped}</dd>
+      <aside className="mapping-control" aria-labelledby="mapping-control-title">
+        <Card className="mapping-control-card" appearance="outline">
+          <div className="mapping-control-heading">
+            <InfoRegular aria-hidden="true" />
+            <Text id="mapping-control-title" as="h3" size={300} weight="semibold">
+              Mapping control
+            </Text>
           </div>
-          <div>
-            <dt>Unmapped</dt>
-            <dd>{unmapped}</dd>
+          <Text className="mapping-control-copy" size={200}>
+            Every source account must be mapped before this period can move to
+            review.
+          </Text>
+          <div className="mapping-control-metrics">
+            <div className="mapping-control-metric">
+              <Text size={200}>Mapped</Text>
+              <Badge appearance="tint" color="success" size="small">
+                {mapped}
+              </Badge>
+            </div>
+            <div className="mapping-control-metric">
+              <Text size={200}>Unmapped</Text>
+              <Badge
+                appearance="tint"
+                color={unmapped ? "warning" : "subtle"}
+                size="small"
+              >
+                {unmapped}
+              </Badge>
+            </div>
           </div>
-        </dl>
-        <small>Changes are recorded in the immutable engagement history.</small>
+          <Text className="mapping-control-history" size={200}>
+            Mapping changes are recorded in engagement history.
+          </Text>
+        </Card>
       </aside>
     </div>
   );

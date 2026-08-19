@@ -368,7 +368,6 @@ textarea,
 .auth-card,
 .file-card,
 .preview,
-.guidance,
 .recon-grid article,
 .task-board > section,
 .task-board article,
@@ -627,7 +626,6 @@ tbody tr:hover {
   color: var(--colorNeutralForeground1);
 }
 
-.guidance,
 .task-board > section,
 .record-list details,
 .journal-editor,
@@ -640,7 +638,6 @@ tbody tr:hover {
   border-color: #d6d6d6;
   color: var(--colorNeutralForeground1);
 }
-.guidance > i,
 .file-card > span,
 .readiness-ring::after {
   background: var(--colorNeutralBackground3);
@@ -784,9 +781,7 @@ table thead {
 .production-panel > .panel-head p:last-child,
 .library-objective,
 .production-empty,
-.document-edit-form small,
-.guidance p,
-.guidance small {
+.document-edit-form small {
   color: #4f4f4f;
   font-size: 12px;
   line-height: 1.45;
