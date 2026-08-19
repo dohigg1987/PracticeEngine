@@ -305,8 +305,7 @@ button {
   padding: 20px 22px;
   border-bottom: 1px solid var(--border);
 }
-.panel-head h2,
-.modal h2 {
+.panel-head h2 {
   font-size: var(--fontSizeBase500);
   line-height: var(--lineHeightBase500);
   margin: 0;
@@ -352,6 +351,10 @@ tfoot td {
   background: #fafcfc;
   font-weight: 700;
   border-bottom: 0;
+}
+.control-total-row {
+  background: var(--colorNeutralBackground2);
+  font-weight: var(--fontWeightSemibold);
 }
 .mono {
   font-family: Consolas, "SFMono-Regular", ui-monospace, monospace;
@@ -665,51 +668,25 @@ tfoot td {
   width: 30%;
   height: 24px;
 }
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: #10292f99;
-  z-index: 30;
-  display: grid;
-  place-items: center;
-  padding: 20px;
-}
 .modal {
-  background: white;
-  border-radius: var(--borderRadiusXLarge);
-  box-shadow: 0 24px 70px #07161966;
-  width: min(660px, 100%);
-  max-height: 90vh;
-  overflow: auto;
-}
-.modal-head {
-  display: flex;
-  justify-content: space-between;
-  padding: 22px;
-  border-bottom: 1px solid var(--border);
-}
-.modal-head > button {
-  border: 0;
-  background: transparent;
-  color: #6d7c80;
-  font-size: 23px;
+  width: min(660px, calc(100vw - 32px));
 }
 .file-card {
   display: grid;
   grid-template-columns: 42px 1fr auto;
   align-items: center;
   gap: 12px;
-  margin: 20px 22px;
-  padding: 13px;
-  border: 1px solid var(--border);
+  margin: 0 0 var(--spacingVerticalM);
+  padding: var(--spacingVerticalS) var(--spacingHorizontalM);
+  border: 1px solid var(--colorNeutralStroke1);
   border-radius: var(--borderRadiusLarge);
 }
 .file-card > span {
   display: grid;
   place-items: center;
   height: 38px;
-  background: #e9f4f2;
-  color: #176d66;
+  background: var(--colorNeutralBackground3);
+  color: var(--colorBrandForeground1);
   border-radius: var(--borderRadiusMedium);
   font-size: 12px;
   font-weight: 700;
@@ -721,18 +698,11 @@ tfoot td {
 }
 .file-card small {
   font-size: 12px;
-  color: #758387;
-}
-.file-card button {
-  background: transparent;
-  border: 0;
-  color: #087570;
-  font-size: 12px;
-  font-weight: 700;
+  color: var(--colorNeutralForeground3);
 }
 .preview {
-  margin: 0 22px;
-  border: 1px solid var(--border);
+  margin: var(--spacingVerticalM) 0 0;
+  border: 1px solid var(--colorNeutralStroke1);
   border-radius: var(--borderRadiusLarge);
   overflow: auto;
 }
@@ -744,7 +714,7 @@ tfoot td {
 .preview > small {
   display: block;
   padding: 10px;
-  color: #78868a;
+  color: var(--colorNeutralForeground3);
 }
 .form-error {
   margin: 0 22px 16px;
@@ -754,14 +724,6 @@ tfoot td {
   border-radius: 6px;
   padding: 10px;
   font-size: 12px;
-}
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 18px 22px;
-  margin-top: 20px;
-  border-top: 1px solid var(--border);
 }
 .statement {
   margin-top: 30px;
@@ -793,9 +755,6 @@ tfoot td {
   font-size: 12px;
   color: #7c5a56;
   margin: 3px 0 0;
-}
-.modal:focus {
-  outline: none;
 }
 @media (max-width: 900px) {
   .workspace {

@@ -8,12 +8,17 @@ import React, {
   useState,
 } from "react";
 import {
+  Accordion,
+  AccordionHeader,
+  AccordionItem,
+  AccordionPanel,
   Badge,
   Breadcrumb,
   BreadcrumbButton,
   BreadcrumbDivider,
   BreadcrumbItem,
   Button as FluentButton,
+  Checkbox,
   createTableColumn,
   DataGrid,
   DataGridBody,
@@ -21,6 +26,12 @@ import {
   DataGridHeader,
   DataGridHeaderCell,
   DataGridRow,
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogContent,
+  DialogSurface,
+  DialogTitle,
   Field,
   Input,
   Link as FluentLink,
@@ -58,8 +69,6 @@ import {
 import type { TableColumnDefinition } from "@fluentui/react-components";
 import {
   BuildingRegular,
-  ChevronDownRegular,
-  ChevronRightRegular,
   DismissRegular,
   DocumentRegular,
   ErrorCircleRegular,
@@ -345,63 +354,6 @@ export function inviteTokenFromHash(hash: string): string {
   return new URLSearchParams(hash.slice(1)).get("token")?.trim() || "";
 }
 
-function useDialogFocus(
-  ref: React.RefObject<HTMLElement | null>,
-  active: boolean,
-  onClose: () => void,
-  disabled = false,
-) {
-  const closeRef = useRef(onClose);
-  const disabledRef = useRef(disabled);
-  closeRef.current = onClose;
-  disabledRef.current = disabled;
-  useEffect(() => {
-    if (!active) return;
-    const opener = document.activeElement as HTMLElement | null;
-    const priorOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    requestAnimationFrame(() => ref.current?.focus());
-    const keydown = (event: KeyboardEvent) => {
-      const dialog = ref.current;
-      if (!dialog) return;
-      if (event.key === "Escape" && !disabledRef.current) {
-        event.preventDefault();
-        closeRef.current();
-        return;
-      }
-      if (event.key !== "Tab") return;
-      const controls = [
-        ...dialog.querySelectorAll<HTMLElement>(
-          'button:not([disabled]),a[href],input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])',
-        ),
-      ];
-      if (!controls.length) {
-        event.preventDefault();
-        dialog.focus();
-        return;
-      }
-      const first = controls[0],
-        last = controls[controls.length - 1];
-      if (
-        event.shiftKey &&
-        (document.activeElement === first || document.activeElement === dialog)
-      ) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener("keydown", keydown);
-    return () => {
-      document.removeEventListener("keydown", keydown);
-      document.body.style.overflow = priorOverflow;
-      requestAnimationFrame(() => opener?.focus());
-    };
-  }, [active, ref]);
-}
-
 export function App() {
   const [checkingSession, setCheckingSession] = useState(authConfigured);
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -561,7 +513,6 @@ function AccountsWorkspace({
   const [activeSearchIndex, setActiveSearchIndex] = useState(0);
   const searchRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const modalRef = useRef<HTMLElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const operationsSelectionRef = useRef(selectedId);
   operationsSelectionRef.current = selectedId;
@@ -821,7 +772,6 @@ function AccountsWorkspace({
   useEffect(() => {
     loadOperations();
   }, [loadOperations]);
-  useDialogFocus(modalRef, Boolean(importFile), closeImport, importing);
 
   const { mapped, unmapped } = mappingPopulation(lines),
     debit = lines.reduce((n, line) => n + Number(line.debit || 0), 0),
@@ -1231,9 +1181,11 @@ function AccountsWorkspace({
                         {result.category || "Workspace"}
                       </div>
                     )}
-                    <button
+                    <FluentButton
                       id={`workspace-search-${result.id}`}
                       type="button"
+                      appearance="subtle"
+                      className="global-search-result"
                       role="option"
                       aria-selected={index === activeSearchIndex}
                       onMouseDown={(event) => event.preventDefault()}
@@ -1250,7 +1202,7 @@ function AccountsWorkspace({
                       <span className="global-search-enter" aria-hidden="true">
                         Enter
                       </span>
-                    </button>
+                    </FluentButton>
                   </React.Fragment>
                 ))
               ) : (
@@ -1314,7 +1266,7 @@ function AccountsWorkspace({
               </p>
               <div className="current-engagement-context">
                 <label htmlFor="engagement">Current engagement</label>
-                <select
+                <Select
                   id="engagement"
                   aria-label="Engagement"
                   value={selectedId}
@@ -1333,30 +1285,37 @@ function AccountsWorkspace({
                       {formatPeriodYear(item.period_end)}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
-              <section
-                className="workspace-nav-bookend"
-                aria-labelledby="practice-nav-heading"
+              <Accordion
+                multiple
+                collapsible
+                className="workspace-nav-accordion"
+                openItems={[
+                  ...(practiceNavOpen ? ["practice"] : []),
+                  ...(accountsProductionNavOpen ? ["production"] : []),
+                  ...(administrationNavOpen ? ["administration"] : []),
+                ]}
+                onToggle={(_, data) => {
+                  const openItems = new Set(data.openItems);
+                  setPracticeNavOpen(openItems.has("practice"));
+                  setAccountsProductionNavOpen(openItems.has("production"));
+                  setAdministrationNavOpen(openItems.has("administration"));
+                }}
               >
-                <h2 id="practice-nav-heading">
-                  <button
-                    type="button"
-                    className="workspace-nav-toggle"
-                    aria-expanded={practiceNavOpen}
-                    aria-controls="practice-nav-items"
-                    onClick={() => setPracticeNavOpen((open) => !open)}
-                  >
-                    <span>Practice</span>
-                    {practiceNavOpen ? (
-                      <ChevronDownRegular aria-hidden="true" />
-                    ) : (
-                      <ChevronRightRegular aria-hidden="true" />
-                    )}
-                  </button>
-                </h2>
-                {practiceNavOpen ? (
-                  <div id="practice-nav-items" className="workspace-nav-items">
+              <AccordionItem
+                value="practice"
+                className="workspace-nav-bookend"
+              >
+                <AccordionHeader
+                  className="workspace-nav-header"
+                  button={{ className: "workspace-nav-toggle" }}
+                  expandIconPosition="end"
+                >
+                  Practice
+                </AccordionHeader>
+                <AccordionPanel className="workspace-nav-panel">
+                  <div className="workspace-nav-items">
                     <NavItem
                       className="workspace-nav-item"
                       value="clients"
@@ -1384,33 +1343,21 @@ function AccountsWorkspace({
                       </NavItem>
                     )}
                   </div>
-                ) : null}
-              </section>
-              <section
+                </AccordionPanel>
+              </AccordionItem>
+              <AccordionItem
+                value="production"
                 className="production-navigation"
-                aria-labelledby="production-nav-heading"
               >
-                <h2 id="production-nav-heading">
-                  <button
-                    type="button"
-                    className="workspace-nav-toggle"
-                    aria-expanded={accountsProductionNavOpen}
-                    aria-controls="accounts-production-nav-items"
-                    onClick={() =>
-                      setAccountsProductionNavOpen((open) => !open)
-                    }
-                  >
-                    <span>Accounts production</span>
-                    {accountsProductionNavOpen ? (
-                      <ChevronDownRegular aria-hidden="true" />
-                    ) : (
-                      <ChevronRightRegular aria-hidden="true" />
-                    )}
-                  </button>
-                </h2>
-                {accountsProductionNavOpen ? (
+                <AccordionHeader
+                  className="workspace-nav-header"
+                  button={{ className: "workspace-nav-toggle" }}
+                  expandIconPosition="end"
+                >
+                  Accounts production
+                </AccordionHeader>
+                <AccordionPanel className="workspace-nav-panel">
                   <div
-                    id="accounts-production-nav-items"
                     className="accounts-production-nav-items"
                   >
                     <nav aria-label="Engagement sections">
@@ -1426,39 +1373,34 @@ function AccountsWorkspace({
                       >
                         Overview
                       </NavItem>
+                      <Accordion
+                        collapsible
+                        openItems={openProductionNavStage ? [openProductionNavStage] : []}
+                        onToggle={(_, data) =>
+                          setOpenProductionNavStage(
+                            (data.openItems[0] as ProductionNavStage | undefined) ?? null,
+                          )
+                        }
+                      >
                       {productionNavStages.map((stage) => {
-                        const open = openProductionNavStage === stage.id;
                         const stageViews = views.filter((item) =>
                           stage.viewIds.includes(item.id),
                         );
                         return (
-                          <section
+                          <AccordionItem
+                            value={stage.id}
                             className="production-nav-stage"
                             key={stage.id}
                           >
-                            <button
-                              type="button"
-                              className="production-nav-stage-toggle"
-                              aria-expanded={open}
-                              aria-controls={`production-nav-${stage.id}`}
-                              onClick={() =>
-                                setOpenProductionNavStage(
-                                  open ? null : stage.id,
-                                )
-                              }
+                            <AccordionHeader
+                              className="production-nav-stage-header"
+                              button={{ className: "production-nav-stage-toggle" }}
+                              expandIconPosition="end"
                             >
-                              <span>{stage.label}</span>
-                              {open ? (
-                                <ChevronDownRegular aria-hidden="true" />
-                              ) : (
-                                <ChevronRightRegular aria-hidden="true" />
-                              )}
-                            </button>
-                            {open ? (
-                              <div
-                                id={`production-nav-${stage.id}`}
-                                className="production-nav-stage-items"
-                              >
+                              {stage.label}
+                            </AccordionHeader>
+                            <AccordionPanel className="production-nav-stage-panel">
+                              <div className="production-nav-stage-items">
                                 {stage.id === "source" ? (
                                   <NavItem
                                     className="workspace-nav-item"
@@ -1488,10 +1430,11 @@ function AccountsWorkspace({
                                   </NavItem>
                                 ))}
                               </div>
-                            ) : null}
-                          </section>
+                            </AccordionPanel>
+                          </AccordionItem>
                         );
                       })}
+                      </Accordion>
                     </nav>
                     <div className="progress">
                       <span>Source mapping</span>
@@ -1514,33 +1457,21 @@ function AccountsWorkspace({
                       </small>
                     </div>
                   </div>
-                ) : null}
-              </section>
-              <section
+                </AccordionPanel>
+              </AccordionItem>
+              <AccordionItem
+                value="administration"
                 className="workspace-nav-bookend administration-navigation"
-                aria-labelledby="administration-nav-heading"
               >
-                <h2 id="administration-nav-heading">
-                  <button
-                    type="button"
-                    className="workspace-nav-toggle"
-                    aria-expanded={administrationNavOpen}
-                    aria-controls="administration-nav-items"
-                    onClick={() => setAdministrationNavOpen((open) => !open)}
-                  >
-                    <span>Administration</span>
-                    {administrationNavOpen ? (
-                      <ChevronDownRegular aria-hidden="true" />
-                    ) : (
-                      <ChevronRightRegular aria-hidden="true" />
-                    )}
-                  </button>
-                </h2>
-                {administrationNavOpen ? (
-                  <div
-                    id="administration-nav-items"
-                    className="workspace-nav-items"
-                  >
+                <AccordionHeader
+                  className="workspace-nav-header"
+                  button={{ className: "workspace-nav-toggle" }}
+                  expandIconPosition="end"
+                >
+                  Administration
+                </AccordionHeader>
+                <AccordionPanel className="workspace-nav-panel">
+                  <div className="workspace-nav-items">
                     <NavItem
                       className="workspace-nav-item"
                       value="inbox"
@@ -1568,8 +1499,9 @@ function AccountsWorkspace({
                       </NavItem>
                     )}
                   </div>
-                ) : null}
-              </section>
+                </AccordionPanel>
+              </AccordionItem>
+              </Accordion>
             </NavDrawerBody>
           </NavDrawer>
         </aside>
@@ -1661,24 +1593,24 @@ function AccountsWorkspace({
               </span>
               <h1>We couldn’t open this workspace</h1>
               <p>{error}</p>
-              <button className="primary" onClick={loadEngagements}>
+              <FluentButton appearance="primary" onClick={loadEngagements}>
                 Try again
-              </button>
+              </FluentButton>
             </section>
           ) : !engagements.length ? (
             <Empty
               heading="No engagements yet"
               body="Create an accounting period for one of your clients to begin preparation."
             >
-              <button
-                className="primary"
+              <FluentButton
+                appearance="primary"
                 onClick={() => {
                   setEngagementOrganisationId("");
                   setShowEngagementSetup(true);
                 }}
               >
                 Create engagement
-              </button>
+              </FluentButton>
             </Empty>
           ) : (
             <>
@@ -1713,19 +1645,18 @@ function AccountsWorkspace({
                   </small>
                 </div>
                 <div className="page-actions">
-                  <button
-                    className="secondary"
+                  <FluentButton
                     onClick={() => {
                       setEngagementOrganisationId("");
                       setShowEngagementSetup(true);
                     }}
                   >
                     New engagement
-                  </button>
+                  </FluentButton>
                   {memberships.length > 1 && (
-                    <button className="secondary" onClick={clearWorkspace}>
+                    <FluentButton onClick={clearWorkspace}>
                       Switch workspace
-                    </button>
+                    </FluentButton>
                   )}
                 </div>
               </section>
@@ -1787,21 +1718,20 @@ function AccountsWorkspace({
                 })}
               </TabList>
               {notice && (
-                <div
-                  className={`notice ${notice.good ? "good" : "bad"}`}
-                  role={notice.good ? "status" : "alert"}
-                  aria-live={notice.good ? "polite" : "assertive"}
-                >
-                  <b>{notice.good ? "Saved" : "Action needed"}</b>
-                  {notice.text}
-                  <button
-                    type="button"
-                    onClick={() => setNotice(null)}
-                    aria-label="Dismiss notification"
-                  >
-                    ×
-                  </button>
-                </div>
+                <MessageBar intent={notice.good ? "success" : "error"}>
+                  <MessageBarBody>
+                    <b>{notice.good ? "Saved" : "Action needed"}</b>{" "}
+                    {notice.text}
+                  </MessageBarBody>
+                  <MessageBarActions>
+                    <FluentButton
+                      appearance="transparent"
+                      icon={<DismissRegular />}
+                      onClick={() => setNotice(null)}
+                      aria-label="Dismiss notification"
+                    />
+                  </MessageBarActions>
+                </MessageBar>
               )}
               <RoutePanelBoundary resetKey={`${selectedId}:${view}`}>
               {view === "portal" ? (
@@ -1851,9 +1781,9 @@ function AccountsWorkspace({
                     <b>Couldn’t load engagement data</b>
                     <p>{detailError}</p>
                   </div>
-                  <button className="secondary" onClick={loadDetail}>
+                  <FluentButton onClick={loadDetail}>
                     Retry
-                  </button>
+                  </FluentButton>
                 </div>
               ) : view === "data" ? (
                 <DataView
@@ -1899,106 +1829,87 @@ function AccountsWorkspace({
         </main>
       </div>
       {importFile && (
-        <div
-          className="modal-backdrop"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget && !importing) closeImport();
+        <Dialog
+          open
+          onOpenChange={(_, data) => {
+            if (!data.open && !importing) closeImport();
           }}
         >
-          <section
-            ref={modalRef}
-            className="modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="import-title"
-            aria-describedby="import-summary"
-            tabIndex={-1}
-          >
-            <div className="modal-head">
-              <div>
+          <DialogSurface className="modal">
+            <DialogBody>
+              <DialogTitle id="import-title">
                 <p className="eyebrow">Import source data</p>
-                <h2 id="import-title">Review trial balance</h2>
-              </div>
-              <button
-                type="button"
-                onClick={closeImport}
-                aria-label="Close import dialog"
-                disabled={importing}
-              >
-                ×
-              </button>
-            </div>
-            <div className="file-card" id="import-summary">
-              <span>CSV</span>
-              <div>
-                <b>{importFile.name}</b>
-                <small>
-                  {(importFile.size / 1024).toFixed(1)} KB · {csvRows.length}{" "}
-                  rows detected
-                </small>
-              </div>
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                disabled={importing}
-              >
-                Replace file
-              </button>
-            </div>
-            {importError && (
-              <p className="form-error" role="alert">
-                {importError}
-              </p>
-            )}
-            {csvRows.length > 0 && (
-              <div className="preview">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Code</th>
-                      <th>Account</th>
-                      <th>Debit</th>
-                      <th>Credit</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {csvRows.slice(0, 5).map((row, i) => (
-                      <tr key={i}>
-                        <td>{row.accountCode}</td>
-                        <td>{row.accountName}</td>
-                        <td>{row.debit || "—"}</td>
-                        <td>{row.credit || "—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {csvRows.length > 5 && (
-                  <small>Plus {csvRows.length - 5} more rows</small>
+                Review trial balance
+              </DialogTitle>
+              <DialogContent>
+                <div className="file-card" id="import-summary">
+                  <span>CSV</span>
+                  <div>
+                    <b>{importFile.name}</b>
+                    <small>
+                      {(importFile.size / 1024).toFixed(1)} KB · {csvRows.length}{" "}
+                      rows detected
+                    </small>
+                  </div>
+                  <FluentButton
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    disabled={importing}
+                  >
+                    Replace file
+                  </FluentButton>
+                </div>
+                {importError && (
+                  <MessageBar intent="error">
+                    <MessageBarBody>{importError}</MessageBarBody>
+                  </MessageBar>
                 )}
-              </div>
-            )}
-            <div className="modal-actions">
-              <button
-                type="button"
-                className="secondary"
-                onClick={closeImport}
-                disabled={importing}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="primary"
-                onClick={commitImport}
-                disabled={!csvRows.length || importing}
-              >
-                {importing
-                  ? "Importing…"
-                  : `Import ${csvRows.length || ""} rows`}
-              </button>
-            </div>
-          </section>
-        </div>
+                {csvRows.length > 0 && (
+                  <div className="preview">
+                    <Table size="small" aria-label="Trial balance import preview">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHeaderCell>Code</TableHeaderCell>
+                          <TableHeaderCell>Account</TableHeaderCell>
+                          <TableHeaderCell>Debit</TableHeaderCell>
+                          <TableHeaderCell>Credit</TableHeaderCell>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                    {csvRows.slice(0, 5).map((row, i) => (
+                          <TableRow key={i}>
+                            <TableCell>{row.accountCode}</TableCell>
+                            <TableCell>{row.accountName}</TableCell>
+                            <TableCell>{row.debit || "—"}</TableCell>
+                            <TableCell>{row.credit || "—"}</TableCell>
+                          </TableRow>
+                    ))}
+                      </TableBody>
+                    </Table>
+                    {csvRows.length > 5 && (
+                      <small>Plus {csvRows.length - 5} more rows</small>
+                    )}
+                  </div>
+                )}
+              </DialogContent>
+              <DialogActions>
+                <FluentButton
+                  appearance="primary"
+                  type="button"
+                  onClick={commitImport}
+                  disabled={!csvRows.length || importing}
+                >
+                  {importing
+                    ? "Importing…"
+                    : `Import ${csvRows.length || ""} rows`}
+                </FluentButton>
+                <FluentButton type="button" onClick={closeImport} disabled={importing}>
+                  Cancel
+                </FluentButton>
+              </DialogActions>
+            </DialogBody>
+          </DialogSurface>
+        </Dialog>
       )}
       {showEngagementSetup && (
         <EngagementSetup
@@ -2316,7 +2227,7 @@ function TeamView({
                 leave this page.
               </span>
             </div>
-            <input
+            <Input
               aria-label="One-time invitation link"
               readOnly
               value={oneTimeLink}
@@ -2432,22 +2343,21 @@ export function InviteAcceptance({
         </p>
       )}
       <div>
-        <button
+        <FluentButton
           type="button"
-          className="primary"
+          appearance="primary"
           disabled={busy}
           onClick={accept}
         >
           {busy ? "Accepting…" : "Accept invitation"}
-        </button>
-        <button
+        </FluentButton>
+        <FluentButton
           type="button"
-          className="secondary"
           disabled={busy}
           onClick={onCancel}
         >
           Continue without invite
-        </button>
+        </FluentButton>
       </div>
     </section>
   );
@@ -2795,8 +2705,6 @@ function EngagementSetup({
   const frameworks = permittedFrameworks(
     selectedOrganisation?.legal_form ?? "",
   );
-  const dialogRef = useRef<HTMLElement>(null);
-  useDialogFocus(dialogRef, true, onClose, busy);
   async function create(event: React.FormEvent) {
     event.preventDefault();
     if (form.periodEnd < form.periodStart) {
@@ -2824,40 +2732,29 @@ function EngagementSetup({
     }
   }
   return (
-    <div
-      className="modal-backdrop"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !busy) onClose();
+    <Dialog
+      open
+      onOpenChange={(_, data) => {
+        if (!data.open && !busy) onClose();
       }}
     >
-      <section
-        ref={dialogRef}
-        className="modal engagement-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="engagement-title"
-        tabIndex={-1}
-      >
-        <div className="modal-head">
-          <div>
+      <DialogSurface className="modal engagement-dialog">
+        <DialogBody>
+          <DialogTitle id="engagement-title">
             <p className="eyebrow">Engagement setup</p>
-            <h2 id="engagement-title">Create accounts period</h2>
-          </div>
-          <Tooltip content="Close engagement setup" relationship="description">
-            <FluentButton
-              appearance="subtle"
-              icon={<DismissRegular />}
-              onClick={onClose}
-              aria-label="Close engagement setup"
-              disabled={busy}
-            />
-          </Tooltip>
-        </div>
+            Create accounts period
+          </DialogTitle>
+          <DialogContent>
         {!organisations.length ? (
-          <Empty
-            heading="Create a client first"
-            body="An engagement must belong to a legal entity in this workspace."
-          />
+          <>
+            <Empty
+              heading="Create a client first"
+              body="An engagement must belong to a legal entity in this workspace."
+            />
+            <DialogActions>
+              <FluentButton type="button" onClick={onClose}>Close</FluentButton>
+            </DialogActions>
+          </>
         ) : (
           <form className="engagement-form" onSubmit={create}>
             <Field label="Client" required>
@@ -2957,22 +2854,20 @@ function EngagementSetup({
                 {error}
               </p>
             )}
-            <div className="modal-actions">
-              <FluentButton
-                type="button"
-                onClick={onClose}
-                disabled={busy}
-              >
-                Cancel
-              </FluentButton>
+            <DialogActions>
               <FluentButton appearance="primary" type="submit" disabled={busy}>
                 {busy ? "Creating…" : "Create engagement"}
               </FluentButton>
-            </div>
+              <FluentButton type="button" onClick={onClose} disabled={busy}>
+                Cancel
+              </FluentButton>
+            </DialogActions>
           </form>
         )}
-      </section>
-    </div>
+          </DialogContent>
+        </DialogBody>
+      </DialogSurface>
+    </Dialog>
   );
 }
 
@@ -2985,7 +2880,7 @@ function WorkspaceChooser({
 }) {
   const [tenantId, setTenantId] = useState("");
   return (
-    <section className="setup workspace-choice">
+    <section className="setup fluent-workspace-choice">
       <p className="eyebrow">Select your workspace</p>
       <h1>Where would you like to work?</h1>
       <p>
@@ -2998,9 +2893,8 @@ function WorkspaceChooser({
           onSelect(tenantId);
         }}
       >
-        <label htmlFor="workspace-select">
-          Workspace
-          <select
+        <Field label="Workspace" required>
+          <Select
             id="workspace-select"
             value={tenantId}
             onChange={(event) => setTenantId(event.target.value)}
@@ -3012,11 +2906,11 @@ function WorkspaceChooser({
                 {item.name} · {title(item.role_code)}
               </option>
             ))}
-          </select>
-        </label>
-        <button className="primary" disabled={!tenantId}>
+          </Select>
+        </Field>
+        <FluentButton appearance="primary" type="submit" disabled={!tenantId}>
           Open workspace
-        </button>
+        </FluentButton>
       </form>
     </section>
   );
@@ -3071,9 +2965,8 @@ export function NoMembership({
             become its owner and begin setting up clients.
           </p>
           <form className="workspace-create" onSubmit={create}>
-            <label htmlFor="new-workspace-name">
-              Workspace name
-              <input
+            <Field label="Workspace name" required>
+              <Input
                 id="new-workspace-name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
@@ -3081,15 +2974,15 @@ export function NoMembership({
                 required
                 autoFocus
               />
-            </label>
+            </Field>
             {error && (
               <p className="form-error" role="alert">
                 {error}
               </p>
             )}
-            <button className="primary" disabled={busy || !name.trim()}>
+            <FluentButton appearance="primary" type="submit" disabled={busy || !name.trim()}>
               {busy ? "Creating…" : "Create workspace"}
-            </button>
+            </FluentButton>
           </form>
           <small>
             You will be the workspace owner and can invite trusted colleagues
@@ -3106,9 +2999,9 @@ export function NoMembership({
               "Ask your Ledgerly administrator to invite this email address, then check again."}
           </p>
           <div>
-            <button type="button" className="primary" onClick={onRetry}>
+            <FluentButton appearance="primary" type="button" onClick={onRetry}>
               Check again
-            </button>
+            </FluentButton>
           </div>
           <small>
             Once an administrator adds you, your workspace will appear here
@@ -3138,9 +3031,9 @@ function MembershipError({
         Your sign-in is still active. Retry the membership check before
         contacting your administrator.
       </p>
-      <button type="button" className="primary" onClick={onRetry}>
+      <FluentButton appearance="primary" type="button" onClick={onRetry}>
         Try again
-      </button>
+      </FluentButton>
     </section>
   );
 }
@@ -3989,14 +3882,12 @@ function TasksView({
               required
             />
           </Field>
-          <label className="check">
-            <input
-              type="checkbox"
+          <Checkbox
+              className="check"
+              label="Blocking"
               checked={blocking}
-              onChange={(e) => setBlocking(e.target.checked)}
-            />{" "}
-            Blocking
-          </label>
+              onChange={(_, data) => setBlocking(Boolean(data.checked))}
+          />
           <FluentButton appearance="primary" type="submit" disabled={busy}>
             Add task
           </FluentButton>
@@ -4034,7 +3925,7 @@ function TasksView({
                         : ""}
                     </small>
                   </div>
-                  <select
+                  <Select
                     aria-label={`Status for ${item.title}`}
                     value={item.status}
                     disabled={busy}
@@ -4045,7 +3936,7 @@ function TasksView({
                     {statusOptions.map((value) => (
                       <option key={value}>{value}</option>
                     ))}
-                  </select>
+                  </Select>
                 </article>
               ))}
           </section>
@@ -4394,31 +4285,25 @@ function AuthScreen({
                 : "Enter and confirm your new password."}
         </p>
         {confirmation && (
-          <div className="auth-message" role="status">
-            {confirmation}
-          </div>
+          <MessageBar intent="success"><MessageBarBody>{confirmation}</MessageBarBody></MessageBar>
         )}
         {error && (
-          <div className="auth-message error" role="alert">
-            {error}
-          </div>
+          <MessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></MessageBar>
         )}
-        <form className="auth-form" onSubmit={submit}>
+        <form className="fluent-auth-form" onSubmit={submit}>
           {mode === "sign-up" && (
-            <label>
-              Full name
-              <input
+            <Field label="Full name" required>
+              <Input
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 autoComplete="name"
                 required
               />
-            </label>
+            </Field>
           )}
           {mode !== "reset-password" && (
-            <label>
-              Email address
-              <input
+            <Field label="Email address" required>
+              <Input
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
@@ -4426,12 +4311,15 @@ function AuthScreen({
                 inputMode="email"
                 required
               />
-            </label>
+            </Field>
           )}
           {mode !== "reset-request" && (
-            <label>
-              {mode === "reset-password" ? "New password" : "Password"}
-            <input
+            <Field
+              label={mode === "reset-password" ? "New password" : "Password"}
+              hint="At least 8 characters"
+              required
+            >
+            <Input
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
@@ -4441,13 +4329,11 @@ function AuthScreen({
               minLength={8}
               required
             />
-            <small>At least 8 characters</small>
-            </label>
+            </Field>
           )}
           {mode === "reset-password" && (
-            <label>
-              Confirm new password
-              <input
+            <Field label="Confirm new password" required>
+              <Input
                 type="password"
                 value={passwordConfirmation}
                 onChange={(event) => setPasswordConfirmation(event.target.value)}
@@ -4455,9 +4341,9 @@ function AuthScreen({
                 minLength={8}
                 required
               />
-            </label>
+            </Field>
           )}
-          <button className="primary auth-submit" disabled={busy}>
+          <FluentButton appearance="primary" type="submit" className="auth-submit" disabled={busy}>
             {busy
               ? "Please wait…"
               : mode === "sign-in"
@@ -4467,35 +4353,36 @@ function AuthScreen({
                   : mode === "reset-request"
                     ? "Send reset link"
                     : "Update password"}
-          </button>
+          </FluentButton>
         </form>
         {(mode === "sign-in" || mode === "sign-up") && (
-          <button
+          <FluentButton
             type="button"
             className="auth-submit"
             disabled={busy}
             onClick={signInWithGoogle}
           >
             Continue with Google
-          </button>
+          </FluentButton>
         )}
         {mode === "sign-in" && (
           <div className="auth-switch">
-            <button type="button" onClick={() => switchMode("reset-request")}>
+            <FluentButton appearance="transparent" type="button" onClick={() => switchMode("reset-request")}>
               Forgot your password?
-            </button>
+            </FluentButton>
           </div>
         )}
         <div className="auth-switch">
           <span>
             {mode === "sign-in" ? "New to Ledgerly?" : "Return to sign in"}
           </span>
-          <button
+          <FluentButton
+            appearance="transparent"
             type="button"
             onClick={() => switchMode(mode === "sign-in" ? "sign-up" : "sign-in")}
           >
             {mode === "sign-in" ? "Create an account" : "Sign in"}
-          </button>
+          </FluentButton>
         </div>
       </div>
     </AuthFrame>
@@ -4547,9 +4434,9 @@ function DataView({
           heading="Trial balance"
           body="The latest committed source balances for this period."
         >
-          <button type="button" className="primary" onClick={openImport}>
+          <FluentButton appearance="primary" type="button" onClick={openImport}>
             Import trial balance
-          </button>
+          </FluentButton>
           <input
             hidden
             ref={fileRef}
@@ -4567,56 +4454,52 @@ function DataView({
             heading="No trial balance imported"
             body="Import a CSV with account code, account name, debit and credit columns."
           >
-            <button type="button" className="primary" onClick={openImport}>
+            <FluentButton appearance="primary" type="button" onClick={openImport}>
               Choose CSV file
-            </button>
+            </FluentButton>
           </Empty>
         ) : (
           <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Account</th>
-                  <th>Account name</th>
-                  <th className="number">Debit</th>
-                  <th className="number">Credit</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table size="small" aria-label="Trial balance">
+              <TableHeader>
+                <TableRow>
+                  <TableHeaderCell>Account</TableHeaderCell>
+                  <TableHeaderCell>Account name</TableHeaderCell>
+                  <TableHeaderCell className="number">Debit</TableHeaderCell>
+                  <TableHeaderCell className="number">Credit</TableHeaderCell>
+                  <TableHeaderCell>Status</TableHeaderCell>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {lines.map((line) => (
-                  <tr key={line.account_code}>
-                    <td className="mono">{line.account_code}</td>
-                    <td>
+                  <TableRow key={line.account_code}>
+                    <TableCell className="mono">{line.account_code}</TableCell>
+                    <TableCell>
                       <b>{line.account_name}</b>
-                    </td>
-                    <td className="number">
+                    </TableCell>
+                    <TableCell className="number">
                       {Number(line.debit) ? money(Number(line.debit)) : "—"}
-                    </td>
-                    <td className="number">
+                    </TableCell>
+                    <TableCell className="number">
                       {Number(line.credit) ? money(Number(line.credit)) : "—"}
-                    </td>
-                    <td>
-                      <span
-                        className={`tag ${isMappedTrialBalanceLine(line) ? "ok" : "warning"}`}
-                      >
+                    </TableCell>
+                    <TableCell>
+                      <Badge {...statusBadgeProps(isMappedTrialBalanceLine(line) ? "COMPLETE" : "WARNING")}>
                         {isMappedTrialBalanceLine(line)
                           ? "Mapped"
                           : "Needs mapping"}
-                      </span>
-                    </td>
-                  </tr>
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td colSpan={2}>Control total</td>
-                  <td className="number">{money(debit)}</td>
-                  <td className="number">{money(credit)}</td>
-                  <td />
-                </tr>
-              </tfoot>
-            </table>
+                <TableRow className="control-total-row">
+                  <TableCell colSpan={2}>Control total</TableCell>
+                  <TableCell className="number">{money(debit)}</TableCell>
+                  <TableCell className="number">{money(credit)}</TableCell>
+                  <TableCell />
+                </TableRow>
+              </TableBody>
+            </Table>
           </div>
         )}
       </section>
@@ -4671,9 +4554,9 @@ function MappingView({
           heading="Account mapping"
           body="Connect each source account to the reporting taxonomy."
         >
-          <span className={`summary ${unmapped || !lines.length ? "pending" : "complete"}`}>
+          <Badge {...statusBadgeProps(unmapped || !lines.length ? "PENDING" : "COMPLETE")}>
             {mappingSummaryLabel(lines.length, unmapped)}
-          </span>
+          </Badge>
         </PanelHead>
         {taxonomyError && (
           <PanelError
@@ -4689,24 +4572,24 @@ function MappingView({
           />
         ) : (
           <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Source account</th>
-                  <th className="number">Balance</th>
-                  <th>Canonical account</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table size="small" aria-label="Account mapping">
+              <TableHeader>
+                <TableRow>
+                  <TableHeaderCell>Source account</TableHeaderCell>
+                  <TableHeaderCell className="number">Balance</TableHeaderCell>
+                  <TableHeaderCell>Canonical account</TableHeaderCell>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {lines.map((line) => (
-                  <tr key={line.account_code}>
-                    <td>
+                  <TableRow key={line.account_code}>
+                    <TableCell>
                       <small className="mono">{line.account_code}</small>
                       <b className="block">{line.account_name}</b>
-                    </td>
-                    <td className="number">{money(amount(line))}</td>
-                    <td>
-                      <select
+                    </TableCell>
+                    <TableCell className="number">{money(amount(line))}</TableCell>
+                    <TableCell>
+                      <Select
                         aria-label={`Canonical account for ${line.account_code} ${line.account_name}`}
                         className={
                           !line.canonical_account_id ? "select-warning" : ""
@@ -4731,12 +4614,12 @@ function MappingView({
                             {name}
                           </option>
                         ))}
-                      </select>
-                    </td>
-                  </tr>
+                      </Select>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         )}
       </section>
@@ -6053,9 +5936,9 @@ function HistoryView({
         heading="Engagement history"
         body="An immutable record of material activity."
       >
-        <button type="button" className="secondary" onClick={onRefresh}>
+        <FluentButton type="button" onClick={onRefresh}>
           Refresh
-        </button>
+        </FluentButton>
       </PanelHead>
       {error ? (
         <PanelError
