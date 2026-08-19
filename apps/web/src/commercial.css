@@ -59,7 +59,7 @@
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   min-height: 32px;
-  border: 1px solid #8a8886;
+  border: 1px solid var(--colorNeutralStroke1);
   border-radius: 2px;
   background: var(--colorNeutralBackground1);
 }
@@ -202,7 +202,7 @@
   background: var(--colorStatusSuccessBackground3);
 }
 .notification-marker.warning {
-  background: #986f0b;
+  background: var(--colorStatusWarningBackground3);
 }
 .notification-marker.error {
   background: var(--colorStatusDangerBackground3);

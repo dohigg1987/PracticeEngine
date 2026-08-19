@@ -445,8 +445,8 @@
   gap: 2px;
   margin-top: 5px;
   padding: 7px 9px;
-  border-left: 3px solid var(--colorPaletteMarigoldBorderActive, #bc4b09);
-  background: var(--colorPaletteMarigoldBackground1, #fff4ce);
+  border-left: 3px solid var(--colorStatusWarningBorderActive);
+  background: var(--colorStatusWarningBackground1);
   color: var(--colorNeutralForeground1);
   font-size: 12px;
 }
@@ -476,7 +476,7 @@
 .accounts-version-list dl div {
   min-width: 0;
   padding: 8px 10px;
-  background: white;
+  background: var(--colorNeutralBackground1);
 }
 .accounts-version-list dt {
   color: var(--muted);
@@ -590,7 +590,7 @@
 .accounts-review {
   margin: 18px 0;
   padding: 14px;
-  border: 1px solid #d6d6d6;
+  border: 1px solid var(--colorNeutralStroke1);
   border-radius: var(--borderRadiusSmall);
   background: var(--colorNeutralBackground1);
 }
@@ -635,7 +635,7 @@
   gap: 8px;
   padding: 8px 0;
   border: 0;
-  border-bottom: 1px solid #ededed;
+  border-bottom: 1px solid var(--colorNeutralStroke2);
   border-radius: 0;
   background: transparent;
 }
@@ -653,7 +653,7 @@
 }
 .release-checks li.outstanding > span {
   background: transparent;
-  color: #8a5d00;
+  color: var(--colorStatusWarningForeground1);
 }
 .release-checks li div {
   display: flex;
@@ -683,7 +683,7 @@
   gap: 7px 15px;
   margin-top: 12px;
   padding: 10px 12px;
-  border-left: 3px solid #6a8f87;
+  border-left: 3px solid var(--colorNeutralStrokeAccessible);
   background: var(--colorNeutralBackground2);
 }
 .version-comparison span {
@@ -695,7 +695,7 @@
   align-items: center;
   padding: 13px 16px;
   margin: 0 0 12px;
-  border-block: 1px solid #b8d6f2;
+  border-block: 1px solid var(--colorBrandStroke2);
   border-radius: 0;
   background: var(--colorNeutralBackground2);
   color: var(--ink);
@@ -708,7 +708,7 @@
   gap: 12px;
   margin: 16px 0;
   padding: 14px;
-  border: 1px solid #d6d6d6;
+  border: 1px solid var(--colorNeutralStroke1);
   border-radius: var(--borderRadiusSmall);
   background: var(--colorNeutralBackground1);
 }
@@ -881,10 +881,10 @@
   align-items: center;
   margin: 0 0 12px;
   padding: 10px 12px;
-  border: 1px solid #edc873;
+  border: 1px solid var(--colorStatusWarningBorder1);
   border-radius: 2px;
   background: var(--colorNeutralBackground2);
-  color: #72500b;
+  color: var(--colorStatusWarningForeground1);
 }
 .pack-warning.certified {
   border-color: var(--border);
@@ -916,7 +916,7 @@
   overflow-wrap: anywhere;
 }
 .artefact-control.error {
-  border-color: #efcbc6;
+  border-color: var(--colorStatusDangerBorder1);
   background: var(--colorNeutralBackground2);
 }
 .artefact-actions {
@@ -1034,12 +1034,12 @@
 }
 .filing-decision-row td {
   padding: 0 !important;
-  background: #f8f8f8;
+  background: var(--colorNeutralBackground2);
 }
 .decision-form {
   padding: 16px 20px 18px;
   border-top: 1px solid var(--border);
-  background: #f8f8f8;
+  background: var(--colorNeutralBackground2);
 }
 .decision-form fieldset {
   display: grid;
@@ -1128,16 +1128,16 @@ td {
   display: grid;
   place-items: center;
   padding: 24px;
-  background: #f3f6f6;
+  background: var(--colorNeutralBackground2);
 }
 .fatal-error section {
   width: min(560px, 100%);
   padding: 36px;
   border: 1px solid var(--border);
   border-radius: var(--borderRadiusXLarge);
-  background: white;
+  background: var(--colorNeutralBackground1);
   text-align: center;
-  box-shadow: 0 18px 60px #16343c12;
+  box-shadow: var(--shadow16);
 }
 .fatal-error section > span {
   display: grid;
@@ -1146,7 +1146,7 @@ td {
   height: 42px;
   margin: 0 auto 18px;
   border-radius: 50%;
-  background: #fff0ed;
+  background: var(--colorStatusDangerBackground1);
   color: var(--danger);
   font-weight: 800;
 }
