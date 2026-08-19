@@ -142,7 +142,7 @@
   color: #616161;
   font-size: 12px;
 }
-.commercial-section > .fui-MessageBar {
+.commercial-section > .commercial-message {
   margin: 12px 16px 16px;
 }
 .import-preview {
@@ -216,7 +216,7 @@
 .danger-zone {
   border-color: #d1d1d1;
 }
-.danger-zone > .fui-Field {
+.danger-zone > .danger-zone-reason {
   max-width: 760px;
   margin: 14px 16px 8px;
 }

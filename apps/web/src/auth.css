@@ -18,7 +18,7 @@
 .auth-brand:after {
   content: "";
   position: absolute;
-  border-radius: 3px;
+  border-radius: var(--borderRadiusSmall);
   border: 1px solid #ffffff12;
 }
 .auth-brand:before {
@@ -76,7 +76,7 @@
   width: min(430px, 100%);
   background: #fff;
   border: 1px solid #d9e3e2;
-  border-radius: 12px;
+  border-radius: var(--borderRadiusXLarge);
   padding: 36px;
   box-shadow: 0 18px 60px #16343c0d;
 }
@@ -180,12 +180,12 @@
 .configuration > p code {
   background: #eff3f2;
   padding: 2px 5px;
-  border-radius: 3px;
+  border-radius: var(--borderRadiusSmall);
 }
 .config-example {
   background: #f5f8f7;
   border: 1px solid #dce5e4;
-  border-radius: 7px;
+  border-radius: var(--borderRadiusLarge);
   padding: 13px;
   margin: 18px 0;
   overflow: auto;
@@ -225,7 +225,7 @@
 }
 .sign-out {
   border: 1px solid #58737a;
-  border-radius: 5px;
+  border-radius: var(--borderRadiusMedium);
   background: transparent;
   color: #d6e1e2;
   padding: 6px 10px;

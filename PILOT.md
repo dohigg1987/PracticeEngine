@@ -62,12 +62,15 @@ control**. The guarded release always supplies `--branch main` and the exact
 Git SHA; if the remote project still treats another branch as production, the
 upload will be only a preview and must not be promoted as a release.
 
+The current web-only release remains pinned to the audited Pages, Workers and
+Neon Auth endpoints below. This does not relax the API release gate: an API
+deployment still requires the controlled custom domain and `workers_dev=false`.
 Build from the repository root in a clean checkout:
 
 ```powershell
-$env:VITE_API_URL="https://api.accounts.example"
-$env:VITE_NEON_AUTH_URL="https://your-neon-auth-host/neondb/auth"
-$env:WEB_ORIGIN="https://accounts.example"
+$env:VITE_API_URL="https://uk-accounts-api-production.dennis-ohiggins.workers.dev"
+$env:VITE_NEON_AUTH_URL="https://ep-wispy-thunder-zatp3scz.neonauth.c-2.eu-west-2.aws.neon.tech/neondb/auth"
+$env:WEB_ORIGIN="https://ledgerly-accounts.pages.dev"
 $env:VITE_DEMO_MODE="false"
 npm ci
 npm run typecheck -w apps/web
@@ -77,7 +80,12 @@ npm run test:e2e -w apps/web
 npm run build:production -w apps/web
 ```
 
-Replace every `.example` value above with the selected real HTTPS production origin before running it. `build:production` fails before Vite runs if any origin is absent, non-HTTPS, local, credentialed, wildcarded or recognisably placeholder-based. It reduces API and Neon Auth URLs to exact origins and generates `apps/web/public/_headers`; that generated environment-specific file is ignored by Git and copied into `dist` by Vite. Run `npm run test:headers -w apps/web` to verify rejection rules and the generated policy contract.
+`build:production` fails before Vite runs if any origin is absent, non-HTTPS,
+local, credentialed, wildcarded or recognisably placeholder-based. It reduces
+API and Neon Auth URLs to exact origins and generates
+`apps/web/public/_headers`; that generated environment-specific file is ignored
+by Git and copied into `dist` by Vite. Run `npm run test:headers -w apps/web` to
+verify rejection rules and the generated policy contract.
 
 Deploy output is `apps/web/dist`. For a Cloudflare Pages Direct Upload project,
 authenticate to the selected account and create the project once. Subsequent
@@ -87,9 +95,9 @@ cannot be published and Cloudflare records the exact Git SHA:
 ```powershell
 npx wrangler login
 npx wrangler pages project create
-$env:WEB_ORIGIN="https://accounts.example"
-$env:VITE_API_URL="https://api.accounts.example"
-$env:VITE_NEON_AUTH_URL="https://your-neon-auth-host/neondb/auth"
+$env:WEB_ORIGIN="https://ledgerly-accounts.pages.dev"
+$env:VITE_API_URL="https://uk-accounts-api-production.dennis-ohiggins.workers.dev"
+$env:VITE_NEON_AUTH_URL="https://ep-wispy-thunder-zatp3scz.neonauth.c-2.eu-west-2.aws.neon.tech/neondb/auth"
 $env:VITE_DEMO_MODE="false"
 npm run release:check:web
 npm run release:web
@@ -105,7 +113,7 @@ Post-deploy smoke checks:
 
 1. Open the custom HTTPS hostname and confirm no showcase badge or demo data is present.
 2. Deep-link to `/invite#token=invalid-test-token`; confirm the SPA loads and the token remains only in the fragment, then remove it from browser history.
-3. Sign in and sign out through Neon Auth. Confirm the production web origin is in Neon Auth's trusted-origin configuration and that cookies/session requests are not using the DEV `/neon-auth` proxy.
+3. Sign in and sign out through Neon Auth. Confirm the production web origin is in Neon Auth's trusted-origin configuration and that session requests use the deployed Pages `/neon-auth` Function, not the Vite development proxy.
 4. Select a permitted tenant and inspect one API request: it must target `VITE_API_URL`, carry `Authorization: Bearer …` and `x-tenant-id`, and must not contain an actor-ID header.
 5. Verify an unauthenticated API request returns `401`, an unassigned tenant returns `403`, a browser refresh on an application route returns the SPA, and static assets return the intended cache/security headers.
 6. Exercise authenticated HTML/PDF/evidence-bundle download once. Confirm blob downloads work without exposing a storage key or opening an unauthenticated object URL.

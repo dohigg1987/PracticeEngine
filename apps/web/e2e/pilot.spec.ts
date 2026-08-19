@@ -234,6 +234,13 @@ test("pilot workspace administration reaches clients and team without actor iden
   await expect(page.getByRole("heading", { name: "Team" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Members" })).toBeVisible();
   await expect(page.getByText("Actor ID", { exact: false })).toHaveCount(0);
+  await page
+    .getByRole("navigation", { name: "Team location" })
+    .getByRole("button", { name: "Workspace" })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Northstar Community Foundation" }),
+  ).toBeVisible();
 });
 
 test("production boundary gives actionable auth configuration recovery", async ({

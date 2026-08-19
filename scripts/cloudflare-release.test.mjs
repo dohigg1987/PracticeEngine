@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  expectedWebApiOrigin,
+  pagesDeploymentInvocation,
   productionConfigErrors,
   releaseContextErrors,
   webEnvironmentErrors,
+  webReleaseConfigErrors,
 } from "./cloudflare-release.mjs";
 
 const sha = "a".repeat(40);
@@ -48,7 +51,39 @@ test("locks the web build origins to the API production configuration", () => {
   };
   assert.deepEqual(webEnvironmentErrors(environment, config), []);
   assert.ok(webEnvironmentErrors({ ...environment, VITE_API_URL: "https://preview.invalid" }, config)
-    .some((error) => error.includes("custom domain")));
+    .some((error) => error.includes("Worker origin")));
   assert.ok(webEnvironmentErrors({ ...environment, VITE_DEMO_MODE: "true" }, config)
     .some((error) => error.includes("exactly false")));
+});
+
+test("allows the audited workers.dev origin for a web-only release", () => {
+  const workersDevConfig = {
+    ...config,
+    workers_dev: true,
+    routes: undefined,
+    vars: {
+      WEB_ORIGIN: "https://ledgerly-accounts.pages.dev",
+      NEON_AUTH_URL: "https://ep-wispy-thunder-zatp3scz.neonauth.c-2.eu-west-2.aws.neon.tech/neondb/auth",
+    },
+  };
+  const environment = {
+    WEB_ORIGIN: workersDevConfig.vars.WEB_ORIGIN,
+    VITE_API_URL: "https://uk-accounts-api-production.dennis-ohiggins.workers.dev",
+    VITE_NEON_AUTH_URL: workersDevConfig.vars.NEON_AUTH_URL,
+    VITE_DEMO_MODE: "false",
+  };
+  assert.deepEqual(webReleaseConfigErrors(workersDevConfig), []);
+  assert.equal(expectedWebApiOrigin(workersDevConfig), environment.VITE_API_URL);
+  assert.deepEqual(webEnvironmentErrors(environment, workersDevConfig), []);
+  assert.ok(webEnvironmentErrors({ ...environment, VITE_API_URL: "https://preview.invalid" }, workersDevConfig)
+    .some((error) => error.includes("Worker origin")));
+  assert.ok(webReleaseConfigErrors(config).some((error) => error.includes("audited production workers.dev")));
+});
+
+test("deploys Pages from apps/web so the Functions directory is discovered", () => {
+  const invocation = pagesDeploymentInvocation(sha);
+  assert.equal(invocation.cwd.replaceAll("\\", "/").endsWith("/apps/web"), true);
+  assert.deepEqual(invocation.args.slice(0, 3), ["pages", "deploy", "dist"]);
+  assert.equal(invocation.args[invocation.args.indexOf("--commit-hash") + 1], sha);
+  assert.ok(invocation.args.includes("--commit-dirty=false"));
 });

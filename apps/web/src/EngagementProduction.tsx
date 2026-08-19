@@ -2202,7 +2202,7 @@ function FilingEvidence({
           Refresh
         </Button>
       </Head>
-      <MessageBar intent="info">
+      <MessageBar className="filing-message" intent="info">
         <MessageBarBody>
           <b>Manual evidence record.</b> No action on this page contacts a
           regulator or retrieves a regulator decision.
@@ -2253,7 +2253,7 @@ function FilingEvidence({
         </fieldset>
       </form>
       {!eligible.length && (
-        <MessageBar intent="warning">
+        <MessageBar className="filing-message" intent="warning">
           <MessageBarBody>
             <b>No eligible accounts version.</b>{" "}
             {unsignedFinal
@@ -2263,7 +2263,7 @@ function FilingEvidence({
         </MessageBar>
       )}
       {actionError && (
-        <MessageBar intent="error">
+        <MessageBar className="filing-message" intent="error">
           <MessageBarBody>{actionError}</MessageBarBody>
         </MessageBar>
       )}

@@ -35,13 +35,13 @@ textarea {
   transform: translateX(-50%);
   z-index: 2;
 }
-.global-search .fui-SearchBox {
+.global-search-box {
   width: 100%;
   border-color: #c7c7c7;
   background: #fff;
   box-shadow: 0 1px 2px #0000000f;
 }
-.global-search:focus-within .fui-SearchBox {
+.global-search:focus-within .global-search-box {
   border-color: #0f6cbd;
   box-shadow: 0 0 0 1px #0f6cbd;
 }
@@ -55,7 +55,7 @@ textarea {
   max-height: min(480px, 72vh);
   padding: 5px 0 7px;
   border: 1px solid #d1d1d1;
-  border-radius: 3px;
+  border-radius: var(--borderRadiusSmall);
   background: #fff;
   box-shadow: 0 10px 30px #00000029;
 }
@@ -217,11 +217,11 @@ pre,
   background: transparent;
 }
 
-.workspace-nav-bookend .fui-NavItem {
+.workspace-nav-bookend .workspace-nav-item {
   background: #fff !important;
 }
 
-.workspace-nav-bookend .fui-NavItem:hover {
+.workspace-nav-bookend .workspace-nav-item:hover {
   background: #f5f5f5 !important;
 }
 
@@ -382,7 +382,7 @@ textarea,
 .inline-error,
 .panel-error,
 .skeleton {
-  border-radius: 3px;
+  border-radius: var(--borderRadiusSmall);
   box-shadow: none;
 }
 
@@ -393,7 +393,7 @@ textarea,
 .task-board > section > header span,
 .review-progress,
 .avatar {
-  border-radius: 3px;
+  border-radius: var(--borderRadiusSmall);
 }
 
 .panel,
@@ -416,7 +416,7 @@ textarea,
 }
 .primary,
 .secondary {
-  border-radius: 3px;
+  border-radius: var(--borderRadiusSmall);
 }
 .production-spine {
   margin: 0;
@@ -451,7 +451,7 @@ textarea,
   width: 22px;
   height: 22px;
   border: 1px solid #bdbdbd;
-  border-radius: 3px;
+  border-radius: var(--borderRadiusSmall);
   font-size: 12px;
   font-weight: 600;
 }
@@ -663,7 +663,7 @@ tbody tr:hover {
 .empty > span,
 .error-state > span,
 .configuration .config-mark {
-  border-radius: 3px;
+  border-radius: var(--borderRadiusSmall);
 }
 .panel-head {
   padding: 14px 16px;
@@ -750,7 +750,6 @@ body { background: #f4f7fa; }
   border-bottom-color: #cbd9e6;
   background: #eef6fc;
 }
-.fui-TableHeader,
 .table-wrap thead,
 table thead {
   background: #edf3f8;
@@ -760,8 +759,7 @@ table thead {
 .metrics > div:nth-child(3) { border-top: 3px solid #8764b8; }
 .metrics > div:nth-child(4) { border-top: 3px solid #d08300; }
 .summary.complete,
-.tag.good,
-.fui-Badge[style*="success"] {
+.tag.good {
   background: #dff6dd;
   color: #0b6a0b;
 }
@@ -847,7 +845,7 @@ table thead {
   display: grid;
   align-items: center;
   width: 100%;
-  min-height: 40px;
+  min-height: 44px;
   padding: 8px 10px 8px 12px;
   border: 0;
   border-radius: 0;
@@ -937,8 +935,8 @@ table thead {
 }
 
 /* One row geometry for every Fluent destination in the sidebar. */
-.sidebar .fui-NavItem,
-.sidebar nav .fui-NavItem {
+.sidebar .workspace-nav-item,
+.sidebar nav .workspace-nav-item {
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr);
   align-items: center;
@@ -956,26 +954,15 @@ table thead {
   text-align: left;
 }
 
-.sidebar .fui-NavItem:hover,
-.sidebar nav .fui-NavItem:hover {
+.sidebar .workspace-nav-item:hover,
+.sidebar nav .workspace-nav-item:hover {
   background: #f5f5f5 !important;
 }
 
-.sidebar .fui-NavItem__icon {
-  display: grid;
-  place-items: center;
-  align-self: center;
+.sidebar .workspace-nav-item svg {
   width: 20px;
   height: 20px;
-  margin: 0;
-  font-size: 20px;
-  line-height: 20px;
-}
-
-.sidebar .fui-NavItem__icon svg {
   display: block;
-  width: 20px;
-  height: 20px;
 }
 
 .sidebar .production-nav-stage-items,
