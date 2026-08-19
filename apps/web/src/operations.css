@@ -62,3 +62,83 @@
   .balance-control { align-items: stretch; }
   .balance-control > span { text-align: right; }
 }
+
+/* Task board */
+.task-create .compact-form {
+  grid-template-columns: minmax(240px, 1fr) minmax(160px, 220px) auto auto;
+  align-items: end;
+}
+.task-create .check,
+.task-create .compact-form > button {
+  align-self: end;
+}
+.task-create .check {
+  min-height: 32px;
+}
+.task-type-select,
+.task-status-select {
+  width: 100%;
+}
+.task-create .task-select-native,
+.task-board .task-select-native {
+  border: 0;
+  background: transparent;
+}
+.task-board .task-select-native {
+  margin-top: 0;
+}
+.task-board-empty {
+  gap: 2px;
+  margin-top: 14px;
+  padding: 12px 16px;
+}
+.task-board-empty h3,
+.task-board-empty p {
+  margin: 0;
+}
+.task-board-empty h3 {
+  font-size: var(--fontSizeBase300);
+}
+.task-board-empty p {
+  color: var(--colorNeutralForeground2);
+  font-size: var(--fontSizeBase200);
+}
+.task-column {
+  min-width: 0;
+  padding: 10px;
+}
+.task-column > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 2px 6px;
+}
+.task-column-items {
+  display: grid;
+  gap: 8px;
+}
+.task-card {
+  gap: 8px;
+  padding: 10px;
+}
+.task-card h4 {
+  margin: 5px 0;
+}
+.task-card small {
+  color: var(--colorNeutralForeground3);
+  font-size: var(--fontSizeBase200);
+}
+@media (max-width: 900px) {
+  .task-create .compact-form {
+    grid-template-columns: minmax(220px, 1fr) minmax(160px, 220px);
+  }
+}
+@media (max-width: 620px) {
+  .task-create .compact-form {
+    grid-template-columns: 1fr;
+  }
+  .task-create .compact-form > button {
+    justify-self: start;
+  }
+}
