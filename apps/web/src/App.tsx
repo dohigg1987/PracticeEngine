@@ -79,6 +79,7 @@ import {
   Dashboard,
   Disclosure,
   Engagement,
+  FilingAttempt,
   Journal,
   JournalLine,
   onUnauthorized,
@@ -87,6 +88,7 @@ import {
   Reconciliation,
   ReportLine,
   ReviewPoint,
+  ReviewPointStatus,
   TenantMembership,
   TenantOnboarding,
   TeamInvitation,
@@ -115,7 +117,14 @@ import {
 } from "./auth";
 import ClientPermanentFile from "./ClientPermanentFile";
 import { ConfirmAction } from "./ConfirmAction";
-import { submissionStageState } from "./workflowState";
+import {
+  blockingItemsLabel,
+  blockingItemsMessage,
+  engagementResponseIsCurrent,
+  isOutstandingReviewPoint,
+  reportBalanceLabel,
+  submissionStageState,
+} from "./workflowState";
 import {
   permittedSectorProfiles,
   permittedFrameworks,
@@ -496,6 +505,7 @@ function AccountsWorkspace({
   const [lines, setLines] = useState<TrialBalanceLine[]>([]);
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [report, setReport] = useState<ReportLine[]>([]);
+  const [reportBalanced, setReportBalanced] = useState<boolean | null>(null);
   const [view, setView] = useState<View>(demoMode ? "accounts" : "overview");
   const [openProductionNavStage, setOpenProductionNavStage] =
     useState<ProductionNavStage | null>(
@@ -510,6 +520,7 @@ function AccountsWorkspace({
   const [reconciliations, setReconciliations] = useState<Reconciliation[]>([]);
   const [tasks, setTasks] = useState<WorkflowTask[]>([]);
   const [reviewPoints, setReviewPoints] = useState<ReviewPoint[]>([]);
+  const [filingAttempts, setFilingAttempts] = useState<FilingAttempt[]>([]);
   const [operationsLoading, setOperationsLoading] = useState(false);
   const [operationsError, setOperationsError] = useState("");
   const [canonicalAccounts, setCanonicalAccounts] = useState<
@@ -537,6 +548,8 @@ function AccountsWorkspace({
   const fileRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
+  const operationsSelectionRef = useRef(selectedId);
+  operationsSelectionRef.current = selectedId;
   useEffect(() => {
     const focusSearch = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
@@ -652,6 +665,7 @@ function AccountsWorkspace({
       setLines([]);
       setEvents([]);
       setReport([]);
+      setReportBalanced(null);
       setReportError("");
       setHistoryError("");
       return;
@@ -677,9 +691,13 @@ function AccountsWorkspace({
         history.reason?.message || "Could not load engagement history.",
       );
     }
-    if (reportData.status === "fulfilled") setReport(reportData.value.lines);
+    if (reportData.status === "fulfilled") {
+      setReport(reportData.value.lines);
+      setReportBalanced(reportData.value.balanced);
+    }
     else {
       setReport([]);
+      setReportBalanced(null);
       if (
         !(
           reportData.reason instanceof ApiError &&
@@ -699,8 +717,11 @@ function AccountsWorkspace({
       setReconciliations([]);
       setTasks([]);
       setReviewPoints([]);
+      setFilingAttempts([]);
+      setOperationsLoading(false);
       return;
     }
+    const requestEngagementId = selectedId;
     setOperationsLoading(true);
     setOperationsError("");
     const results = await Promise.allSettled([
@@ -709,17 +730,39 @@ function AccountsWorkspace({
       api.reconciliations(context, selectedId),
       api.workflowTasks(context, selectedId),
       api.reviewPoints(context, selectedId),
+      api.filingAttempts(context, selectedId),
     ]);
-    const [dash, journalData, reconciliationData, taskData, reviewData] =
-      results;
+    if (
+      !engagementResponseIsCurrent(
+        requestEngagementId,
+        operationsSelectionRef.current,
+      )
+    )
+      return;
+    const [
+      dash,
+      journalData,
+      reconciliationData,
+      taskData,
+      reviewData,
+      filingData,
+    ] = results;
     if (dash.status === "fulfilled") setDashboard(dash.value);
+    else setDashboard({});
     if (journalData.status === "fulfilled")
       setJournals(journalData.value.items);
+    else setJournals([]);
     if (reconciliationData.status === "fulfilled")
       setReconciliations(reconciliationData.value.items);
+    else setReconciliations([]);
     if (taskData.status === "fulfilled") setTasks(taskData.value.items);
+    else setTasks([]);
     if (reviewData.status === "fulfilled")
       setReviewPoints(reviewData.value.items);
+    else setReviewPoints([]);
+    if (filingData.status === "fulfilled")
+      setFilingAttempts(filingData.value.items);
+    else setFilingAttempts([]);
     const failure = results.find((result) => result.status === "rejected");
     if (failure?.status === "rejected")
       setOperationsError(
@@ -737,6 +780,16 @@ function AccountsWorkspace({
   useEffect(() => {
     loadOrganisations();
   }, [loadOrganisations]);
+  useEffect(() => {
+    setDashboard({});
+    setJournals([]);
+    setReconciliations([]);
+    setTasks([]);
+    setReviewPoints([]);
+    setFilingAttempts([]);
+    setOperationsError("");
+    setOperationsLoading(false);
+  }, [selectedId]);
   useEffect(() => {
     loadDetail();
   }, [loadDetail]);
@@ -875,9 +928,7 @@ function AccountsWorkspace({
       id: "review",
       label: "Review points",
       count:
-        reviewPoints.filter(
-          (item) => !["RESOLVED", "CLOSED"].includes(item.status),
-        ).length || undefined,
+        reviewPoints.filter(isOutstandingReviewPoint).length || undefined,
     },
     { id: "working-papers", label: "Working papers" },
     { id: "disclosures", label: "Disclosures" },
@@ -958,9 +1009,7 @@ function AccountsWorkspace({
       label: "Review / approval",
       target: "versions",
       views: ["tasks", "review", "versions", "history"],
-      state: reviewPoints.some(
-        (item) => !["CLEARED", "CLOSED"].includes(item.status),
-      )
+      state: reviewPoints.some(isOutstandingReviewPoint)
         ? "attention"
         : dashboard.progress?.percent === 100
           ? "ready"
@@ -970,7 +1019,7 @@ function AccountsWorkspace({
       label: "Submission",
       target: "filing",
       views: ["filing", "portal"],
-      state: submissionStageState(dashboard.filingAttempts),
+      state: submissionStageState(filingAttempts),
     },
   ];
   const activeProductionStage =
@@ -1817,6 +1866,7 @@ function AccountsWorkspace({
                   engagement={engagement}
                   lines={lines}
                   report={report}
+                  reportBalanced={reportBalanced}
                   error={reportError}
                   onRetry={loadDetail}
                   onOpenSource={() => setView("mapping")}
@@ -3192,7 +3242,7 @@ function Overview({
     {
       label: "Review points",
       value: dashboard.reviewPoints?.total ?? reviewPoints.length,
-      note: `${dashboard.blockingItems ?? reviewPoints.filter((item) => item.severity === "BLOCKING" && item.status !== "CLEARED").length} blocking`,
+      note: blockingItemsLabel(dashboard.blockingItems),
     },
   ];
   return (
@@ -3230,9 +3280,7 @@ function Overview({
           <div>
             <h3>Workflow readiness</h3>
             <p>
-              {dashboard.blockingItems
-                ? `${dashboard.blockingItems} blocking items must be cleared before approval.`
-                : "No blocking items are currently reported."}
+              {blockingItemsMessage(dashboard.blockingItems)}
             </p>
             <dl>
               <div>
@@ -3999,7 +4047,7 @@ function ReviewPointsView({
       setBusy(false);
     }
   }
-  async function update(item: ReviewPoint, status: string) {
+  async function update(item: ReviewPoint, status: ReviewPointStatus) {
     setBusy(true);
     setError("");
     try {
@@ -4698,6 +4746,7 @@ function AccountsView({
   engagement,
   lines,
   report,
+  reportBalanced,
   error,
   onRetry,
   onOpenSource,
@@ -4706,6 +4755,7 @@ function AccountsView({
   engagement?: Engagement;
   lines: TrialBalanceLine[];
   report: ReportLine[];
+  reportBalanced: boolean | null;
   error: string;
   onRetry: () => void;
   onOpenSource: () => void;
@@ -5802,7 +5852,7 @@ function AccountsView({
                   </div>
                   <div>
                     <dt>Rounding</dt>
-                    <dd>Balanced</dd>
+                    <dd>{reportBalanceLabel(reportBalanced)}</dd>
                   </div>
                 </dl>
                 <Field

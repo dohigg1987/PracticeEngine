@@ -137,12 +137,13 @@ export type ReviewPoint = {
   object_type?: string;
   object_id?: string;
   question?: string;
-  status: string;
+  status: ReviewPointStatus;
   severity?: string;
   response?: string | null;
   assigned_to?: string | null;
   created_at?: string;
 };
+export type ReviewPointStatus = "OPEN" | "RESPONDED" | "CLEARED" | "REOPENED";
 export type WorkingPaperVersion = {
   id: string;
   version: number;
