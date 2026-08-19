@@ -2532,9 +2532,9 @@ function AccountsHtmlArtefact({
     return (
       <div className="artefact-control error" role="alert">
         <span>{error || "Output capabilities are unavailable."}</span>
-        <button type="button" className="secondary" onClick={load}>
+        <Button appearance="secondary" onClick={load}>
           Retry
-        </button>
+        </Button>
       </div>
     );
   const generated = capabilities.html.generated || Boolean(artefact);
@@ -2560,32 +2560,29 @@ function AccountsHtmlArtefact({
       )}
       <div className="artefact-actions">
         {!generated ? (
-          <button
-            type="button"
-            className="secondary"
+          <Button
+            appearance="secondary"
             disabled={Boolean(busy) || version.status === "SUPERSEDED"}
             onClick={generate}
           >
             {busy === "generate" ? "Generating…" : "Generate HTML"}
-          </button>
+          </Button>
         ) : (
           <>
-            <button
-              type="button"
-              className="secondary"
+            <Button
+              appearance="secondary"
               disabled={Boolean(busy)}
               onClick={() => openArtefact(false)}
             >
               {busy === "view" ? "Opening…" : "View"}
-            </button>
-            <button
-              type="button"
-              className="secondary"
+            </Button>
+            <Button
+              appearance="secondary"
               disabled={Boolean(busy)}
               onClick={() => openArtefact(true)}
             >
               {busy === "download" ? "Downloading…" : "Download"}
-            </button>
+            </Button>
           </>
         )}
       </div>
@@ -2691,9 +2688,9 @@ export function AccountsPdfArtefact({
     return (
       <div className="artefact-control error" role="alert">
         <span>{error || "PDF capability is unavailable."}</span>
-        <button type="button" className="secondary" onClick={load}>
+        <Button appearance="secondary" onClick={load}>
           Retry
-        </button>
+        </Button>
       </div>
     );
   if (!capability.available)
@@ -2731,32 +2728,29 @@ export function AccountsPdfArtefact({
       )}
       <div className="artefact-actions">
         {!generated ? (
-          <button
-            type="button"
-            className="secondary"
+          <Button
+            appearance="secondary"
             disabled={Boolean(busy) || version.status === "SUPERSEDED"}
             onClick={generate}
           >
             {busy === "generate" ? "Generating…" : "Generate PDF"}
-          </button>
+          </Button>
         ) : (
           <>
-            <button
-              type="button"
-              className="secondary"
+            <Button
+              appearance="secondary"
               disabled={Boolean(busy)}
               onClick={() => openPdf(false)}
             >
               {busy === "view" ? "Opening…" : "View PDF"}
-            </button>
-            <button
-              type="button"
-              className="secondary"
+            </Button>
+            <Button
+              appearance="secondary"
               disabled={Boolean(busy)}
               onClick={() => openPdf(true)}
             >
               {busy === "download" ? "Downloading…" : "Download PDF"}
-            </button>
+            </Button>
           </>
         )}
       </div>
