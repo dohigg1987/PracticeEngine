@@ -178,11 +178,11 @@ pre,
 
 /* Accounts-production navigation hierarchy */
 .workspace {
-  grid-template-columns: 272px minmax(0, 1fr);
+  grid-template-columns: 240px minmax(0, 1fr);
 }
 
-.fluent-nav [class*="drawerBody"] {
-  padding: 8px;
+.fluent-nav .workspace-nav-body {
+  padding: 20px 12px;
   overflow-y: auto;
 }
 
@@ -853,15 +853,15 @@ table thead {
   display: grid;
   align-items: center;
   width: 100%;
-  min-height: 44px;
-  padding: 8px 10px 8px 12px;
+  min-height: 36px;
+  padding: 6px 8px;
   border: 0;
   border-radius: 0;
-  background: #edebe9 !important;
-  color: #323130 !important;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 20px;
+  background: var(--colorNeutralBackground3) !important;
+  color: var(--colorNeutralForeground1) !important;
+  font-size: var(--fontSizeBase200);
+  font-weight: var(--fontWeightSemibold);
+  line-height: var(--lineHeightBase200);
   text-align: left;
 }
 
@@ -877,44 +877,43 @@ table thead {
 .sidebar nav .production-nav-stage-toggle > span {
   display: block !important;
   color: inherit;
-  font-size: 13px;
+  font-size: inherit;
 }
 
 .sidebar .workspace-nav-toggle:hover,
 .sidebar nav .production-nav-stage-toggle:hover {
-  background: #e5e5e5 !important;
+  background: var(--colorNeutralBackground3Hover) !important;
 }
 
 .sidebar .workspace-nav-toggle[aria-expanded="true"],
 .sidebar nav .production-nav-stage-toggle[aria-expanded="true"] {
-  background: #e1dfdd !important;
+  background: var(--colorNeutralBackground3Selected) !important;
 }
 
 /* Engagement context belongs to the workspace, before the navigation groups. */
 .sidebar .current-engagement-context {
   display: grid;
   gap: 4px;
-  padding: 0 4px 18px;
+  padding: 0 4px 12px;
 }
 
 .sidebar .current-engagement-context label {
   color: var(--colorNeutralForeground3);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 16px;
+  font-size: var(--fontSizeBase100);
+  font-weight: var(--fontWeightRegular);
+  line-height: var(--lineHeightBase100);
 }
 
 .sidebar .current-engagement-context select {
   width: 100%;
-  height: 36px;
   margin: 0;
-  padding: 0 30px 0 10px;
-  border: 1px solid #8a8886;
-  border-radius: 2px;
+  padding-inline: 8px 28px;
+  border-color: var(--colorNeutralStroke1);
+  border-radius: var(--borderRadiusMedium);
   background-color: var(--colorNeutralBackground1);
-  color: #323130;
+  color: var(--colorNeutralForeground1);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--fontSizeBase200);
 }
 
 .sidebar .current-engagement-context select:focus-visible {
@@ -946,19 +945,19 @@ table thead {
 .sidebar .workspace-nav-item,
 .sidebar nav .workspace-nav-item {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr);
+  grid-template-columns: 16px minmax(0, 1fr);
   align-items: center;
-  column-gap: 12px;
+  column-gap: 8px;
   width: 100%;
-  min-height: 44px;
+  min-height: 36px;
   margin: 0;
-  padding: 0 12px;
-  border-radius: 2px;
+  padding: 0 8px;
+  border-radius: var(--borderRadiusMedium);
   background: var(--colorNeutralBackground1) !important;
-  color: #323130;
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 20px;
+  color: var(--colorNeutralForeground1);
+  font-size: var(--fontSizeBase200);
+  font-weight: var(--fontWeightRegular);
+  line-height: var(--lineHeightBase200);
   text-align: left;
 }
 
@@ -968,8 +967,8 @@ table thead {
 }
 
 .sidebar .workspace-nav-item svg {
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   display: block;
 }
 
@@ -982,6 +981,15 @@ table thead {
   margin: 12px 8px 4px;
   padding: 12px 4px 4px;
   border-top: 1px solid #e5e5e5;
+}
+
+@media (max-width: 900px) {
+  .sidebar .workspace-nav-toggle,
+  .sidebar nav .production-nav-stage-toggle,
+  .sidebar .workspace-nav-item,
+  .sidebar nav .workspace-nav-item {
+    min-height: 44px;
+  }
 }
 
 /* Readable Fluent application text; the statutory document keeps its own print scale. */
