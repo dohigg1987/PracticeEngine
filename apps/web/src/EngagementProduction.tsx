@@ -1687,14 +1687,14 @@ export function accountsReleaseChecks(version: AccountsVersion) {
   );
   return [
     {
-      label: "Deterministic content manifest",
+      label: "Content manifest recorded",
       complete: Boolean(
         version.content_hash &&
         Object.keys(version.content_manifest || {}).length,
       ),
       evidence: version.content_hash
-        ? "Manifest integrity verified"
-        : "Manifest integrity unavailable",
+        ? "Manifest hash recorded"
+        : "Manifest hash unavailable",
     },
     {
       label: "Prepared sign-off",

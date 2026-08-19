@@ -202,6 +202,7 @@ describe("accessible recovery and asynchronous states", () => {
     });
     expect(
       checks.filter((check) => check.complete).map((check) => check.label),
-    ).toEqual(["Deterministic content manifest", "Prepared sign-off"]);
+    ).toEqual(["Content manifest recorded", "Prepared sign-off"]);
+    expect(checks[0]?.evidence).toBe("Manifest hash recorded");
   });
 });

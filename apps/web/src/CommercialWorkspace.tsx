@@ -36,6 +36,7 @@ import { formatDate, formatDateTime } from "./displayFormat";
 import { statutoryLabel } from "./format";
 import { RoutePanelBoundary } from "./RoutePanelBoundary";
 import { statusBadgeProps } from "./statusBadge";
+import { inboxEmptyMessage } from "./inboxState";
 
 export type CommercialView = "portal" | "integrations" | "inbox" | "settings";
 type Props = {
@@ -975,9 +976,7 @@ function Inbox({ context }: Props) {
             </article>
           ))
         ) : (
-          <p className="commercial-empty">
-            No notifications match this filter.
-          </p>
+          <p className="commercial-empty">{inboxEmptyMessage(filter)}</p>
         )}
       </div>
       <section className="commercial-section delivery-status">
