@@ -6,15 +6,19 @@ vi.mock("@neondatabase/neon-js/auth", () => ({
 }));
 
 describe("Neon Auth session boundary", () => {
-  beforeEach(() => { vi.resetModules(); vi.stubEnv("VITE_NEON_AUTH_URL", "https://auth.example.test/neondb/auth"); mocks.token.mockReset(); mocks.getSession.mockReset(); });
+  beforeEach(() => { vi.resetModules(); vi.stubEnv("VITE_NEON_AUTH_URL", "https://auth.example.test/neondb/auth"); mocks.token.mockReset(); mocks.getSession.mockReset(); vi.unstubAllGlobals(); });
 
   it("returns the current JWT instead of caching an earlier token", async () => {
-    mocks.token.mockResolvedValueOnce({ data: { token: "jwt-one" }, error: null }).mockResolvedValueOnce({ data: { token: "jwt-two" }, error: null });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 200, headers: { "set-auth-jwt": "jwt-one" } }))
+      .mockResolvedValueOnce(new Response(null, { status: 200, headers: { "set-auth-jwt": "jwt-two" } }));
+    vi.stubGlobal("fetch", fetchMock);
     const { authTransportUrl, freshAuthToken } = await import("./auth");
     expect(authTransportUrl).toMatch(/^http:\/\/127\.0\.0\.1(?::\d+)?\/neon-auth$/);
     await expect(freshAuthToken()).resolves.toBe("jwt-one");
     await expect(freshAuthToken()).resolves.toBe("jwt-two");
-    expect(mocks.token).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringMatching(/\/neon-auth\/get-session$/), expect.objectContaining({ credentials: "include" }));
   });
 
   it("diagnoses local network failures without reflecting sensitive exception text", async () => {
@@ -44,7 +48,7 @@ describe("Neon Auth session boundary", () => {
   });
 
   it("turns an expired or missing token into an authentication-required error", async () => {
-    mocks.token.mockResolvedValue({ data: null, error: { message: "expired" } });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 200 })));
     const { AuthRequiredError, freshAuthToken } = await import("./auth");
     await expect(freshAuthToken()).rejects.toBeInstanceOf(AuthRequiredError);
   });

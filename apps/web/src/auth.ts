@@ -5,9 +5,10 @@ export const demoMode = import.meta.env.DEV && import.meta.env.VITE_DEMO_MODE ==
 
 export const authConfigured = demoMode || Boolean(authUrl);
 const browserOrigin = typeof window === "undefined" ? "http://127.0.0.1" : window.location.origin;
-export const authTransportUrl = import.meta.env.DEV
-  ? `${browserOrigin}/neon-auth`
-  : authUrl;
+// Keep the browser session first-party in every environment. Production
+// Pages proxies this path to Neon Auth and rewrites the session cookie onto
+// the application origin; Vite provides the equivalent development proxy.
+export const authTransportUrl = `${browserOrigin}/neon-auth`;
 export const authClient = !demoMode && authUrl ? createAuthClient(authTransportUrl) : null;
 
 export function authFailureMessage(error: unknown, development = import.meta.env.DEV): string {
@@ -93,7 +94,15 @@ export class AuthRequiredError extends Error {
 export async function freshAuthToken(): Promise<string> {
   if (demoMode) return "demo-mode";
   if (!authClient) throw new AuthRequiredError("Neon Auth is not configured.");
-  const result = await authClient.token();
-  if (result.error || !result.data?.token) throw new AuthRequiredError();
-  return result.data.token;
+  // Neon Auth returns the API JWT on the authenticated session response.
+  // Reading it explicitly avoids the beta client's token cache returning an
+  // absent/stale value immediately after a successful sign-in.
+  const session = await fetch(`${authTransportUrl}/get-session`, {
+    credentials: "include",
+    headers: { "x-force-fetch": "true" },
+    cache: "no-store",
+  });
+  const token = session.headers.get("set-auth-jwt");
+  if (!session.ok || !token) throw new AuthRequiredError();
+  return token;
 }
