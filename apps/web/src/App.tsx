@@ -12,6 +12,7 @@ import {
   AccordionHeader,
   AccordionItem,
   AccordionPanel,
+  Avatar,
   Badge,
   Breadcrumb,
   BreadcrumbButton,
@@ -1235,14 +1236,20 @@ function AccountsWorkspace({
                   appearance="subtle"
                   className="account-menu-button"
                   type="button"
-                  aria-label={`Account menu for ${user.email}`}
+                  aria-label={`Open account menu for ${user.email}`}
                 >
-                  <span className="account-menu-copy">
-                    <span>Account</span>
-                    <small>{user.email}</small>
-                  </span>
-                  <span className="avatar" aria-hidden="true">
-                    {initials(user)}
+                  <span className="account-menu-content">
+                    <span className="account-menu-copy">
+                      <span>Account</span>
+                      <small>{user.email}</small>
+                    </span>
+                    <Avatar
+                      className="account-menu-avatar"
+                      name={user.email}
+                      initials={initials(user)}
+                      size={32}
+                      aria-hidden="true"
+                    />
                   </span>
                 </FluentButton>
               </MenuTrigger>
