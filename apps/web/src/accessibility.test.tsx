@@ -77,8 +77,9 @@ describe("accessible recovery and asynchronous states", () => {
         }}
       />,
     );
-    expect(html).toContain('role="status"');
-    expect(html).toContain('aria-live="polite"');
+    // Fluent Spinner exposes loading as a labelled indeterminate progressbar.
+    expect(html).toContain('role="progressbar"');
+    expect(html).toContain("aria-labelledby=");
     expect(html).toContain("Checking PDF output");
   });
 

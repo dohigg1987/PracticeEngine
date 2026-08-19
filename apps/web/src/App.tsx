@@ -3381,19 +3381,19 @@ function JournalsView({
             </Field>
           </div>
           <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Canonical account</th>
-                  <th>Narrative</th>
-                  <th>Debit</th>
-                  <th>Credit</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table size="small" aria-label="Journal lines">
+              <TableHeader>
+                <TableRow>
+                  <TableHeaderCell>Canonical account</TableHeaderCell>
+                  <TableHeaderCell>Narrative</TableHeaderCell>
+                  <TableHeaderCell>Debit</TableHeaderCell>
+                  <TableHeaderCell>Credit</TableHeaderCell>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {lines.map((line, index) => (
-                  <tr key={index}>
-                    <td>
+                  <TableRow key={index}>
+                    <TableCell>
                       <Select
                         size="small"
                         aria-label={`Line ${index + 1} canonical account`}
@@ -3419,8 +3419,8 @@ function JournalsView({
                           </option>
                         ))}
                       </Select>
-                    </td>
-                    <td>
+                    </TableCell>
+                    <TableCell>
                       <Input
                         size="small"
                         aria-label={`Line ${index + 1} narrative`}
@@ -3436,8 +3436,8 @@ function JournalsView({
                           )
                         }
                       />
-                    </td>
-                    <td>
+                    </TableCell>
+                    <TableCell>
                       <Input
                         size="small"
                         aria-label={`Line ${index + 1} debit`}
@@ -3457,8 +3457,8 @@ function JournalsView({
                           )
                         }
                       />
-                    </td>
-                    <td>
+                    </TableCell>
+                    <TableCell>
                       <Input
                         size="small"
                         aria-label={`Line ${index + 1} credit`}
@@ -3478,11 +3478,11 @@ function JournalsView({
                           )
                         }
                       />
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
           <div
             className={`balance-control ${balanced ? "balanced" : "unbalanced"}`}
@@ -3511,32 +3511,31 @@ function JournalsView({
         />
       ) : (
         <div className="table-wrap operation-register">
-          <table className="journal-register">
-            <caption className="sr-only">Journal register</caption>
-            <thead>
-              <tr>
-                <th>Journal</th>
-                <th>Type</th>
-                <th>Status</th>
-                <th>Version</th>
-                <th className="number">Lines</th>
-                <th>
+          <Table size="small" className="journal-register" aria-label="Journal register">
+            <TableHeader>
+              <TableRow>
+                <TableHeaderCell>Journal</TableHeaderCell>
+                <TableHeaderCell>Type</TableHeaderCell>
+                <TableHeaderCell>Status</TableHeaderCell>
+                <TableHeaderCell>Version</TableHeaderCell>
+                <TableHeaderCell className="number">Lines</TableHeaderCell>
+                <TableHeaderCell>
                   <span className="sr-only">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
+                </TableHeaderCell>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {items.map((item) => (
                 <React.Fragment key={item.id}>
-                  <tr>
-                    <td>
+                  <TableRow>
+                    <TableCell>
                       <span className="mono block">
                         J{item.journal_no ?? item.id.slice(0, 6)}
                       </span>
                       <b>{item.description}</b>
-                    </td>
-                    <td>{title(item.journal_type || "Journal")}</td>
-                    <td>
+                    </TableCell>
+                    <TableCell>{title(item.journal_type || "Journal")}</TableCell>
+                    <TableCell>
                       <Badge
                         appearance="outline"
                         color={
@@ -3545,10 +3544,10 @@ function JournalsView({
                       >
                         {title(item.status)}
                       </Badge>
-                    </td>
-                    <td>{item.version || 1}</td>
-                    <td className="number">{item.lines?.length || 0}</td>
-                    <td className="register-action">
+                    </TableCell>
+                    <TableCell>{item.version || 1}</TableCell>
+                    <TableCell className="number">{item.lines?.length || 0}</TableCell>
+                    <TableCell className="register-action">
                       {next[item.status] && (
                         <FluentButton
                           size="small"
@@ -3561,11 +3560,11 @@ function JournalsView({
                             : title(next[item.status])}
                         </FluentButton>
                       )}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                   {item.lines?.length ? (
-                    <tr className="journal-lines-row">
-                      <td colSpan={6}>
+                    <TableRow className="journal-lines-row">
+                      <TableCell colSpan={6}>
                         <details>
                           <summary>View journal lines</summary>
                           <div className="journal-line-list">
@@ -3589,13 +3588,13 @@ function JournalsView({
                             ))}
                           </div>
                         </details>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ) : null}
                 </React.Fragment>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       )}
     </section>
@@ -3769,22 +3768,21 @@ function ReconciliationsView({
         />
       ) : (
         <div className="table-wrap operation-register">
-          <table className="reconciliation-register">
-            <caption className="sr-only">Reconciliation register</caption>
-            <thead>
-              <tr>
-                <th>Control</th>
-                <th>Status</th>
-                <th className="number">Ledger</th>
-                <th className="number">Supporting</th>
-                <th className="number">Difference</th>
-                <th className="number">Tolerance</th>
-                <th>
+          <Table size="small" className="reconciliation-register" aria-label="Reconciliation register">
+            <TableHeader>
+              <TableRow>
+                <TableHeaderCell>Control</TableHeaderCell>
+                <TableHeaderCell>Status</TableHeaderCell>
+                <TableHeaderCell className="number">Ledger</TableHeaderCell>
+                <TableHeaderCell className="number">Supporting</TableHeaderCell>
+                <TableHeaderCell className="number">Difference</TableHeaderCell>
+                <TableHeaderCell className="number">Tolerance</TableHeaderCell>
+                <TableHeaderCell>
                   <span className="sr-only">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
+                </TableHeaderCell>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {items.map((item) => {
                 const difference =
                   Number(item.ledger_balance || 0) -
@@ -3792,14 +3790,14 @@ function ReconciliationsView({
                 const exception =
                   Math.abs(difference) > Number(item.tolerance || 0);
                 return (
-                  <tr key={item.id}>
-                    <td>
+                  <TableRow key={item.id}>
+                    <TableCell>
                       <span className="mono block">
                         {title(item.reconciliation_type || "CONTROL")}
                       </span>
                       <b>{item.title || "Reconciliation"}</b>
-                    </td>
-                    <td>
+                    </TableCell>
+                    <TableCell>
                       <Badge
                         appearance="outline"
                         color={
@@ -3812,20 +3810,20 @@ function ReconciliationsView({
                       >
                         {title(item.status)}
                       </Badge>
-                    </td>
-                    <td className="number">
+                    </TableCell>
+                    <TableCell className="number">
                       {money(Number(item.ledger_balance || 0))}
-                    </td>
-                    <td className="number">
+                    </TableCell>
+                    <TableCell className="number">
                       {money(Number(item.supporting_balance || 0))}
-                    </td>
-                    <td className={`number ${exception ? "difference" : ""}`}>
+                    </TableCell>
+                    <TableCell className={`number ${exception ? "difference" : ""}`}>
                       {money(difference)}
-                    </td>
-                    <td className="number">
+                    </TableCell>
+                    <TableCell className="number">
                       {money(Number(item.tolerance || 0))}
-                    </td>
-                    <td className="register-action">
+                    </TableCell>
+                    <TableCell className="register-action">
                       {item.status !== "REVIEWED" && (
                         <FluentButton
                           size="small"
@@ -3836,12 +3834,12 @@ function ReconciliationsView({
                           Mark reviewed
                         </FluentButton>
                       )}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 );
               })}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       )}
     </section>

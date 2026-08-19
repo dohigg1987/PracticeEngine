@@ -35,9 +35,9 @@ textarea {
   transform: translateX(-50%);
   z-index: 2;
 }
-.global-search-box {
+.global-search .global-search-box {
   width: 100%;
-  min-height: 40px;
+  min-height: 42px;
   border-color: var(--colorNeutralStroke1);
   background: var(--colorNeutralBackground1);
 }
