@@ -6,6 +6,7 @@ import {
   AccordionPanel,
   Badge,
   Button,
+  Card,
   Checkbox,
   Field,
   Input,
@@ -858,10 +859,18 @@ function WorkingPaperEditor({
           <h3>{paper.title}</h3>
         </div>
         <Badge
-          appearance="outline"
-          color={paper.status === "REVIEWED" ? "success" : "informative"}
+          appearance="tint"
+          className="working-paper-detail-status"
+          color={
+            paper.status === "NOT_STARTED"
+              ? "subtle"
+              : paper.status === "REVIEWED"
+                ? "success"
+                : "informative"
+          }
+          size="small"
         >
-          {pretty(paper.status)}
+          {paper.status === "NOT_STARTED" ? "Not started" : pretty(paper.status)}
         </Badge>
       </header>
       <dl className="working-paper-metadata">
@@ -903,9 +912,14 @@ function WorkingPaperEditor({
         </div>
       </dl>
       {paper.objective && (
-        <section className="working-paper-objective" aria-label="Working paper objective">
-          <b>Objective</b>
-          <p>{paper.objective}</p>
+        <section
+          className="working-paper-objective-section"
+          aria-labelledby={`working-paper-objective-${paper.id}`}
+        >
+          <Card appearance="subtle" className="working-paper-objective">
+            <h4 id={`working-paper-objective-${paper.id}`}>Objective</h4>
+            <p>{paper.objective}</p>
+          </Card>
         </section>
       )}
       <Field label="Evidence narrative">
