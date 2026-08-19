@@ -29,8 +29,17 @@ function auditFile(relativeFile, source) {
   const productionScript = !/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(relativeFile) && relativeFile !== "src/demo.ts";
 
   if (productionScript && /\.[cm]?[jt]sx?$/.test(relativeFile)) {
-    for (const match of source.matchAll(/\b(?:window|globalThis)\s*\.\s*confirm\s*\(/g))
-      add(findings, "window-confirm", relativeFile, source, match.index, "call", "Use the shared confirmation dialog instead of a browser confirm call");
+    const browserDialogPatterns = [
+      { pattern: /\b(?:window|globalThis)\s*\.\s*(?:confirm|prompt)\s*\(/g },
+      { pattern: /\b(?:window|globalThis)\s*\[\s*["'](?:confirm|prompt)["']\s*\]\s*\(/g },
+      { pattern: /(?<![\w$.])(?:confirm|prompt)\s*\(/g, bare: true },
+    ];
+    for (const { pattern, bare = false } of browserDialogPatterns) {
+      for (const match of source.matchAll(pattern)) {
+        if (bare && /\bfunction\s*$/.test(source.slice(Math.max(0, match.index - 24), match.index))) continue;
+        add(findings, "browser-dialog", relativeFile, source, match.index, match[0].replace(/\s+/g, ""), "Use a shared Fluent dialog instead of a browser confirm or prompt call");
+      }
+    }
   }
 
   if (extension === ".css") {

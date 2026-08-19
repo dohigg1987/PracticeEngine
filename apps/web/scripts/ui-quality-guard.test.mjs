@@ -23,7 +23,18 @@ test("detects every prohibited UI source pattern", async (t) => {
   });
   t.after(() => rm(root, { recursive: true, force: true }));
   const rules = new Set((await auditSource(root)).map(({ rule }) => rule));
-  assert.deepEqual(rules, new Set(["off-ramp-radius", "private-fluent-selector", "small-font", "visible-hash", "window-confirm"]));
+  assert.deepEqual(rules, new Set(["browser-dialog", "off-ramp-radius", "private-fluent-selector", "small-font", "visible-hash"]));
+});
+
+test("detects confirm and prompt browser-dialog variants", async (t) => {
+  const root = await fixture({
+    "dialogs.tsx": `window.prompt("Reason"); globalThis.confirm("Continue?"); window["prompt"]("Reason"); prompt("Reason");`,
+  });
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const findings = (await auditSource(root)).filter(
+    ({ rule }) => rule === "browser-dialog",
+  );
+  assert.equal(findings.length, 4);
 });
 
 test("accepts public selectors, the type floor, and the Fluent radius ramp", async (t) => {
@@ -47,8 +58,8 @@ test("baseline is a debt ceiling and a new occurrence fails", async (t) => {
 
 test("tests and demo fixtures do not create product UI findings", async (t) => {
   const root = await fixture({
-    "component.test.tsx": `window.confirm("test"); export const label = "Content hash";`,
-    "demo.ts": `window.confirm("demo");`,
+    "component.test.tsx": `window.confirm("test"); window.prompt("test"); export const label = "Content hash";`,
+    "demo.ts": `window.confirm("demo"); window.prompt("demo");`,
   });
   t.after(() => rm(root, { recursive: true, force: true }));
   assert.deepEqual(await auditSource(root), []);
