@@ -279,7 +279,7 @@ test("global search focuses from the command shortcut and opens a real section",
   page,
 }) => {
   await page.keyboard.press("Control+K");
-  const search = page.getByRole("searchbox", { name: "Search workspace" });
+  const search = page.getByRole("combobox", { name: "Search workspace" });
   await expect(search).toBeFocused();
   const results = page.getByRole("listbox", {
     name: "Workspace search results",
