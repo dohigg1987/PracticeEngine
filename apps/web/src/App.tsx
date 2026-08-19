@@ -4044,6 +4044,7 @@ function ReviewPointsView({
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [composerOpen, setComposerOpen] = useState(false);
   async function create(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
@@ -4052,6 +4053,7 @@ function ReviewPointsView({
       await api.createReviewPoint(context, engagementId, form);
       setForm({ ...form, question: "" });
       await reload();
+      setComposerOpen(false);
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "Could not raise review point.",
@@ -4081,29 +4083,56 @@ function ReviewPointsView({
         heading="Review points"
         body="Raise, respond to and clear review queries."
       />
-      <form className="review-create" onSubmit={create}>
-        <Field className="review-question-field" label="Review question" required>
-          <Textarea
-            rows={3}
-            value={form.question}
-            onChange={(e) => setForm({ ...form, question: e.target.value })}
-            required
-          />
-        </Field>
-        <Field className="review-severity-field" label="Severity">
-          <Select
-            value={form.severity}
-            onChange={(e) => setForm({ ...form, severity: e.target.value })}
-          >
-            <option value="NORMAL">Normal</option>
-            <option value="BLOCKING">Blocking</option>
-          </Select>
-        </Field>
-        <FluentButton className="review-create-action" appearance="primary" type="submit" disabled={busy}>
-          Raise point
+      <div className="review-points-toolbar">
+        <FluentButton appearance="primary" onClick={() => setComposerOpen(true)}>
+          Raise review point
         </FluentButton>
-      </form>
-      {error && (
+      </div>
+      <Dialog
+        open={composerOpen}
+        onOpenChange={(_, data) => !busy && setComposerOpen(data.open)}
+      >
+        <DialogSurface className="review-point-dialog">
+          <DialogBody>
+            <DialogTitle>Raise review point</DialogTitle>
+            <DialogContent>
+              <form id="review-point-form" className="review-dialog-form" onSubmit={create}>
+                <Field label="Review question" required>
+                  <Textarea
+                    rows={4}
+                    value={form.question}
+                    onChange={(e) => setForm({ ...form, question: e.target.value })}
+                    required
+                  />
+                </Field>
+                <Field label="Severity">
+                  <Select
+                    value={form.severity}
+                    onChange={(e) => setForm({ ...form, severity: e.target.value })}
+                  >
+                    <option value="NORMAL">Normal</option>
+                    <option value="BLOCKING">Blocking</option>
+                  </Select>
+                </Field>
+                {error && (
+                  <MessageBar intent="error">
+                    <MessageBarBody>{error}</MessageBarBody>
+                  </MessageBar>
+                )}
+              </form>
+            </DialogContent>
+            <DialogActions>
+              <FluentButton appearance="primary" type="submit" form="review-point-form" disabled={busy}>
+                Raise point
+              </FluentButton>
+              <FluentButton appearance="secondary" onClick={() => setComposerOpen(false)} disabled={busy}>
+                Cancel
+              </FluentButton>
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
+      {error && !composerOpen && (
         <MessageBar intent="error">
           <MessageBarBody>{error}</MessageBarBody>
         </MessageBar>
