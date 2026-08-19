@@ -1,7 +1,7 @@
 .team-section {
   margin: 0 0 24px;
   border: 1px solid var(--border);
-  background: #fff;
+  background: var(--colorNeutralBackground1);
 }
 .team-section-head {
   display: flex;

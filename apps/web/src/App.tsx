@@ -24,6 +24,11 @@ import {
   Field,
   Input,
   Link as FluentLink,
+  Menu,
+  MenuItem,
+  MenuList,
+  MenuPopover,
+  MenuTrigger,
   MessageBar,
   MessageBarActions,
   MessageBarBody,
@@ -1090,7 +1095,8 @@ function AccountsWorkspace({
           <SearchBox
             className="global-search-box"
             ref={searchRef}
-            size="small"
+            size="large"
+            role="combobox"
             contentBefore={<SearchRegular aria-hidden="true" />}
             placeholder="Search clients, engagements and sections"
             aria-label="Search workspace"
@@ -1184,30 +1190,40 @@ function AccountsWorkspace({
           )}
         </div>
         <Toolbar className="top-actions" aria-label="Workspace actions">
-          <i className={error ? "down" : ""} aria-hidden="true" />
-          <Badge
-            appearance="tint"
-            color={error ? "danger" : demoMode ? "informative" : "brand"}
-          >
-            {demoMode
-              ? "Showcase mode · seeded data"
-              : error
-                ? "Service issue"
-                : user.email}
-          </Badge>
-          {!demoMode && (
-            <FluentButton
-              appearance="subtle"
-              className="sign-out"
-              type="button"
-              onClick={onSignOut}
-            >
-              Sign out
-            </FluentButton>
+          {error && (
+            <Badge appearance="tint" color="danger">
+              Service issue
+            </Badge>
           )}
-          <span className="avatar" aria-hidden="true">
-            {initials(user)}
-          </span>
+          {demoMode ? (
+            <Badge appearance="tint" color="informative">
+              Showcase mode · seeded data
+            </Badge>
+          ) : (
+            <Menu>
+              <MenuTrigger disableButtonEnhancement>
+                <FluentButton
+                  appearance="subtle"
+                  className="account-menu-button"
+                  type="button"
+                  aria-label={`Account menu for ${user.email}`}
+                >
+                  <span className="account-menu-copy">
+                    <span>Account</span>
+                    <small>{user.email}</small>
+                  </span>
+                  <span className="avatar" aria-hidden="true">
+                    {initials(user)}
+                  </span>
+                </FluentButton>
+              </MenuTrigger>
+              <MenuPopover>
+                <MenuList>
+                  <MenuItem onClick={onSignOut}>Sign out</MenuItem>
+                </MenuList>
+              </MenuPopover>
+            </Menu>
+          )}
         </Toolbar>
       </header>
       <div className="workspace">
@@ -1414,6 +1430,7 @@ function AccountsWorkspace({
                         %
                       </b>
                       <ProgressBar
+                        aria-label="Source mapping progress"
                         value={lines.length ? mapped / lines.length : 0}
                       />
                       <small>
@@ -2443,15 +2460,26 @@ function ClientsView({
   );
   async function create(event: React.FormEvent) {
     event.preventDefault();
+    const legalName = form.legalName.trim();
+    if (!legalName) {
+      setFormError("Enter the client’s legal name.");
+      return;
+    }
     setBusy(true);
     setFormError("");
     try {
-      await api.createOrganisation(context, form);
+      await api.createOrganisation(context, { ...form, legalName });
       setForm({ ...form, legalName: "" });
       setCreating(false);
       await reload();
     } catch (e) {
-      setFormError(e instanceof Error ? e.message : "Could not create client.");
+      setFormError(
+        e instanceof ApiError && e.status >= 500
+          ? "The service could not create this client. Your details were not saved. Try again; if the problem continues, contact your workspace administrator."
+          : e instanceof Error
+            ? e.message
+            : "Could not create client.",
+      );
     } finally {
       setBusy(false);
     }
@@ -2497,9 +2525,9 @@ function ClientsView({
           </div>
         </div>
         <div className="page-actions">
-          {canCreateClient && (
+          {canCreateClient && (creating || items.length > 0) && (
             <FluentButton
-              appearance="primary"
+              appearance={creating ? "secondary" : "primary"}
               onClick={() => setCreating(!creating)}
             >
               {creating ? "Close" : "New client"}
@@ -2509,11 +2537,9 @@ function ClientsView({
       </section>
       {creating && (
         <section className="panel client-form">
-          <PanelHead
-            eyebrow="Client setup"
-            heading="Add legal entity"
-            body="Record the legal identity used throughout accounts production."
-          />
+          <header className="client-form-header">
+            <h2>Add legal entity</h2>
+          </header>
           <form className="compact-form" onSubmit={create}>
             <Field label="Legal name" required>
               <Input
@@ -2526,6 +2552,7 @@ function ClientsView({
             </Field>
             <Field label="Legal form">
               <Select
+                className="client-select"
                 value={form.legalForm}
                 onChange={(e) =>
                   setForm({ ...form, legalForm: e.target.value })
@@ -2544,6 +2571,7 @@ function ClientsView({
             </Field>
             <Field label="Jurisdiction">
               <Select
+                className="client-select"
                 value={form.jurisdiction}
                 onChange={(e) =>
                   setForm({ ...form, jurisdiction: e.target.value })
@@ -2554,9 +2582,11 @@ function ClientsView({
                 <option value="NORTHERN_IRELAND">Northern Ireland</option>
               </Select>
             </Field>
-            <FluentButton appearance="primary" type="submit" disabled={busy}>
-              {busy ? "Creating…" : "Create client"}
-            </FluentButton>
+            <div className="client-form-actions">
+              <FluentButton appearance="primary" type="submit" disabled={busy}>
+                {busy ? "Creating…" : "Create client"}
+              </FluentButton>
+            </div>
           </form>
           {formError && (
             <MessageBar intent="error">
@@ -2566,7 +2596,7 @@ function ClientsView({
         </section>
       )}
       {!items.length ? (
-        <section className="panel">
+        !creating ? <section className="panel client-empty-panel">
           <Empty
             heading="No clients yet"
             body={
@@ -2584,7 +2614,7 @@ function ClientsView({
               </FluentButton>
             )}
           </Empty>
-        </section>
+        </section> : null
       ) : (
         <div className="table-wrap client-table">
           <DataGrid

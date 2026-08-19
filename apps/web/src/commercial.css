@@ -9,7 +9,7 @@
   justify-content: space-between;
   gap: 20px;
   padding: 0 0 12px;
-  border-bottom: 1px solid #d1d1d1;
+  border-bottom: 1px solid var(--colorNeutralStroke1);
 }
 .commercial-head h1 {
   margin: 0;
@@ -19,7 +19,7 @@
 .commercial-head p,
 .commercial-section header p {
   margin: 4px 0 0;
-  color: #616161;
+  color: var(--colorNeutralForeground3);
 }
 .commercial-loading {
   display: grid;
@@ -28,11 +28,11 @@
 }
 .commercial-section {
   min-width: 0;
-  border: 1px solid #d1d1d1;
+  border: 1px solid var(--colorNeutralStroke1);
 }
 .commercial-section > header {
   padding: 14px 16px;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--colorNeutralStroke2);
 }
 .commercial-section h2 {
   margin: 0;
@@ -45,7 +45,7 @@
   align-items: end;
   gap: 16px;
   padding: 16px;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--colorNeutralStroke2);
 }
 .request-form,
 .import-form {
@@ -61,7 +61,7 @@
   min-height: 32px;
   border: 1px solid #8a8886;
   border-radius: 2px;
-  background: #fff;
+  background: var(--colorNeutralBackground1);
 }
 .file-picker > button {
   border-block: 0;
@@ -72,7 +72,7 @@
   min-width: 0;
   padding: 0 10px;
   overflow: hidden;
-  color: #424242;
+  color: var(--colorNeutralForeground2);
   font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -93,7 +93,7 @@
 }
 .commercial-table td small {
   margin-top: 3px;
-  color: #616161;
+  color: var(--colorNeutralForeground3);
 }
 .row-actions {
   display: flex;
@@ -108,15 +108,15 @@
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
-  border: 1px solid #0f6cbd;
-  background: #f5f5f5;
+  border: 1px solid var(--colorBrandStroke1);
+  background: var(--colorNeutralBackground3);
 }
 .commercial-secret div {
   display: grid;
   gap: 2px;
 }
 .commercial-secret span {
-  color: #424242;
+  color: var(--colorNeutralForeground2);
   font-size: 12px;
 }
 .capability-list {
@@ -128,7 +128,7 @@
   align-items: center;
   gap: 14px;
   padding: 9px 12px;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--colorNeutralStroke2);
 }
 .capability-list > div:last-child {
   border-bottom: 0;
@@ -139,7 +139,7 @@
 }
 .capability-list span,
 .filing-locked {
-  color: #616161;
+  color: var(--colorNeutralForeground3);
   font-size: 12px;
 }
 .commercial-section > .commercial-message {
@@ -151,17 +151,17 @@
   justify-content: space-between;
   gap: 16px;
   padding: 12px 16px;
-  background: #fafafa;
+  background: var(--colorNeutralBackground2);
 }
 .import-preview > div { display: grid; gap: 2px; }
 .import-preview span {
-  color: #616161;
+  color: var(--colorNeutralForeground3);
 }
 .action-precondition {
   display: block;
   grid-column: 1 / -1;
   margin-top: 2px;
-  color: var(--colorNeutralForeground2, #424242);
+  color: var(--colorNeutralForeground2);
   font-size: 12px;
   line-height: 16px;
 }
@@ -169,7 +169,7 @@
   margin-top: 4px;
 }
 .inbox-list {
-  border-block: 1px solid #e0e0e0;
+  border-block: 1px solid var(--colorNeutralStroke2);
 }
 .inbox-list article {
   display: grid;
@@ -177,7 +177,7 @@
   gap: 12px;
   align-items: start;
   padding: 10px 12px;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--colorNeutralStroke2);
 }
 .inbox-list article:last-child {
   border-bottom: 0;
@@ -192,25 +192,25 @@
   margin: 4px 0;
 }
 .inbox-list article small {
-  color: #616161;
+  color: var(--colorNeutralForeground3);
 }
 .notification-marker {
   align-self: stretch;
-  background: #0f6cbd;
+  background: var(--colorBrandBackground);
 }
 .notification-marker.success {
-  background: #107c10;
+  background: var(--colorStatusSuccessBackground3);
 }
 .notification-marker.warning {
   background: #986f0b;
 }
 .notification-marker.error {
-  background: #c50f1f;
+  background: var(--colorStatusDangerBackground3);
 }
 .commercial-empty {
   margin: 0;
   padding: 24px 12px;
-  color: #616161;
+  color: var(--colorNeutralForeground3);
   text-align: center;
 }
 .delivery-status table {
@@ -220,12 +220,13 @@
 .delivery-status td:nth-child(2) { width: 160px; }
 .delivery-capability-status {
   display: inline-flex;
+  align-items: center;
   justify-content: center;
   width: 132px;
   min-height: 24px;
 }
 .danger-zone {
-  border-color: #d1d1d1;
+  border-color: var(--colorNeutralStroke1);
 }
 .danger-zone > .danger-zone-reason {
   max-width: 760px;
