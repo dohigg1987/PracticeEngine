@@ -31,7 +31,7 @@ import {
   SyncRun,
   TenantSettings,
 } from "./api";
-import { ConfirmAction } from "./ConfirmAction";
+import { ConfirmAction, ReasonAction } from "./ConfirmAction";
 import { formatDate, formatDateTime } from "./displayFormat";
 import { statutoryLabel } from "./format";
 import { RoutePanelBoundary } from "./RoutePanelBoundary";
@@ -501,27 +501,32 @@ function PortalWorkspace({
                           >
                             Approve
                           </Button>
-                          <Button
-                            size="small"
-                            onClick={() => {
-                              const reason = window.prompt(
-                                "Reason for rejecting this evidence",
-                              );
-                              if (reason)
-                                act(`reject-${item.id}`, () =>
-                                  api.reviewDocumentResponse(
-                                    context,
-                                    engagementId,
-                                    item.id,
-                                    item.latestResponse!.id,
-                                    "REJECTED",
-                                    reason,
-                                  ),
-                                );
-                            }}
-                          >
-                            Reject
-                          </Button>
+                          <ReasonAction
+                            label="Reject"
+                            title="Reject submitted evidence?"
+                            body={
+                              <p>
+                                Explain why “{item.latestResponse.filename}”
+                                does not meet this request. The reason will be
+                                recorded for the client.
+                              </p>
+                            }
+                            reasonLabel="Reason for rejection"
+                            confirmLabel="Reject evidence"
+                            disabled={busy === `reject-${item.id}`}
+                            onConfirm={(reason) =>
+                              act(`reject-${item.id}`, () =>
+                                api.reviewDocumentResponse(
+                                  context,
+                                  engagementId,
+                                  item.id,
+                                  item.latestResponse!.id,
+                                  "REJECTED",
+                                  reason,
+                                ),
+                              )
+                            }
+                          />
                         </>
                       )}
                       {item.status === "OPEN" && (

@@ -8,6 +8,8 @@ import {
   DialogSurface,
   DialogTitle,
   DialogTrigger,
+  Field,
+  Textarea,
 } from "@fluentui/react-components";
 
 type ButtonProps = React.ComponentProps<typeof Button>;
@@ -66,6 +68,98 @@ export function ConfirmAction({
               </Button>
             </DialogTrigger>
             <Button appearance="primary" disabled={busy} onClick={confirm}>
+              {busy ? "Working…" : confirmLabel}
+            </Button>
+          </DialogActions>
+        </DialogBody>
+      </DialogSurface>
+    </Dialog>
+  );
+}
+
+export function ReasonAction({
+  label,
+  title,
+  body,
+  reasonLabel,
+  confirmLabel,
+  onConfirm,
+  appearance = "secondary",
+  size = "small",
+  disabled,
+}: {
+  label: string;
+  title: string;
+  body: React.ReactNode;
+  reasonLabel: string;
+  confirmLabel: string;
+  onConfirm: (reason: string) => void | Promise<void>;
+  appearance?: ButtonProps["appearance"];
+  size?: ButtonProps["size"];
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [reason, setReason] = useState("");
+  const trimmedReason = reason.trim();
+
+  function updateOpen(nextOpen: boolean) {
+    if (busy) return;
+    setOpen(nextOpen);
+    if (!nextOpen) setReason("");
+  }
+
+  async function confirm() {
+    if (!trimmedReason) return;
+    setBusy(true);
+    try {
+      await onConfirm(trimmedReason);
+      setOpen(false);
+      setReason("");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog
+      modalType="alert"
+      open={open}
+      onOpenChange={(_, data) => updateOpen(data.open)}
+    >
+      <DialogTrigger disableButtonEnhancement>
+        <Button appearance={appearance} size={size} disabled={disabled}>
+          {label}
+        </Button>
+      </DialogTrigger>
+      <DialogSurface>
+        <DialogBody>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogContent>
+            {body}
+            <Field label={reasonLabel} required>
+              <Textarea
+                value={reason}
+                onChange={(_, data) => setReason(data.value)}
+                resize="vertical"
+                rows={4}
+                disabled={busy}
+              />
+            </Field>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              appearance="secondary"
+              disabled={busy}
+              onClick={() => updateOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              appearance="primary"
+              disabled={busy || !trimmedReason}
+              onClick={confirm}
+            >
               {busy ? "Working…" : confirmLabel}
             </Button>
           </DialogActions>

@@ -405,6 +405,31 @@ test("commercial workspaces expose portal, imports, inbox, settings and comparat
     page.getByRole("table", { name: "Client document requests" }),
   ).toContainText("current-account-december.pdf");
 
+  let nativeDialogOpened = false;
+  page.on("dialog", () => {
+    nativeDialogOpened = true;
+  });
+  const respondedRequest = page
+    .getByRole("table", { name: "Client document requests" })
+    .getByRole("row")
+    .filter({ hasText: "current-account-december.pdf" });
+  await respondedRequest.getByRole("button", { name: "Reject" }).click();
+  const rejectionDialog = page.getByRole("alertdialog", {
+    name: "Reject submitted evidence?",
+  });
+  await expect(rejectionDialog).toBeVisible();
+  await expect(
+    rejectionDialog.getByRole("button", { name: "Reject evidence" }),
+  ).toBeDisabled();
+  await rejectionDialog
+    .getByRole("textbox", { name: "Reason for rejection" })
+    .fill("The statement does not cover the year end.");
+  await rejectionDialog
+    .getByRole("button", { name: "Reject evidence" })
+    .click();
+  await expect(rejectionDialog).not.toBeVisible();
+  expect(nativeDialogOpened).toBe(false);
+
   await openEngagementSection(page, "Accounts versions");
   await page
     .getByRole("button", { name: /Version 3 · Final Generated/ })
