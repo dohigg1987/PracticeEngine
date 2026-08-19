@@ -826,13 +826,6 @@ table thead {
   font-size: 12px;
   line-height: 1.45;
 }
-.timeline header,
-.timeline time,
-.timeline small,
-.timeline p {
-  font-size: 12px;
-  line-height: 18px;
-}
 .production-spine b { font-size: 13px; }
 .production-spine small { font-size: 12px; }
 .stage-number { width: 26px; height: 26px; font-size: 12px; }
