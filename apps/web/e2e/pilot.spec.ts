@@ -103,7 +103,10 @@ test("pilot preparation journey exposes source, mapping and adjustment evidence"
   ).toBeVisible();
   await expect(page.getByText("All mapped", { exact: true })).toBeVisible();
   await expect(
-    page.getByRole("definition").filter({ hasText: "0" }),
+    page
+      .locator(".mapping-control-metric")
+      .filter({ hasText: "Unmapped" })
+      .getByText("0", { exact: true }),
   ).toBeVisible();
 
   await openEngagementSection(page, "Journals");
@@ -396,9 +399,10 @@ test("commercial workspaces expose portal, imports, inbox, settings and comparat
   await page.locator('button[value="inbox"]').click();
   await expect(page.getByRole("heading", { name: "Inbox" })).toBeVisible();
   await expect(page.getByText("Bank statement received")).toBeVisible();
+  await page.getByRole("button", { name: /Delivery capabilities/ }).click();
   await expect(
-    page.getByText("No public retry or DLQ action is exposed."),
-  ).toBeVisible();
+    page.getByRole("table", { name: "Notification delivery capabilities" }),
+  ).toContainText("No public retry or DLQ action is exposed.");
 
   await page.locator('button[value="settings"]').click();
   await expect(
