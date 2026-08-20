@@ -253,7 +253,7 @@ pre,
 
 .fluent-nav [role="menuitem"][aria-current="page"],
 .fluent-nav [role="menuitem"][aria-selected="true"] {
-  background: #eaf3fc !important;
+  background: var(--colorBrandBackground2) !important;
   color: var(--colorBrandForeground1) !important;
 }
 
@@ -733,7 +733,7 @@ tbody tr:hover {
 :root {
   --muted: #4f4f4f;
   --soft: #f5f8fb;
-  --accent-soft: #eef6fc;
+  --accent-soft: var(--colorBrandBackground2);
   --success-soft: #f1faf1;
   --warning-soft: #fff8e8;
 }
@@ -743,48 +743,48 @@ body { background: #f4f7fa; }
   background: var(--colorNeutralBackground1);
 }
 .topbar .brand span {
-  border-color: #79b8e8;
-  background: #e8f3fb;
+  border-color: var(--colorBrandStroke2);
+  background: var(--colorBrandBackground2);
   color: var(--colorBrandForeground1);
 }
-.topbar .brand strong { color: #17324d; }
+.topbar .brand strong { color: var(--colorNeutralForeground1); }
 .sidebar {
-  background: #fbfdff;
-  border-right-color: #c9d7e5;
+  background: var(--colorNeutralBackground1);
+  border-right-color: var(--colorNeutralStroke2);
 }
 .sidebar .workspace-nav-toggle[aria-expanded="true"],
 .sidebar nav .production-nav-stage-toggle[aria-expanded="true"] {
   border-left: 3px solid var(--colorBrandStroke1);
-  background: #e8f3fb !important;
-  color: #0f548c !important;
+  background: var(--colorBrandBackground2) !important;
+  color: var(--colorBrandForeground1) !important;
 }
 .sidebar nav button[aria-current="page"],
 .sidebar nav button.selected {
-  background: #eaf4fc !important;
-  color: #0f5f9d !important;
+  background: var(--colorBrandBackground2) !important;
+  color: var(--colorBrandForeground1) !important;
   box-shadow: inset 3px 0 var(--colorBrandStroke1);
 }
-.sidebar nav button svg { color: #276f97; }
+.sidebar nav button svg { color: var(--colorBrandForeground1); }
 .production-stage-menu {
-  background: #fbfdff;
-  border-color: #cbd9e6;
+  background: var(--colorNeutralBackground1);
+  border-color: var(--colorNeutralStroke2);
 }
 .production-stage-menu [role="tab"][aria-selected="true"] {
-  color: #0f5f9d;
-  background: #eef6fc;
+  color: var(--colorBrandForeground1);
+  background: var(--colorBrandBackground2);
 }
 .panel,
 .accounts-builder-shell,
 .production-panel {
-  border-color: #cbd9e6;
+  border-color: var(--colorNeutralStroke2);
 }
 .panel-head {
-  border-bottom-color: #cbd9e6;
-  background: #eef6fc;
+  border-bottom-color: var(--colorNeutralStroke2);
+  background: var(--colorBrandBackground2);
 }
 .table-wrap thead,
 table thead {
-  background: #edf3f8;
+  background: var(--colorNeutralBackground2);
 }
 .metrics > div:nth-child(1) { border-top: 3px solid var(--colorBrandStroke1); }
 .metrics > div:nth-child(2) { border-top: 3px solid #008272; }
