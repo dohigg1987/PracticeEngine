@@ -1169,7 +1169,13 @@ export const api = {
     context: ApiContext,
     id: string,
     taskId: string,
-    body: Partial<WorkflowTask>,
+    body: {
+      title?: string;
+      status?: WorkflowTaskStatus;
+      blocking?: boolean;
+      assignedTo?: string | null;
+      dueAt?: string | null;
+    },
   ) =>
     request<{ item: WorkflowTask }>(
       `/v1/engagements/${encodeURIComponent(id)}/workflow-tasks/${encodeURIComponent(taskId)}`,
