@@ -4014,6 +4014,7 @@ function TasksView({
           <Field label="Assignee">
             <Select
               aria-label="Task assignee"
+              className="task-assignee-select"
               size="medium"
               value={assignedTo}
               onChange={(e) => setAssignedTo(e.target.value)}

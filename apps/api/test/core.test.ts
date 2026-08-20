@@ -4,6 +4,8 @@ import { PDFDocument } from "pdf-lib";
 import { strFromU8, unzipSync } from "fflate";
 import {
   ApiError,
+  decodeTrialBalanceCsv,
+  inspectTrialBalanceCsv,
   parseTrialBalanceCsv,
   regulatorEvidenceContentType,
   regulatorEvidenceFilename,
@@ -173,6 +175,94 @@ test("rejects invalid double-sided rows", () => {
       error instanceof ApiError &&
       error.status === 422 &&
       error.code === "INVALID_CSV",
+  );
+});
+
+test("auto-detects common trial-balance aliases regardless of punctuation or case", () => {
+  const csv = "G/L CODE,Account.Description,DR Amount,CR-Amount\n1000,Bank,25,\n4000,Sales,,25";
+  const inspection = inspectTrialBalanceCsv(csv);
+  assert.deepEqual(inspection.suggestedMapping, {
+    accountCode: 0,
+    accountName: 1,
+    debit: 2,
+    credit: 3,
+  });
+  assert.equal(parseTrialBalanceCsv(csv).balanced, true);
+});
+
+test("parses arbitrary headings with an explicit column mapping", () => {
+  const csv = "Ref,Label,Left side,Right side\n1000,Bank,100,\n4000,Income,,100";
+  assert.throws(
+    () => parseTrialBalanceCsv(csv),
+    (error: unknown) => error instanceof ApiError && error.code === "CSV_MAPPING_REQUIRED",
+  );
+  const result = parseTrialBalanceCsv(csv, {
+    accountCode: 0,
+    accountName: 1,
+    debit: 2,
+    credit: 3,
+  });
+  assert.equal(result.balanced, true);
+  assert.equal(result.rows[0]?.accountName, "Bank");
+});
+
+test("decodes UTF-8 BOM, UTF-16 LE/BE and Windows-1252 trial balances", () => {
+  const csv = "Code,Name,Debit,Credit\n1000,Café,10,\n4000,Sales,,10";
+  const utf8 = new TextEncoder().encode(csv);
+  const utf8Bom = Uint8Array.from([0xef, 0xbb, 0xbf, ...utf8]);
+  assert.equal(decodeTrialBalanceCsv(utf8Bom).encoding, "UTF-8");
+
+  const utf16leBody = new Uint8Array(csv.length * 2);
+  for (let index = 0; index < csv.length; index++) {
+    const code = csv.charCodeAt(index);
+    utf16leBody[index * 2] = code & 0xff;
+    utf16leBody[index * 2 + 1] = code >> 8;
+  }
+  const utf16le = Uint8Array.from([0xff, 0xfe, ...utf16leBody]);
+  assert.equal(decodeTrialBalanceCsv(utf16le).encoding, "UTF-16 LE");
+  assert.equal(parseTrialBalanceCsv(decodeTrialBalanceCsv(utf16le).text).balanced, true);
+
+  const utf16beBody = Uint8Array.from(utf16leBody);
+  for (let index = 0; index < utf16beBody.length; index += 2)
+    [utf16beBody[index], utf16beBody[index + 1]] = [utf16beBody[index + 1]!, utf16beBody[index]!];
+  const utf16be = Uint8Array.from([0xfe, 0xff, ...utf16beBody]);
+  assert.equal(decodeTrialBalanceCsv(utf16be).encoding, "UTF-16 BE");
+
+  const windowsText = "Code,Name,Debit,Credit\r\n1000,Director’s loan,£10,\r\n4000,Sales,,10";
+  const windows1252 = Uint8Array.from(
+    [...windowsText].map((character) =>
+      character === "’" ? 0x92 : character === "£" ? 0xa3 : character.charCodeAt(0),
+    ),
+  );
+  const decoded = decodeTrialBalanceCsv(windows1252);
+  assert.equal(decoded.encoding, "Windows-1252");
+  assert.equal(parseTrialBalanceCsv(decoded.text).rows[0]?.accountName, "Director’s loan");
+});
+
+test("rejects binary data instead of treating it as Windows-1252 CSV", () => {
+  assert.throws(
+    () => decodeTrialBalanceCsv(Uint8Array.from([0x50, 0x4b, 0x03, 0x04, 0, 1, 2, 3])),
+    (error: unknown) =>
+      error instanceof ApiError &&
+      error.status === 422 &&
+      error.code === "INVALID_CSV_BINARY" &&
+      /binary/.test(error.message),
+  );
+  assert.throws(
+    () => decodeTrialBalanceCsv(Uint8Array.from([0xff, 0xfe, 0x41])),
+    (error: unknown) =>
+      error instanceof ApiError && error.code === "INVALID_CSV_ENCODING",
+  );
+});
+
+test("rejects duplicate manual column assignments", () => {
+  assert.throws(
+    () => parseTrialBalanceCsv(
+      "Ref,Label,Left,Right\n1000,Bank,10,\n4000,Sales,,10",
+      { accountCode: 0, accountName: 0, debit: 2, credit: 3 },
+    ),
+    (error: unknown) =>
+      error instanceof ApiError && error.code === "INVALID_CSV_MAPPING",
   );
 });
 

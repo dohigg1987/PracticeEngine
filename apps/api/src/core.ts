@@ -14,6 +14,27 @@ export interface ParsedCsv {
   balanced: boolean;
 }
 
+export const TRIAL_BALANCE_FIELDS = [
+  "accountCode",
+  "accountName",
+  "debit",
+  "credit",
+] as const;
+export type TrialBalanceField = (typeof TRIAL_BALANCE_FIELDS)[number];
+export type TrialBalanceColumnMapping = Record<TrialBalanceField, number>;
+
+export interface TrialBalanceCsvInspection {
+  headers: string[];
+  rowCount: number;
+  suggestedMapping: Partial<TrialBalanceColumnMapping>;
+  rawPreview: Record<string, string>[];
+}
+
+export interface DecodedTrialBalanceCsv {
+  text: string;
+  encoding: "UTF-8" | "UTF-16 LE" | "UTF-16 BE" | "Windows-1252";
+}
+
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
@@ -220,6 +241,154 @@ function normaliseHeader(value: string): string {
     .trim();
 }
 
+const TRIAL_BALANCE_HEADER_ALIASES: Record<TrialBalanceField, readonly string[]> = {
+  accountCode: [
+    "account code", "account number", "account no", "account", "code",
+    "nominal code", "nominal number", "nominal", "gl code", "g l code",
+    "a c code", "acct code", "acc code", "ledger code",
+  ],
+  accountName: [
+    "account name", "account description", "name", "description", "details",
+    "nominal description", "nominal name", "ledger name",
+  ],
+  debit: ["debit", "debits", "debit amount", "dr", "dr amount"],
+  credit: ["credit", "credits", "credit amount", "cr", "cr amount"],
+};
+
+function csvLines(csv: string): string[] {
+  return csv
+    .replace(/^\uFEFF/, "")
+    .split(/\r?\n/)
+    .filter((line) => line.trim() !== "");
+}
+
+export function inspectTrialBalanceCsv(csv: string): TrialBalanceCsvInspection {
+  const lines = csvLines(csv);
+  if (lines.length < 2)
+    throw new ApiError(
+      422,
+      "INVALID_CSV",
+      "CSV must contain a header and at least one data row",
+    );
+  const headers = splitCsvLine(lines[0]!);
+  if (headers.some((header) => header === ""))
+    throw new ApiError(422, "INVALID_CSV", "CSV column headings must not be blank");
+  const normalised = headers.map(normaliseHeader);
+  const suggestedMapping: Partial<TrialBalanceColumnMapping> = {};
+  for (const field of TRIAL_BALANCE_FIELDS) {
+    const index = normalised.findIndex((header) =>
+      TRIAL_BALANCE_HEADER_ALIASES[field].includes(header),
+    );
+    if (index >= 0) suggestedMapping[field] = index;
+  }
+  return {
+    headers,
+    rowCount: lines.length - 1,
+    suggestedMapping,
+    rawPreview: lines.slice(1, 6).map((line) => {
+      const values = splitCsvLine(line);
+      return Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""]));
+    }),
+  };
+}
+
+function completeTrialBalanceMapping(
+  inspection: TrialBalanceCsvInspection,
+  mapping?: Partial<TrialBalanceColumnMapping>,
+): TrialBalanceColumnMapping {
+  const effective = mapping ?? inspection.suggestedMapping;
+  const missing = TRIAL_BALANCE_FIELDS.filter((field) => !Number.isInteger(effective[field]));
+  if (missing.length)
+    throw new ApiError(
+      422,
+      "CSV_MAPPING_REQUIRED",
+      `Choose columns for ${missing.map((field) => field.replace(/([A-Z])/g, " $1").toLowerCase()).join(", ")}`,
+    );
+  const result = Object.fromEntries(
+    TRIAL_BALANCE_FIELDS.map((field) => [field, Number(effective[field])]),
+  ) as unknown as TrialBalanceColumnMapping;
+  const indexes = Object.values(result);
+  if (indexes.some((index) => index < 0 || index >= inspection.headers.length))
+    throw new ApiError(422, "INVALID_CSV_MAPPING", "A selected CSV column is not available");
+  if (new Set(indexes).size !== indexes.length)
+    throw new ApiError(422, "INVALID_CSV_MAPPING", "Each trial-balance field must use a different CSV column");
+  return result;
+}
+
+export function trialBalanceColumnMapping(
+  value: unknown,
+): Partial<TrialBalanceColumnMapping> | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  let input: unknown = value;
+  if (typeof value === "string") {
+    try {
+      input = JSON.parse(value);
+    } catch {
+      throw new ApiError(400, "INVALID_CSV_MAPPING", "Column mapping must be valid JSON");
+    }
+  }
+  if (!input || typeof input !== "object" || Array.isArray(input))
+    throw new ApiError(400, "INVALID_CSV_MAPPING", "Column mapping must be an object");
+  const record = input as Record<string, unknown>;
+  const mapping: Partial<TrialBalanceColumnMapping> = {};
+  for (const field of TRIAL_BALANCE_FIELDS) {
+    const index = record[field];
+    if (index === undefined) continue;
+    if (!Number.isInteger(index) || Number(index) < 0)
+      throw new ApiError(400, "INVALID_CSV_MAPPING", `${field} must identify a CSV column`);
+    mapping[field] = Number(index);
+  }
+  return mapping;
+}
+
+function decodedTextIsSafe(text: string): boolean {
+  return !/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u0081\u008D\u008F\u0090\u009D]/.test(text);
+}
+
+export function decodeTrialBalanceCsv(
+  input: ArrayBuffer | Uint8Array,
+): DecodedTrialBalanceCsv {
+  const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
+  if (!bytes.length)
+    throw new ApiError(422, "INVALID_CSV", "CSV file is empty");
+  const decode = (label: string, start = 0) =>
+    new TextDecoder(label, { fatal: true, ignoreBOM: true }).decode(bytes.subarray(start));
+  let decoded: DecodedTrialBalanceCsv | null = null;
+  try {
+    if (bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf)
+      decoded = { text: decode("utf-8", 3), encoding: "UTF-8" };
+    else if (bytes[0] === 0xff && bytes[1] === 0xfe)
+      decoded = { text: decode("utf-16le", 2), encoding: "UTF-16 LE" };
+    else if (bytes[0] === 0xfe && bytes[1] === 0xff)
+      decoded = { text: decode("utf-16be", 2), encoding: "UTF-16 BE" };
+    else {
+      const pairs = Math.floor(bytes.length / 2);
+      let evenNulls = 0;
+      let oddNulls = 0;
+      for (let index = 0; index < pairs * 2; index += 2) {
+        if (bytes[index] === 0) evenNulls++;
+        if (bytes[index + 1] === 0) oddNulls++;
+      }
+      if (pairs > 0 && oddNulls / pairs > 0.3 && evenNulls / pairs < 0.05)
+        decoded = { text: decode("utf-16le"), encoding: "UTF-16 LE" };
+      else if (pairs > 0 && evenNulls / pairs > 0.3 && oddNulls / pairs < 0.05)
+        decoded = { text: decode("utf-16be"), encoding: "UTF-16 BE" };
+      else {
+        try {
+          decoded = { text: decode("utf-8"), encoding: "UTF-8" };
+        } catch {
+          decoded = { text: decode("windows-1252"), encoding: "Windows-1252" };
+        }
+      }
+    }
+  } catch {
+    throw new ApiError(422, "INVALID_CSV_ENCODING", "CSV uses an unsupported or damaged text encoding");
+  }
+  if (!decodedTextIsSafe(decoded.text))
+    throw new ApiError(422, "INVALID_CSV_BINARY", "The selected file appears to be binary, not CSV text");
+  return decoded;
+}
+
 function parseMoney(value: string, rowNo: number): bigint {
   const cleaned = value.trim().replace(/[\u00a3,$]/g, "");
   if (cleaned === "") return 0n;
@@ -239,40 +408,18 @@ export function decimal(minorUnits: bigint): string {
   return `${minorUnits / 100n}.${(minorUnits % 100n).toString().padStart(2, "0")}`;
 }
 
-export function parseTrialBalanceCsv(csv: string): ParsedCsv {
-  const lines = csv
-    .replace(/^\uFEFF/, "")
-    .split(/\r?\n/)
-    .filter((line) => line.trim() !== "");
-  if (lines.length < 2)
-    throw new ApiError(
-      422,
-      "INVALID_CSV",
-      "CSV must contain a header and at least one data row",
-    );
-
-  const originalHeaders = splitCsvLine(lines[0]!);
-  const headers = originalHeaders.map(normaliseHeader);
-  const find = (...candidates: string[]) =>
-    headers.findIndex((header) => candidates.includes(header));
-  const codeIndex = find("account code", "code", "nominal code", "account");
-  const nameIndex = find(
-    "account name",
-    "name",
-    "description",
-    "nominal description",
-  );
-  const debitIndex = find("debit", "debits");
-  const creditIndex = find("credit", "credits");
-  if (
-    [codeIndex, nameIndex, debitIndex, creditIndex].some((index) => index < 0)
-  ) {
-    throw new ApiError(
-      422,
-      "INVALID_CSV",
-      "CSV requires account code, account name, debit and credit columns",
-    );
-  }
+export function parseTrialBalanceCsv(
+  csv: string,
+  mapping?: Partial<TrialBalanceColumnMapping>,
+): ParsedCsv {
+  const lines = csvLines(csv);
+  const inspection = inspectTrialBalanceCsv(csv);
+  const originalHeaders = inspection.headers;
+  const selected = completeTrialBalanceMapping(inspection, mapping);
+  const codeIndex = selected.accountCode;
+  const nameIndex = selected.accountName;
+  const debitIndex = selected.debit;
+  const creditIndex = selected.credit;
 
   let debitTotal = 0n;
   let creditTotal = 0n;

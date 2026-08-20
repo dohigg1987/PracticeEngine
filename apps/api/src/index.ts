@@ -42,6 +42,7 @@ import {
 } from "./operations.js";
 import {
   ApiError,
+  decodeTrialBalanceCsv,
   parseTrialBalanceCsv,
   regulatorEvidenceContentType,
   regulatorEvidenceFilename,
@@ -54,6 +55,8 @@ import {
   teamInvitationRole,
   teamInvitationToken,
   trialBalanceReadiness,
+  trialBalanceColumnMapping,
+  type TrialBalanceColumnMapping,
   workspaceName,
   workspaceOnboardingDatabaseError,
 } from "./core.js";
@@ -1078,7 +1081,11 @@ async function createEngagement(
 
 async function csvUpload(
   request: Request,
-): Promise<{ bytes: ArrayBuffer; filename: string }> {
+): Promise<{
+  bytes: ArrayBuffer;
+  filename: string;
+  mapping?: Partial<TrialBalanceColumnMapping>;
+}> {
   const contentTypeHeader = request.headers.get("content-type") ?? "";
   const contentType = contentTypeHeader.toLowerCase();
   if (contentType.includes("multipart/form-data")) {
@@ -1106,6 +1113,7 @@ async function csvUpload(
     return {
       bytes: await file.arrayBuffer(),
       filename: (file.name || "trial-balance.csv").slice(0, 255),
+      mapping: trialBalanceColumnMapping(form.get("mapping")),
     };
   }
   if (
@@ -1155,16 +1163,12 @@ async function importCsv(
       engagementAccess(tx, ctx, engagementId, WRITE_ROLES),
     );
     const upload = await csvUpload(request);
-    const hash = await sha256(upload.bytes);
-    let csv: string;
-    try {
-      csv = new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(
-        upload.bytes,
-      );
-    } catch {
-      throw new ApiError(422, "INVALID_CSV", "CSV must be valid UTF-8 text");
-    }
-    const parsed = parseTrialBalanceCsv(csv);
+    const sourceHash = await sha256(upload.bytes);
+    const hash = upload.mapping
+      ? await canonicalHash({ sourceHash, mapping: upload.mapping })
+      : sourceHash;
+    const decoded = decodeTrialBalanceCsv(upload.bytes);
+    const parsed = parseTrialBalanceCsv(decoded.text, upload.mapping);
     if (!parsed.balanced)
       throw new ApiError(
         422,
@@ -1183,14 +1187,22 @@ async function importCsv(
     if (existing.length) return json({ item: existing[0], duplicate: true });
     const batchId = crypto.randomUUID();
     const storageKey = `tenants/${ctx.tenantId}/engagements/${engagementId}/imports/${batchId}-${hash}.csv`;
+    const charset = {
+      "UTF-8": "utf-8",
+      "UTF-16 LE": "utf-16le",
+      "UTF-16 BE": "utf-16be",
+      "Windows-1252": "windows-1252",
+    }[decoded.encoding];
     // R2 completes before the transaction starts: database state can never point at a missing object.
     await env.ARTEFACTS.put(storageKey, upload.bytes, {
-      httpMetadata: { contentType: "text/csv; charset=utf-8" },
+      httpMetadata: { contentType: `text/csv; charset=${charset}` },
       customMetadata: {
         sha256: hash,
+        sourceSha256: sourceHash,
         tenantId: ctx.tenantId,
         engagementId,
         originalFilename: upload.filename,
+        sourceEncoding: decoded.encoding,
       },
     });
     let transactionBodyCompleted = false;

@@ -94,9 +94,16 @@
   min-height: 32px;
 }
 .task-type-select,
+.task-assignee-select,
 .task-status-select {
   min-width: 0;
+  min-height: 32px;
   width: 100%;
+}
+.task-type-select > select,
+.task-assignee-select > select,
+.task-status-select > select {
+  min-height: 32px;
 }
 .task-board-empty {
   gap: 2px;

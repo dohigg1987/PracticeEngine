@@ -34,6 +34,8 @@ import {
   PortalContact,
   SyncRun,
   TenantSettings,
+  TrialBalanceColumnMapping,
+  TrialBalanceField,
 } from "./api";
 import { ConfirmAction, ReasonAction } from "./ConfirmAction";
 import { formatDate, formatDateTime } from "./displayFormat";
@@ -575,6 +577,9 @@ function ImportCentre({ context, engagements, onOpenSource }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<NormalizedImportPreview | null>(null);
+  const [columnMapping, setColumnMapping] = useState<Partial<TrialBalanceColumnMapping>>({});
+  const [mappingValidated, setMappingValidated] = useState(false);
+  const [manualMapping, setManualMapping] = useState(false);
   const [notice, setNotice] = useState("");
   const load = useCallback(async () => {
     setLoading(true);
@@ -611,15 +616,53 @@ function ImportCentre({ context, engagements, onOpenSource }: Props) {
     }
   }
   async function importPreviewedFile() {
-    if (!file || !engagementId || !preview) return;
+    if (!file || !engagementId || !preview || !mappingValidated) return;
     setBusy("import");
     setError("");
     setNotice("");
     try {
-      await api.importTrialBalance(context, engagementId, file);
+      await api.importTrialBalance(
+        context,
+        engagementId,
+        file,
+        manualMapping ? columnMapping as TrialBalanceColumnMapping : undefined,
+      );
       setNotice(`${file.name} was imported to the selected engagement.`);
       onOpenSource?.(engagementId);
     } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy("");
+    }
+  }
+  const mappingFields: Array<{ field: TrialBalanceField; label: string }> = [
+    { field: "accountCode", label: "Account code" },
+    { field: "accountName", label: "Account name" },
+    { field: "debit", label: "Debit" },
+    { field: "credit", label: "Credit" },
+  ];
+  const completeMapping = mappingFields.every(({ field }) =>
+    Number.isInteger(columnMapping[field]),
+  );
+  const uniqueMapping = new Set(Object.values(columnMapping)).size === mappingFields.length;
+  async function applyColumnMapping() {
+    if (!file || !engagementId || !completeMapping || !uniqueMapping) return;
+    setBusy("mapping");
+    setError("");
+    try {
+      const item = (
+        await api.normalizeImport(
+          context,
+          engagementId,
+          file,
+          columnMapping as TrialBalanceColumnMapping,
+        )
+      ).item;
+      setPreview(item);
+      setMappingValidated(item.mappingComplete);
+      setManualMapping(true);
+    } catch (e) {
+      setMappingValidated(false);
       setError(errorText(e));
     } finally {
       setBusy("");
@@ -671,9 +714,11 @@ function ImportCentre({ context, engagements, onOpenSource }: Props) {
             setBusy("preview");
             setError("");
             try {
-              setPreview(
-                (await api.normalizeImport(context, engagementId, file)).item,
-              );
+              const item = (await api.normalizeImport(context, engagementId, file)).item;
+              setPreview(item);
+              setColumnMapping(item.suggestedMapping);
+              setMappingValidated(item.mappingComplete);
+              setManualMapping(false);
             } catch (e) {
               setError(errorText(e));
             } finally {
@@ -703,6 +748,9 @@ function ImportCentre({ context, engagements, onOpenSource }: Props) {
                 onChange={(event) => {
                   setFile(event.target.files?.[0] || null);
                   setPreview(null);
+                  setColumnMapping({});
+                  setMappingValidated(false);
+                  setManualMapping(false);
                 }}
               />
               <Button type="button" onClick={() => fileInputRef.current?.click()}>
@@ -727,19 +775,90 @@ function ImportCentre({ context, engagements, onOpenSource }: Props) {
           )}
         </form>
         {preview && (
-          <div className="import-preview" role="status">
-            <div>
-              <b>
-                {preview.rowCount ?? preview.rows?.length ?? preview.preview?.length ?? 0} rows detected
-              </b>
-              <span>
-                {(preview.detectedColumns || preview.columns || []).join(", ") || "Columns detected"}
-              </span>
+          <div className="import-preview">
+            <div aria-live="polite">
+              <b>{preview.rowCount} rows detected</b>
+              <span>{preview.encoding} · {preview.headers.join(", ")}</span>
             </div>
-            <Button appearance="primary" disabled={busy === "import"} onClick={importPreviewedFile}>
+            <section aria-labelledby="column-mapping-heading">
+              <h3 id="column-mapping-heading">Column mapping</h3>
+              <p>Confirm which source column supplies each required trial-balance field.</p>
+              <div className="commercial-form import-mapping-form">
+                {mappingFields.map(({ field, label }) => (
+                  <Field key={field} label={label} required>
+                    <Select
+                      value={columnMapping[field]?.toString() ?? ""}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        setColumnMapping((current) => ({
+                          ...current,
+                          [field]: value === "" ? undefined : Number(value),
+                        }));
+                        setMappingValidated(false);
+                        setManualMapping(true);
+                      }}
+                    >
+                      <option value="">Choose a column</option>
+                      {preview.headers.map((header, index) => (
+                        <option key={`${header}-${index}`} value={index}>{header}</option>
+                      ))}
+                    </Select>
+                  </Field>
+                ))}
+              </div>
+              {!uniqueMapping && completeMapping && (
+                <MessageBar className="commercial-message" intent="error">
+                  <MessageBarBody>Choose a different source column for each field.</MessageBarBody>
+                </MessageBar>
+              )}
+              <Button
+                type="button"
+                disabled={!completeMapping || !uniqueMapping || busy === "mapping"}
+                onClick={applyColumnMapping}
+              >
+                {busy === "mapping" ? "Applying mapping…" : "Apply column mapping"}
+              </Button>
+            </section>
+            <div
+              className="commercial-table"
+              role="region"
+              aria-label="Trial balance preview table"
+              tabIndex={0}
+            >
+              <Table size="small" aria-label={mappingValidated ? "Mapped trial balance preview" : "Source CSV preview"}>
+                <TableHeader>
+                  <TableRow>
+                    {(mappingValidated
+                      ? ["Account code", "Account name", "Debit", "Credit"]
+                      : preview.headers
+                    ).map((header) => <TableHeaderCell key={header}>{header}</TableHeaderCell>)}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(mappingValidated ? preview.preview : preview.rawPreview).map((row, index) => (
+                    <TableRow key={index}>
+                      {(mappingValidated
+                        ? [row.accountCode, row.accountName, row.debit, row.credit]
+                        : preview.headers.map((header) => (row as unknown as Record<string, unknown>)[header])
+                      ).map((value, column) => <TableCell key={column}>{String(value ?? "")}</TableCell>)}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            {mappingValidated && (
+              <p aria-live="polite">
+                Debit {preview.debitTotal} · Credit {preview.creditTotal} · {preview.balanced ? "Balanced" : "Not balanced"}
+              </p>
+            )}
+            <Button
+              appearance="primary"
+              disabled={!mappingValidated || preview.balanced !== true || busy === "import"}
+              onClick={importPreviewedFile}
+            >
               {busy === "import" ? "Importing…" : "Import trial balance"}
             </Button>
-            {preview.warnings?.map((warning) => (
+            {preview.warnings.map((warning) => (
               <MessageBar
                 className="commercial-message"
                 key={warning}
@@ -766,7 +885,7 @@ function ImportCentre({ context, engagements, onOpenSource }: Props) {
               api.createIntegration(context, organisationId, name, {
                 templateVersion: 1,
                 sourceFileName: file?.name || null,
-                detectedColumns: preview?.detectedColumns || preview?.columns || [],
+                detectedColumns: preview?.detectedColumns || [],
               }),
             );
           }}
