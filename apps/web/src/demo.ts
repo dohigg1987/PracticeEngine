@@ -1234,6 +1234,19 @@ export function demoRequest(path: string, init?: RequestInit): unknown {
         body.sourceAccountId
     )
       localStorage.removeItem("accounts.demo.unmappedSource");
+    const unmappedSources = (
+      localStorage.getItem("accounts.demo.unmappedSources") || ""
+    )
+      .split(",")
+      .filter(Boolean);
+    if (body.sourceAccountId && unmappedSources.includes(body.sourceAccountId)) {
+      const remaining = unmappedSources.filter(
+        (sourceId) => sourceId !== body.sourceAccountId,
+      );
+      if (remaining.length)
+        localStorage.setItem("accounts.demo.unmappedSources", remaining.join(","));
+      else localStorage.removeItem("accounts.demo.unmappedSources");
+    }
     return {
       item: {
         source_account_id: body.sourceAccountId,
@@ -1496,19 +1509,21 @@ export function demoRequest(path: string, init?: RequestInit): unknown {
         }
       }
       if (path.endsWith("/trial-balance")) {
-        const sourceAccountId = localStorage.getItem(
-          "accounts.demo.unmappedSource",
-        );
-        const item = (
+        const sourceAccountIds = [
+          localStorage.getItem("accounts.demo.unmappedSource") || "",
+          ...(localStorage.getItem("accounts.demo.unmappedSources") || "")
+            .split(",")
+            .filter(Boolean),
+        ];
+        for (const item of (
           response as { items?: Array<Record<string, unknown>> }
-        ).items?.find(
-          (line) => line.source_account_id === sourceAccountId,
-        );
-        if (item) {
-          item.canonical_account_id = null;
-          item.canonical_code = null;
-          item.canonical_name = null;
-          item.report_line = null;
+        ).items || []) {
+          if (sourceAccountIds.includes(String(item.source_account_id))) {
+            item.canonical_account_id = null;
+            item.canonical_code = null;
+            item.canonical_name = null;
+            item.report_line = null;
+          }
         }
       }
       return response;
