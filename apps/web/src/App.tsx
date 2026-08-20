@@ -478,6 +478,7 @@ function AccountsWorkspace({
     [],
   );
   const [view, setView] = useState<View>(demoMode ? "accounts" : "overview");
+  const [mappingMode, setMappingMode] = useState<"table" | "model">("table");
   const [openProductionNavStage, setOpenProductionNavStage] =
     useState<ProductionNavStage | null>(
       productionNavStageForView[demoMode ? "accounts" : "overview"] ?? null,
@@ -1824,6 +1825,9 @@ function AccountsWorkspace({
               ) : view === "mapping" ? (
                 <MappingView
                   lines={lines}
+                  canonicalAccounts={canonicalAccounts}
+                  mode={mappingMode}
+                  onModeChange={setMappingMode}
                   options={options}
                   mapped={mapped}
                   unmapped={unmapped}
@@ -4827,6 +4831,9 @@ function PanelHead({
 }
 function MappingView({
   lines,
+  canonicalAccounts,
+  mode,
+  onModeChange,
   options,
   mapped,
   unmapped,
@@ -4836,6 +4843,9 @@ function MappingView({
   onRetryTaxonomy,
 }: {
   lines: TrialBalanceLine[];
+  canonicalAccounts: CanonicalAccount[];
+  mode: "table" | "model";
+  onModeChange: (mode: "table" | "model") => void;
   options: string[][];
   mapped: number;
   unmapped: number;
@@ -4844,6 +4854,24 @@ function MappingView({
   taxonomyError: string;
   onRetryTaxonomy: () => void;
 }) {
+  const [selectedSourceId, setSelectedSourceId] = useState("");
+  const unmappedLines = lines.filter((line) => !line.canonical_account_id);
+  const selectedLine = lines.find(
+    (line) => line.source_account_id === selectedSourceId,
+  );
+  const accountsByReportLine = canonicalAccounts.reduce<
+    Map<string, CanonicalAccount[]>
+  >((groups, account) => {
+    const group = groups.get(account.report_line) ?? [];
+    group.push(account);
+    groups.set(account.report_line, group);
+    return groups;
+  }, new Map());
+  const assign = (line: TrialBalanceLine | undefined, accountId: string) => {
+    if (!line || taxonomyError || saving) return;
+    setSelectedSourceId("");
+    onSave(line, accountId);
+  };
   return (
     <div className="mapping-layout">
       <section className="panel">
@@ -4852,9 +4880,22 @@ function MappingView({
           heading="Account mapping"
           body="Connect each source account to the reporting taxonomy."
         >
-          <Badge {...statusBadgeProps(unmapped || !lines.length ? "PENDING" : "COMPLETE")}>
-            {mappingSummaryLabel(lines.length, unmapped)}
-          </Badge>
+          <div className="mapping-view-actions">
+            <TabList
+              size="small"
+              selectedValue={mode}
+              onTabSelect={(_, data) =>
+                onModeChange(data.value as "table" | "model")
+              }
+              aria-label="Mapping view"
+            >
+              <Tab value="table">Table</Tab>
+              <Tab value="model">Model</Tab>
+            </TabList>
+            <Badge {...statusBadgeProps(unmapped || !lines.length ? "PENDING" : "COMPLETE")}>
+              {mappingSummaryLabel(lines.length, unmapped)}
+            </Badge>
+          </div>
         </PanelHead>
         {taxonomyError && (
           <PanelError
@@ -4868,7 +4909,7 @@ function MappingView({
             heading="Nothing to map"
             body="Import a trial balance before mapping source accounts."
           />
-        ) : (
+        ) : mode === "table" ? (
           <div className="table-wrap">
             <Table size="small" aria-label="Account mapping">
               <TableHeader>
@@ -4918,6 +4959,195 @@ function MappingView({
                 ))}
               </TableBody>
             </Table>
+          </div>
+        ) : (
+          <div className="mapping-model">
+            <section
+              className="mapping-source-accounts"
+              aria-labelledby="unmapped-source-accounts-title"
+            >
+              <div className="mapping-model-section-head">
+                <Text
+                  id="unmapped-source-accounts-title"
+                  as="h3"
+                  size={300}
+                  weight="semibold"
+                >
+                  Unmapped source accounts
+                </Text>
+                <Badge
+                  size="small"
+                  appearance="tint"
+                  color={unmapped ? "warning" : "subtle"}
+                >
+                  {unmapped}
+                </Badge>
+              </div>
+              <Text className="mapping-model-instruction" size={200}>
+                Drag an account to the model, or select it and activate a
+                canonical account. The select remains available as a fallback.
+              </Text>
+              {unmappedLines.length ? (
+                <div className="mapping-source-list">
+                  {unmappedLines.map((line) => {
+                    const isSelected =
+                      selectedSourceId === line.source_account_id;
+                    const isSaving = saving === line.account_code;
+                    return (
+                      <Card
+                        key={line.source_account_id}
+                        className={`mapping-source-card${isSelected ? " is-selected" : ""}`}
+                        appearance="outline"
+                      >
+                        <FluentButton
+                          className="mapping-source-drag-handle"
+                          appearance="subtle"
+                          draggable={!taxonomyError && !isSaving}
+                          aria-pressed={isSelected}
+                          disabled={Boolean(taxonomyError) || isSaving}
+                          onClick={() =>
+                            setSelectedSourceId((current) =>
+                              current === line.source_account_id
+                                ? ""
+                                : line.source_account_id,
+                            )
+                          }
+                          onDragStart={(event) => {
+                            event.dataTransfer.effectAllowed = "move";
+                            event.dataTransfer.setData(
+                              "text/plain",
+                              line.source_account_id,
+                            );
+                            setSelectedSourceId(line.source_account_id);
+                          }}
+                        >
+                          <span>
+                            <small className="mono">{line.account_code}</small>
+                            <b>{line.account_name}</b>
+                          </span>
+                          <Text size={200}>{money(amount(line))}</Text>
+                        </FluentButton>
+                        <Select
+                          aria-label={`Canonical account for ${line.account_code} ${line.account_name}`}
+                          value=""
+                          disabled={Boolean(taxonomyError) || isSaving}
+                          onChange={(event) => assign(line, event.target.value)}
+                        >
+                          <option value="">Select canonical accountâ€¦</option>
+                          {options.map(([id, name]) => (
+                            <option key={id} value={id}>
+                              {name}
+                            </option>
+                          ))}
+                        </Select>
+                      </Card>
+                    );
+                  })}
+                </div>
+              ) : (
+                <Text className="mapping-model-empty" size={200}>
+                  All source accounts are mapped.
+                </Text>
+              )}
+            </section>
+            <section
+              className="mapping-canonical-model"
+              aria-labelledby="canonical-model-title"
+            >
+              <div className="mapping-model-section-head">
+                <Text
+                  id="canonical-model-title"
+                  as="h3"
+                  size={300}
+                  weight="semibold"
+                >
+                  Canonical model
+                </Text>
+                {selectedLine && (
+                  <Text size={200}>
+                    Choose a target for {selectedLine.account_code}.
+                  </Text>
+                )}
+              </div>
+              <div className="mapping-report-line-groups">
+                {[...accountsByReportLine.entries()].map(
+                  ([reportLine, accounts]) => (
+                    <section
+                      className="mapping-report-line-group"
+                      key={reportLine}
+                      aria-labelledby={`mapping-report-line-${reportLine.replace(
+                        /[^a-z0-9]+/gi,
+                        "-",
+                      )}`}
+                    >
+                      <Text
+                        id={`mapping-report-line-${reportLine.replace(/[^a-z0-9]+/gi, "-")}`}
+                        as="h4"
+                        size={200}
+                        weight="semibold"
+                      >
+                        {statutoryLabel(reportLine)}
+                      </Text>
+                      <div className="mapping-canonical-grid">
+                        {accounts.map((account) => {
+                          const assignedLines = lines.filter(
+                            (line) =>
+                              line.canonical_account_id === account.id,
+                          );
+                          return (
+                            <FluentButton
+                              key={account.id}
+                              className="mapping-canonical-target"
+                              appearance="subtle"
+                              disabled={Boolean(taxonomyError) || Boolean(saving)}
+                              aria-label={`Map to ${account.canonical_code} ${account.name}`}
+                              onClick={() => assign(selectedLine, account.id)}
+                              onDragOver={(event) => {
+                                if (!taxonomyError && !saving) {
+                                  event.preventDefault();
+                                  event.dataTransfer.dropEffect = "move";
+                                }
+                              }}
+                              onDrop={(event) => {
+                                event.preventDefault();
+                                const sourceId =
+                                  event.dataTransfer.getData("text/plain");
+                                assign(
+                                  lines.find(
+                                    (line) =>
+                                      line.source_account_id === sourceId,
+                                  ),
+                                  account.id,
+                                );
+                              }}
+                            >
+                              <span className="mapping-canonical-copy">
+                                <span>
+                                  <small className="mono">
+                                    {account.canonical_code}
+                                  </small>
+                                  <b>{account.name}</b>
+                                </span>
+                                <Badge size="small" appearance="outline">
+                                  {statutoryLabel(account.normal_balance)}
+                                </Badge>
+                              </span>
+                              <small className="mapping-assigned-sources">
+                                {assignedLines.length
+                                  ? assignedLines
+                                      .map((line) => line.account_code)
+                                      .join(", ")
+                                  : "Drop source account here"}
+                              </small>
+                            </FluentButton>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  ),
+                )}
+              </div>
+            </section>
           </div>
         )}
       </section>
