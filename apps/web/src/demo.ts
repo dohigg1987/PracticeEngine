@@ -1223,6 +1223,24 @@ const reads: Array<[RegExp, unknown]> = [
 
 export function demoRequest(path: string, init?: RequestInit): unknown {
   const method = init?.method ?? "GET";
+  if (method === "POST" && path.endsWith("/mappings")) {
+    const body = JSON.parse(String(init?.body || "{}")) as {
+      sourceAccountId?: string;
+      canonicalAccountId?: string;
+    };
+    if (
+      body.sourceAccountId &&
+      localStorage.getItem("accounts.demo.unmappedSource") ===
+        body.sourceAccountId
+    )
+      localStorage.removeItem("accounts.demo.unmappedSource");
+    return {
+      item: {
+        source_account_id: body.sourceAccountId,
+        canonical_account_id: body.canonicalAccountId,
+      },
+    };
+  }
   if (method === "POST" && path.endsWith("/imports/normalize")) {
     return {
       item: {
@@ -1411,7 +1429,26 @@ export function demoRequest(path: string, init?: RequestInit): unknown {
     if (path.endsWith("/accounts-versions"))
       return { items: structuredClone(demoAccountsVersions) };
     const match = reads.find(([pattern]) => pattern.test(path));
-    if (match) return structuredClone(match[1]);
+    if (match) {
+      const response = structuredClone(match[1]);
+      if (path.endsWith("/trial-balance")) {
+        const sourceAccountId = localStorage.getItem(
+          "accounts.demo.unmappedSource",
+        );
+        const item = (
+          response as { items?: Array<Record<string, unknown>> }
+        ).items?.find(
+          (line) => line.source_account_id === sourceAccountId,
+        );
+        if (item) {
+          item.canonical_account_id = null;
+          item.canonical_code = null;
+          item.canonical_name = null;
+          item.report_line = null;
+        }
+      }
+      return response;
+    }
   }
   if (path.endsWith("/artefacts/html"))
     return {

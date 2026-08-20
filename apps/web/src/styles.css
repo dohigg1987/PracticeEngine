@@ -434,6 +434,156 @@ tfoot td {
   background: #fffbf5;
   color: #865716;
 }
+.mapping-view-actions,
+.mapping-model-section-head,
+.mapping-canonical-copy {
+  display: flex;
+  align-items: center;
+}
+.mapping-view-actions {
+  gap: 12px;
+}
+.mapping-model {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  min-width: 0;
+  border-top: 1px solid var(--colorNeutralStroke2);
+}
+.mapping-source-accounts,
+.mapping-canonical-model {
+  min-width: 0;
+  padding: 14px;
+}
+.mapping-source-accounts {
+  border-right: 1px solid var(--colorNeutralStroke2);
+  background: var(--colorNeutralBackground2);
+}
+.mapping-model-section-head {
+  justify-content: space-between;
+  gap: 12px;
+}
+.mapping-model-section-head h3,
+.mapping-report-line-group h4 {
+  margin: 0;
+}
+.mapping-model-instruction {
+  display: block;
+  margin-top: 5px;
+  color: var(--colorNeutralForeground2);
+  line-height: var(--lineHeightBase200);
+}
+.mapping-source-list,
+.mapping-report-line-groups {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+.mapping-source-card {
+  gap: 8px;
+  min-width: 0;
+  padding: 8px;
+}
+.mapping-source-card.is-selected {
+  border-color: var(--colorBrandStroke1);
+  box-shadow: 0 0 0 1px var(--colorBrandStroke1);
+}
+.mapping-source-drag-handle {
+  justify-content: stretch;
+  width: 100%;
+  height: auto;
+  min-width: 0;
+  padding: 5px 6px;
+  cursor: grab;
+}
+.mapping-source-drag-handle:active {
+  cursor: grabbing;
+}
+.mapping-source-drag-handle > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+}
+.mapping-source-drag-handle > span > span:first-child {
+  display: grid;
+  min-width: 0;
+}
+.mapping-source-drag-handle b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mapping-source-card select {
+  min-width: 0;
+}
+.mapping-model-empty {
+  display: block;
+  margin-top: 12px;
+  padding: 12px;
+  color: var(--colorNeutralForeground2);
+  border: 1px dashed var(--colorNeutralStroke2);
+}
+.mapping-canonical-model {
+  overflow: hidden;
+}
+.mapping-report-line-group {
+  min-width: 0;
+  border: 1px solid var(--colorNeutralStroke2);
+}
+.mapping-report-line-group > h4 {
+  padding: 8px 10px;
+  color: var(--colorNeutralForeground2);
+  background: var(--colorNeutralBackground2);
+  border-bottom: 1px solid var(--colorNeutralStroke2);
+}
+.mapping-canonical-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 8px;
+}
+.mapping-canonical-target {
+  display: grid;
+  justify-content: stretch;
+  width: 100%;
+  height: auto;
+  min-width: 0;
+  min-height: 72px;
+  padding: 8px 10px;
+  text-align: left;
+  border: 1px solid var(--colorNeutralStroke2);
+}
+.mapping-canonical-target > span {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  min-width: 0;
+}
+.mapping-canonical-target:hover,
+.mapping-canonical-target:focus-visible {
+  border-color: var(--colorBrandStroke1);
+}
+.mapping-canonical-copy {
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.mapping-canonical-copy > span:first-child {
+  display: grid;
+  min-width: 0;
+}
+.mapping-canonical-copy b,
+.mapping-assigned-sources {
+  overflow-wrap: anywhere;
+}
+.mapping-assigned-sources {
+  display: block;
+  margin-top: 5px;
+  color: var(--colorNeutralForeground3);
+}
 .mapping-control {
   min-width: 0;
 }
@@ -832,6 +982,9 @@ tfoot td {
   .mapping-control-card {
     padding: 14px 16px;
   }
+  .mapping-model {
+    grid-template-columns: minmax(200px, 240px) minmax(0, 1fr);
+  }
 }
 @media (max-width: 620px) {
   .top-actions > span {
@@ -871,6 +1024,24 @@ tfoot td {
   }
   .mapping-layout td:nth-child(3) {
     min-width: 230px;
+  }
+  .mapping-view-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .mapping-model {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .mapping-source-accounts {
+    border-right: 0;
+    border-bottom: 1px solid var(--colorNeutralStroke2);
+  }
+  .mapping-canonical-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .mapping-source-drag-handle > span {
+    display: grid;
+    justify-items: start;
   }
   .sidebar nav button {
     font-size: 12px;
