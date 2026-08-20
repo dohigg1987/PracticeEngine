@@ -272,13 +272,6 @@
   "literal-color|src/team.css|#236458": 2,
   "literal-color|src/team.css|#a5d4c8": 1,
   "literal-color|src/team.css|#eef9f5": 1,
-  "native-interactive|src/App.tsx|a": 2,
-  "native-interactive|src/App.tsx|button": 28,
-  "native-interactive|src/App.tsx|details": 1,
-  "native-interactive|src/App.tsx|input": 7,
-  "native-interactive|src/App.tsx|select": 4,
-  "native-interactive|src/App.tsx|summary": 1,
   "native-interactive|src/EngagementProduction.tsx|details": 2,
-  "native-interactive|src/EngagementProduction.tsx|summary": 2,
-  "private-fluent-selector|src/operations.css|[class*=\"fui-": 1
+  "native-interactive|src/EngagementProduction.tsx|summary": 2
 }
