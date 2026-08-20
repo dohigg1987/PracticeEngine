@@ -1171,7 +1171,12 @@ function WorkspaceSettings({ context, engagements }: Props) {
             </MessageBarBody>
           </MessageBar>
         )}
-        <div className="commercial-table">
+        <div
+          className="commercial-table"
+          role="region"
+          aria-label="Scrollable data export requests"
+          tabIndex={0}
+        >
           <Table size="small" aria-label="Data export requests">
             <TableHeader>
               <TableRow>
