@@ -731,13 +731,13 @@ tbody tr:hover {
 
 /* Commercial visual baseline: readable hierarchy and restrained functional colour. */
 :root {
-  --muted: #4f4f4f;
-  --soft: #f5f8fb;
+  --muted: var(--colorNeutralForeground2);
+  --soft: var(--colorNeutralBackground2);
   --accent-soft: var(--colorBrandBackground2);
-  --success-soft: #f1faf1;
-  --warning-soft: #fff8e8;
+  --success-soft: var(--colorStatusSuccessBackground1);
+  --warning-soft: var(--colorStatusWarningBackground1);
 }
-body { background: #f4f7fa; }
+body { background: var(--colorNeutralBackground3); }
 .topbar {
   border-top: 3px solid var(--colorBrandStroke1);
   background: var(--colorNeutralBackground1);
@@ -795,17 +795,17 @@ table thead {
   background: var(--colorStatusSuccessBackground1);
   color: var(--colorStatusSuccessForeground1);
 }
-.page-canvas { background: #e7edf3; }
+.page-canvas { background: var(--colorNeutralBackground3); }
 .panel-head {
   border-left: 3px solid var(--colorBrandStroke1);
-  background: #f7fbff;
+  background: var(--colorNeutralBackground1);
 }
 .panel-head small,
 .production-panel > .panel-head p:last-child,
 .library-objective,
 .production-empty,
 .document-edit-form small {
-  color: #4f4f4f;
+  color: var(--colorNeutralForeground2);
   font-size: 12px;
   line-height: 1.45;
 }
