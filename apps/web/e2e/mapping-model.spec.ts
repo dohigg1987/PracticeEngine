@@ -82,6 +82,19 @@ test("pointer drag assigns an unmapped source through the existing save flow", a
 
   await expect(page.getByText(/1000.*Current account was mapped/)).toBeVisible();
   await expect(page.getByText("All source accounts are mapped.")).toBeVisible();
+
+  const filing = page
+    .getByRole("navigation", { name: "Engagement sections" })
+    .locator('button[value="filing"]');
+  if (!(await filing.isVisible())) {
+    await page
+      .locator(".production-nav-stage-toggle")
+      .filter({ hasText: "Submission" })
+      .click();
+  }
+  await filing.click();
+  await expect(page.getByRole("heading", { name: "Regulator filing record" })).toBeVisible();
+  await expect(page.getByText(/1000.*Current account was mapped/)).toHaveCount(0);
 });
 
 test("large canonical model uses suggestions, search and collapsed report lines", async ({ page }) => {

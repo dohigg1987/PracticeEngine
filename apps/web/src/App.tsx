@@ -504,9 +504,12 @@ function AccountsWorkspace({
   const [detailError, setDetailError] = useState("");
   const [reportError, setReportError] = useState("");
   const [historyError, setHistoryError] = useState("");
-  const [notice, setNotice] = useState<{ good: boolean; text: string } | null>(
-    null,
-  );
+  const [notice, setNotice] = useState<{
+    good: boolean;
+    text: string;
+    view: View;
+    engagementId: string;
+  } | null>(null);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [csvRows, setCsvRows] = useState<CsvRow[]>([]);
   const [importError, setImportError] = useState("");
@@ -838,7 +841,12 @@ function AccountsWorkspace({
     setImportError("");
     try {
       await api.importTrialBalance(context, selectedId, importFile);
-      setNotice({ good: true, text: `${importFile.name} was imported.` });
+      setNotice({
+        good: true,
+        text: `${importFile.name} was imported.`,
+        view: "data",
+        engagementId: selectedId,
+      });
       closeImport();
       await loadDetail();
     } catch (e) {
@@ -869,12 +877,16 @@ function AccountsWorkspace({
       );
       setNotice({
         good: true,
+        view: "mapping",
+        engagementId: selectedId,
         text: `${line.account_code} · ${line.account_name} was mapped.`,
       });
       await loadDetail();
     } catch (e) {
       setNotice({
         good: false,
+        view: "mapping",
+        engagementId: selectedId,
         text: e instanceof Error ? e.message : "Mapping failed.",
       });
     } finally {
@@ -1743,7 +1755,7 @@ function AccountsWorkspace({
                   );
                 })}
               </TabList>
-              {notice && (
+              {notice?.view === view && notice.engagementId === selectedId && (
                 <MessageBar intent={notice.good ? "success" : "error"}>
                   <MessageBarBody>
                     <b>{notice.good ? "Saved" : "Action needed"}</b>{" "}
