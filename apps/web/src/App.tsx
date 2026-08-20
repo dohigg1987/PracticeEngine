@@ -477,7 +477,7 @@ function AccountsWorkspace({
     [],
   );
   const [view, setView] = useState<View>(demoMode ? "accounts" : "overview");
-  const [mappingMode, setMappingMode] = useState<"table" | "model">("table");
+  const [mappingMode, setMappingMode] = useState<"table" | "model">("model");
   const [openProductionNavStage, setOpenProductionNavStage] =
     useState<ProductionNavStage | null>(
       productionNavStageForView[demoMode ? "accounts" : "overview"] ?? null,

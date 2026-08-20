@@ -26,7 +26,6 @@ async function openMappingModel(page: Page) {
   }
   await mapping.click();
   await expect(page.getByRole("heading", { name: "Account mapping" })).toBeVisible();
-  await page.getByRole("tab", { name: "Model" }).click();
   await expect(page.getByRole("heading", { name: "Canonical model" })).toBeVisible();
 }
 
@@ -54,6 +53,25 @@ async function assertReflow(page: Page) {
   expect(widths.modelScroll).toBeLessThanOrEqual(widths.modelClient + 1);
   expect(widths.modelRight).toBeLessThanOrEqual(widths.viewport + 1);
 }
+
+test("mapping opens the searchable model by default and retains the table fallback", async ({
+  page,
+}) => {
+  await openMappingModel(page);
+
+  await expect(page.getByRole("tab", { name: "Model" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(page.getByLabel("Search canonical accounts")).toBeVisible();
+
+  await page.getByRole("tab", { name: "Table" }).click();
+  await expect(page.getByRole("table", { name: "Account mapping" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Table" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+});
 
 test("pointer drag assigns an unmapped source through the existing save flow", async ({ page }) => {
   await seedUnmappedAccount(page);
