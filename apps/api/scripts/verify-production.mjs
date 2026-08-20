@@ -14,6 +14,9 @@ const remote = args.has("--remote");
 const expectedHyperdriveId = "a07d1364c5c74e558ef127d515cdce92";
 const expectedAuthUrl =
   "https://ep-wispy-thunder-zatp3scz.neonauth.c-2.eu-west-2.aws.neon.tech/neondb/auth";
+const temporaryWorkersDevApiOrigin =
+  "https://uk-accounts-api-production.dennis-ohiggins.workers.dev";
+const temporaryWorkersDevWebOrigin = "https://ledgerly-accounts.pages.dev";
 
 let config;
 try {
@@ -31,10 +34,15 @@ const requireValue = (condition, message) => {
 const route = config.routes?.[0];
 const webOrigin = config.vars?.WEB_ORIGIN;
 const routePattern = route?.pattern;
+const temporaryWorkersDev = config.name === "uk-accounts-api-production" &&
+  config.workers_dev === true &&
+  !config.routes?.length;
+const customDomain = config.workers_dev === false &&
+  config.routes?.length === 1 &&
+  route?.custom_domain === true;
 const placeholders = JSON.stringify(config).match(/<[^>]+>/g) ?? [];
 
 requireValue(config.name === "uk-accounts-api-production", "Worker name must be uk-accounts-api-production");
-requireValue(config.workers_dev === false, "workers_dev must be false");
 requireValue(config.preview_urls === false, "preview_urls must be false");
 requireValue(config.observability?.enabled === true, "Workers observability must be enabled");
 requireValue(config.observability?.logs?.head_sampling_rate > 0, "Log sampling must be enabled");
@@ -44,8 +52,10 @@ requireValue(config.r2_buckets?.length === 1, "Exactly one production R2 binding
 requireValue(config.r2_buckets?.[0]?.binding === "ARTEFACTS", "R2 binding must be ARTEFACTS");
 requireValue(config.r2_buckets?.[0]?.bucket_name === "uk-accounts-prod-artefacts", "Production must use uk-accounts-prod-artefacts");
 requireValue(config.hyperdrive?.length === 1 && config.hyperdrive[0]?.id === expectedHyperdriveId, `Hyperdrive must use the reviewed production binding ${expectedHyperdriveId}`);
-requireValue(config.routes?.length === 1 && route?.custom_domain === true, "Exactly one custom-domain route is required");
+requireValue(customDomain || temporaryWorkersDev, "Production must use one exact custom domain or the approved temporary workers.dev Worker");
 requireValue(config.vars?.NEON_AUTH_URL === expectedAuthUrl, "NEON_AUTH_URL must match the provisioned production auth service");
+if (temporaryWorkersDev)
+  requireValue(webOrigin === temporaryWorkersDevWebOrigin, `Temporary workers.dev production must use WEB_ORIGIN ${temporaryWorkersDevWebOrigin}`);
 const compatibilityTime = Date.parse(`${config.compatibility_date}T00:00:00Z`);
 const compatibilityAgeDays = (Date.now() - compatibilityTime) / 86_400_000;
 requireValue(Number.isFinite(compatibilityTime) && compatibilityAgeDays >= 0 && compatibilityAgeDays <= 45, "compatibility_date must be valid, not future-dated, and no older than 45 days");
@@ -58,7 +68,7 @@ if (!allowPlaceholders) {
   } catch {
     failures.push("WEB_ORIGIN must be a valid HTTPS origin");
   }
-  requireValue(
+  if (customDomain) requireValue(
     typeof routePattern === "string" &&
       !routePattern.includes("/") &&
       !routePattern.includes("*") &&
@@ -80,9 +90,12 @@ const accessToken = process.env.PILOT_ACCESS_TOKEN;
 if (!apiBaseValue || !accessToken)
   throw new Error("--remote requires PILOT_API_BASE and PILOT_ACCESS_TOKEN environment variables");
 const apiBase = new URL(apiBaseValue);
+const expectedApiHostname = temporaryWorkersDev
+  ? new URL(temporaryWorkersDevApiOrigin).hostname
+  : routePattern;
 requireValue(apiBase.protocol === "https:", "PILOT_API_BASE must use HTTPS");
 requireValue(apiBase.origin === apiBase.href.replace(/\/$/, ""), "PILOT_API_BASE must be an origin with no path");
-requireValue(apiBase.hostname === routePattern, "PILOT_API_BASE must match the configured custom domain");
+requireValue(apiBase.hostname === expectedApiHostname, "PILOT_API_BASE must match the configured production Worker origin");
 if (failures.length) throw new Error(`Remote target validation failed:\n- ${failures.join("\n- ")}`);
 
 const request = async (path, init = {}) => {
