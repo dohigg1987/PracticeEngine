@@ -509,23 +509,23 @@ textarea,
   font-size: 12px;
 }
 .production-spine [role="tab"].ready {
-  background: #f3faf3;
+  background: var(--colorStatusSuccessBackground1);
 }
 
 .production-spine .ready .stage-status {
-  color: #107c10;
+  color: var(--colorStatusSuccessForeground1);
 }
 
 .production-spine [role="tab"].attention {
-  background: #fff8f0;
+  background: var(--colorStatusWarningBackground1);
 }
 
 .production-spine .attention .stage-status {
-  color: #715b00;
+  color: var(--colorStatusWarningForeground1);
 }
 
 .production-spine [role="tab"].active {
-  background: #f3f8fc;
+  background: var(--colorBrandBackground2);
 }
 
 .stage-status {
@@ -686,8 +686,8 @@ tbody tr:hover {
 .tag.warning,
 .summary.pending,
 .balance-control.unbalanced b {
-  background: #fff4ce;
-  color: #5c3b00;
+  background: var(--colorStatusWarningBackground1);
+  color: var(--colorStatusWarningForeground1);
 }
 
 .empty {
@@ -792,8 +792,8 @@ table thead {
 .metrics > div:nth-child(4) { border-top: 3px solid #d08300; }
 .summary.complete,
 .tag.good {
-  background: #dff6dd;
-  color: #0b6a0b;
+  background: var(--colorStatusSuccessBackground1);
+  color: var(--colorStatusSuccessForeground1);
 }
 .page-canvas { background: #e7edf3; }
 .panel-head {
