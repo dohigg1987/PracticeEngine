@@ -55,7 +55,7 @@ const knownViolationNodes: Record<string, KnownViolationNode[]> = {
       ],
     },
   ],
-  team: [{ id: "color-contrast", target: [".page-head > div > small"] }],
+  team: [],
   overview: [
     { id: "color-contrast", target: [".page-head > div:nth-child(1) > small"] },
     { id: "color-contrast", target: ["div:nth-child(1) > span"] },

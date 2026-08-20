@@ -1,7 +1,12 @@
 .team-section {
   margin: 0 0 24px;
+  min-width: 0;
+  overflow-x: auto;
   border: 1px solid var(--colorNeutralStroke1);
   background: var(--colorNeutralBackground1);
+}
+.client-head:has([aria-label="Team location"]) > div > small {
+  color: var(--colorNeutralForeground2);
 }
 .team-section-head {
   display: flex;
