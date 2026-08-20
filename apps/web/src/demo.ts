@@ -1476,6 +1476,25 @@ export function demoRequest(path: string, init?: RequestInit): unknown {
     const match = reads.find(([pattern]) => pattern.test(path));
     if (match) {
       const response = structuredClone(match[1]);
+      if (
+        path.includes("/canonical-accounts") &&
+        localStorage.getItem("accounts.demo.largeCanonicalModel") === "true"
+      ) {
+        const items = (response as { items?: Array<Record<string, unknown>> })
+          .items;
+        if (items) {
+          for (let index = items.length; index < 95; index += 1) {
+            items.push({
+              id: `ca-test-${index}`,
+              taxonomy_version: "UK-CANONICAL-2026",
+              canonical_code: `TEST.${String(index).padStart(3, "0")}`,
+              name: `Canonical test account ${index}`,
+              report_line: `Test report line ${Math.floor(index / 3) + 1}`,
+              normal_balance: index % 2 ? "CREDIT" : "DEBIT",
+            });
+          }
+        }
+      }
       if (path.endsWith("/trial-balance")) {
         const sourceAccountId = localStorage.getItem(
           "accounts.demo.unmappedSource",

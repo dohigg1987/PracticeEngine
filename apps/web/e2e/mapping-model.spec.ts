@@ -31,9 +31,10 @@ async function openMappingModel(page: Page) {
 }
 
 async function seedUnmappedAccount(page: Page) {
-  await page.addInitScript(() =>
-    localStorage.setItem("accounts.demo.unmappedSource", "src-1000"),
-  );
+  await page.addInitScript(() => {
+    localStorage.setItem("accounts.demo.unmappedSource", "src-1000");
+    localStorage.setItem("accounts.demo.largeCanonicalModel", "true");
+  });
   await openMappingModel(page);
   await expect(page.getByRole("button", { name: /1000.*Current account/ })).toBeVisible();
 }
@@ -57,7 +58,7 @@ async function assertReflow(page: Page) {
 test("pointer drag assigns an unmapped source through the existing save flow", async ({ page }) => {
   await seedUnmappedAccount(page);
   const source = page.getByRole("button", { name: /1000.*Current account/ });
-  const target = page.getByRole("button", { name: /Map to SOFA.DONATIONS/ });
+  const target = page.getByRole("button", { name: /Map to BS.CASH/ });
 
   await source.dragTo(target);
 
@@ -65,15 +66,35 @@ test("pointer drag assigns an unmapped source through the existing save flow", a
   await expect(page.getByText("All source accounts are mapped.")).toBeVisible();
 });
 
+test("large canonical model uses suggestions, search and collapsed report lines", async ({ page }) => {
+  await seedUnmappedAccount(page);
+  await expect(page.getByText("95 canonical", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Map to / })).toHaveCount(5);
+
+  await page
+    .getByRole("button", { name: "Test Report Line 10 3", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: /Map to TEST\.027/ }),
+  ).toBeVisible();
+
+  await page.getByLabel("Search canonical accounts").fill("TEST.094");
+  await expect(
+    page.getByRole("button", { name: /Map to TEST\.094/ }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Map to / })).toHaveCount(1);
+  await expect(page.locator("body")).not.toContainText(/Â|Ã|â€¦|â‚¬/);
+});
+
 test("keyboard selection assigns the chosen source to a canonical target", async ({ page }) => {
   await seedUnmappedAccount(page);
   const source = page.getByRole("button", { name: /1000.*Current account/ });
-  const target = page.getByRole("button", { name: /Map to SOFA.DONATIONS/ });
+  const target = page.getByRole("button", { name: /Map to BS.CASH/ });
 
   await source.focus();
   await page.keyboard.press("Enter");
   await expect(source).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByText("Choose a target for 1000.")).toBeVisible();
+  await expect(page.getByText(/Choose a target for 1000/)).toBeVisible();
   await target.focus();
   await page.keyboard.press("Enter");
 
@@ -108,6 +129,7 @@ test("canonical model supports text spacing, forced colors, focus and axe", asyn
   await page.emulateMedia({ forcedColors: "active", reducedMotion: "reduce" });
   await page.addInitScript(() => {
     localStorage.setItem("accounts.demo.unmappedSource", "src-1000");
+    localStorage.setItem("accounts.demo.largeCanonicalModel", "true");
     document.addEventListener("DOMContentLoaded", () => {
       const style = document.createElement("style");
       style.textContent = `
@@ -125,7 +147,8 @@ test("canonical model supports text spacing, forced colors, focus and axe", asyn
   await assertReflow(page);
 
   const source = page.getByRole("button", { name: /1000.*Current account/ });
-  await page.getByRole("tab", { name: "Model" }).focus();
+  await page.getByLabel("Search unmapped source accounts").focus();
+  await page.keyboard.press("Tab");
   await page.keyboard.press("Tab");
   await expect(source).toBeFocused();
   await expect

@@ -118,7 +118,6 @@ import {
   formatDate,
   formatDateTime,
   formatPeriodYear,
-  mappingSummaryLabel,
 } from "./displayFormat";
 import { statusBadgeProps } from "./statusBadge";
 import { RoutePanelBoundary } from "./RoutePanelBoundary";
@@ -4856,10 +4855,64 @@ function MappingView({
   onRetryTaxonomy: () => void;
 }) {
   const [selectedSourceId, setSelectedSourceId] = useState("");
+  const [sourceQuery, setSourceQuery] = useState("");
+  const [canonicalQuery, setCanonicalQuery] = useState("");
+  const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
   const unmappedLines = lines.filter((line) => !line.canonical_account_id);
   const selectedLine = lines.find(
     (line) => line.source_account_id === selectedSourceId,
   );
+  const normalizedSourceQuery = sourceQuery.trim().toLocaleLowerCase();
+  const matchingSourceLines = unmappedLines.filter((line) =>
+    `${line.account_code} ${line.account_name}`
+      .toLocaleLowerCase()
+      .includes(normalizedSourceQuery),
+  );
+  const visibleSourceLines = matchingSourceLines.slice(0, 20);
+  const normalizedCanonicalQuery = canonicalQuery.trim().toLocaleLowerCase();
+  const matchingCanonicalAccounts = normalizedCanonicalQuery
+    ? canonicalAccounts
+        .filter((account) =>
+          `${account.canonical_code} ${account.name} ${account.report_line}`
+            .toLocaleLowerCase()
+            .includes(normalizedCanonicalQuery),
+        )
+        .slice(0, 20)
+    : [];
+  const suggestionTerms = selectedLine
+    ? `${selectedLine.account_code} ${selectedLine.account_name}`
+        .toLocaleLowerCase()
+        .split(/\W+/)
+        .filter(
+          (term) =>
+            term.length > 2 && !["account", "accounts"].includes(term),
+        )
+    : [];
+  const suggestions = selectedLine
+    ? canonicalAccounts
+        .map((account) => {
+          const haystack = `${account.canonical_code} ${account.name} ${account.report_line}`.toLocaleLowerCase();
+          const termScore = suggestionTerms.reduce(
+            (score, term) => score + (haystack.includes(term) ? 3 : 0),
+            0,
+          );
+          const balanceScore =
+            (amount(selectedLine) >= 0 && account.normal_balance === "DEBIT") ||
+            (amount(selectedLine) < 0 && account.normal_balance === "CREDIT")
+              ? 1
+              : 0;
+          return { account, score: termScore + balanceScore };
+        })
+        .sort(
+          (left, right) =>
+            right.score - left.score ||
+            left.account.canonical_code.localeCompare(
+              right.account.canonical_code,
+            ),
+        )
+        .slice(0, 5)
+        .map(({ account }) => account)
+    : [];
   const accountsByReportLine = canonicalAccounts.reduce<
     Map<string, CanonicalAccount[]>
   >((groups, account) => {
@@ -4868,10 +4921,65 @@ function MappingView({
     groups.set(account.report_line, group);
     return groups;
   }, new Map());
+  const reportLineGroups = [...accountsByReportLine.entries()].sort(
+    ([left], [right]) => left.localeCompare(right),
+  );
+  const visibleReportLineGroups = reportLineGroups.slice(0, 10);
   const assign = (line: TrialBalanceLine | undefined, accountId: string) => {
     if (!line || taxonomyError || saving) return;
     setSelectedSourceId("");
     onSave(line, accountId);
+  };
+  useEffect(() => {
+    if (mode !== "model") return;
+    if (
+      selectedSourceId &&
+      unmappedLines.some(
+        (line) => line.source_account_id === selectedSourceId,
+      )
+    )
+      return;
+    setSelectedSourceId(unmappedLines[0]?.source_account_id ?? "");
+  }, [mode, selectedSourceId, unmappedLines]);
+  const targetRow = (account: CanonicalAccount, context: string) => {
+    const assignedLines = lines.filter(
+      (line) => line.canonical_account_id === account.id,
+    );
+    return (
+      <FluentButton
+        key={`${context}-${account.id}`}
+        className="mapping-canonical-target"
+        appearance="subtle"
+        disabled={Boolean(taxonomyError) || Boolean(saving)}
+        aria-label={`Map to ${account.canonical_code} ${account.name}`}
+        onClick={() => assign(selectedLine, account.id)}
+        onDragOver={(event) => {
+          if (!taxonomyError && !saving) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "move";
+          }
+        }}
+        onDrop={(event) => {
+          event.preventDefault();
+          const sourceId = event.dataTransfer.getData("text/plain");
+          assign(
+            lines.find((line) => line.source_account_id === sourceId),
+            account.id,
+          );
+        }}
+      >
+        <span className="mapping-target-code mono">
+          {account.canonical_code}
+        </span>
+        <span className="mapping-target-name">{account.name}</span>
+        <span className="mapping-target-meta">
+          {statutoryLabel(account.normal_balance)}
+          {assignedLines.length
+            ? ` · ${assignedLines.map((line) => line.account_code).join(", ")}`
+            : ""}
+        </span>
+      </FluentButton>
+    );
   };
   return (
     <div className="mapping-layout">
@@ -4893,9 +5001,21 @@ function MappingView({
               <Tab value="table">Table</Tab>
               <Tab value="model">Model</Tab>
             </TabList>
-            <Badge {...statusBadgeProps(unmapped || !lines.length ? "PENDING" : "COMPLETE")}>
-              {mappingSummaryLabel(lines.length, unmapped)}
-            </Badge>
+            <div className="mapping-compact-counts" aria-label="Mapping counts">
+              <Badge appearance="tint" color="success" size="small">
+                {mapped} mapped
+              </Badge>
+              <Badge
+                appearance="tint"
+                color={unmapped ? "warning" : "subtle"}
+                size="small"
+              >
+                {unmapped} unmapped
+              </Badge>
+              <Badge appearance="outline" size="small">
+                {canonicalAccounts.length} canonical
+              </Badge>
+            </div>
           </div>
         </PanelHead>
         {taxonomyError && (
@@ -4984,34 +5104,65 @@ function MappingView({
                   {unmapped}
                 </Badge>
               </div>
-              <Text className="mapping-model-instruction" size={200}>
-                Drag an account to the model, or select it and activate a
-                canonical account. The select remains available as a fallback.
-              </Text>
+              <SearchBox
+                size="small"
+                className="mapping-source-search"
+                aria-label="Search unmapped source accounts"
+                placeholder="Search source accounts"
+                value={sourceQuery}
+                onChange={(_, data) => setSourceQuery(data.value)}
+              />
               {unmappedLines.length ? (
-                <div className="mapping-source-list">
-                  {unmappedLines.map((line) => {
-                    const isSelected =
-                      selectedSourceId === line.source_account_id;
-                    const isSaving = saving === line.account_code;
-                    return (
-                      <Card
-                        key={line.source_account_id}
-                        className={`mapping-source-card${isSelected ? " is-selected" : ""}`}
-                        appearance="outline"
+                <>
+                  {selectedLine && (
+                    <div className="mapping-selected-source">
+                      <Text size={200} weight="semibold">
+                        Selected source
+                      </Text>
+                      <div className="mapping-selected-source-summary">
+                        <span>
+                          <small className="mono">
+                            {selectedLine.account_code}
+                          </small>
+                          <b>{selectedLine.account_name}</b>
+                        </span>
+                        <Text size={200}>{money(amount(selectedLine))}</Text>
+                      </div>
+                      <Select
+                        aria-label={`Canonical account for ${selectedLine.account_code} ${selectedLine.account_name}`}
+                        value=""
+                        disabled={
+                          Boolean(taxonomyError) ||
+                          saving === selectedLine.account_code
+                        }
+                        onChange={(event) =>
+                          assign(selectedLine, event.target.value)
+                        }
                       >
+                        <option value="">Select canonical account…</option>
+                        {options.map(([id, name]) => (
+                          <option key={id} value={id}>
+                            {name}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                  )}
+                  <div className="mapping-source-list">
+                    {visibleSourceLines.map((line) => {
+                      const isSelected =
+                        selectedSourceId === line.source_account_id;
+                      const isSaving = saving === line.account_code;
+                      return (
                         <FluentButton
-                          className="mapping-source-drag-handle"
+                          key={line.source_account_id}
+                          className={`mapping-source-row${isSelected ? " is-selected" : ""}`}
                           appearance="subtle"
                           draggable={!taxonomyError && !isSaving}
                           aria-pressed={isSelected}
                           disabled={Boolean(taxonomyError) || isSaving}
                           onClick={() =>
-                            setSelectedSourceId((current) =>
-                              current === line.source_account_id
-                                ? ""
-                                : line.source_account_id,
-                            )
+                            setSelectedSourceId(line.source_account_id)
                           }
                           onDragStart={(event) => {
                             event.dataTransfer.effectAllowed = "move";
@@ -5022,29 +5173,27 @@ function MappingView({
                             setSelectedSourceId(line.source_account_id);
                           }}
                         >
-                          <span>
-                            <small className="mono">{line.account_code}</small>
-                            <b>{line.account_name}</b>
+                          <span className="mapping-source-row-code mono">
+                            {line.account_code}
                           </span>
-                          <Text size={200}>{money(amount(line))}</Text>
+                          <span className="mapping-source-row-name">
+                            {line.account_name}
+                          </span>
+                          <span className="mapping-source-row-balance">
+                            {money(amount(line))}
+                          </span>
                         </FluentButton>
-                        <Select
-                          aria-label={`Canonical account for ${line.account_code} ${line.account_name}`}
-                          value=""
-                          disabled={Boolean(taxonomyError) || isSaving}
-                          onChange={(event) => assign(line, event.target.value)}
-                        >
-                          <option value="">Select canonical accountâ€¦</option>
-                          {options.map(([id, name]) => (
-                            <option key={id} value={id}>
-                              {name}
-                            </option>
-                          ))}
-                        </Select>
-                      </Card>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                  {matchingSourceLines.length > visibleSourceLines.length && (
+                    <Text className="mapping-result-note" size={200}>
+                      Refine the search to see the remaining{" "}
+                      {matchingSourceLines.length - visibleSourceLines.length}
+                      {" "}accounts.
+                    </Text>
+                  )}
+                </>
               ) : (
                 <Text className="mapping-model-empty" size={200}>
                   All source accounts are mapped.
@@ -5064,129 +5213,138 @@ function MappingView({
                 >
                   Canonical model
                 </Text>
-                {selectedLine && (
-                  <Text size={200}>
-                    Choose a target for {selectedLine.account_code}.
-                  </Text>
-                )}
               </div>
-              <div className="mapping-report-line-groups">
-                {[...accountsByReportLine.entries()].map(
-                  ([reportLine, accounts]) => (
-                    <section
-                      className="mapping-report-line-group"
-                      key={reportLine}
-                      aria-labelledby={`mapping-report-line-${reportLine.replace(
-                        /[^a-z0-9]+/gi,
-                        "-",
-                      )}`}
+              <Text className="mapping-model-instruction" size={200}>
+                {selectedLine
+                  ? `Choose a target for ${selectedLine.account_code}, or drag the source row.`
+                  : "Select or drag an unmapped source account to begin."}
+              </Text>
+              <div className="mapping-search-row">
+                <SearchBox
+                  size="small"
+                  className="mapping-canonical-search"
+                  aria-label="Search canonical accounts"
+                  placeholder="Search code, account or report line"
+                  value={canonicalQuery}
+                  onChange={(_, data) => setCanonicalQuery(data.value)}
+                />
+              </div>
+              {normalizedCanonicalQuery ? (
+                <section
+                  className="mapping-target-section"
+                  aria-labelledby="mapping-search-results-title"
+                >
+                  <div className="mapping-target-section-head">
+                    <Text
+                      id="mapping-search-results-title"
+                      as="h4"
+                      size={200}
+                      weight="semibold"
                     >
+                      Search results
+                    </Text>
+                    <Text size={200}>
+                      {matchingCanonicalAccounts.length}
+                      {matchingCanonicalAccounts.length === 20 ? "+" : ""}
+                    </Text>
+                  </div>
+                  <div className="mapping-target-rows">
+                    {matchingCanonicalAccounts.map((account) =>
+                      targetRow(account, "search"),
+                    )}
+                    {!matchingCanonicalAccounts.length && (
+                      <Text className="mapping-result-note" size={200}>
+                        No canonical accounts match this search.
+                      </Text>
+                    )}
+                  </div>
+                </section>
+              ) : (
+                <>
+                  {selectedLine && (
+                    <section
+                      className="mapping-target-section"
+                      aria-labelledby="mapping-suggestions-title"
+                    >
+                      <div className="mapping-target-section-head">
+                        <Text
+                          id="mapping-suggestions-title"
+                          as="h4"
+                          size={200}
+                          weight="semibold"
+                        >
+                          Suggested targets
+                        </Text>
+                        <Text size={200}>Best matches first</Text>
+                      </div>
+                      <div className="mapping-target-rows">
+                        {suggestions.map((account) =>
+                          targetRow(account, "suggestion"),
+                        )}
+                      </div>
+                    </section>
+                  )}
+                  <section
+                    className="mapping-target-section mapping-report-line-browser"
+                    aria-labelledby="mapping-report-lines-title"
+                  >
+                    <div className="mapping-target-section-head">
                       <Text
-                        id={`mapping-report-line-${reportLine.replace(/[^a-z0-9]+/gi, "-")}`}
+                        id="mapping-report-lines-title"
                         as="h4"
                         size={200}
                         weight="semibold"
                       >
-                        {statutoryLabel(reportLine)}
+                        Browse by report line
                       </Text>
-                      <div className="mapping-canonical-grid">
-                        {accounts.map((account) => {
-                          const assignedLines = lines.filter(
-                            (line) =>
-                              line.canonical_account_id === account.id,
-                          );
-                          return (
-                            <FluentButton
-                              key={account.id}
-                              className="mapping-canonical-target"
-                              appearance="subtle"
-                              disabled={Boolean(taxonomyError) || Boolean(saving)}
-                              aria-label={`Map to ${account.canonical_code} ${account.name}`}
-                              onClick={() => assign(selectedLine, account.id)}
-                              onDragOver={(event) => {
-                                if (!taxonomyError && !saving) {
-                                  event.preventDefault();
-                                  event.dataTransfer.dropEffect = "move";
-                                }
-                              }}
-                              onDrop={(event) => {
-                                event.preventDefault();
-                                const sourceId =
-                                  event.dataTransfer.getData("text/plain");
-                                assign(
-                                  lines.find(
-                                    (line) =>
-                                      line.source_account_id === sourceId,
-                                  ),
-                                  account.id,
-                                );
-                              }}
-                            >
-                              <span className="mapping-canonical-copy">
-                                <span>
-                                  <small className="mono">
-                                    {account.canonical_code}
-                                  </small>
-                                  <b>{account.name}</b>
-                                </span>
+                      <Text size={200}>{reportLineGroups.length} groups</Text>
+                    </div>
+                    <Accordion
+                      multiple
+                      collapsible
+                      openItems={expandedGroups}
+                      onToggle={(_, data) =>
+                        setExpandedGroups(data.openItems.map(String))
+                      }
+                    >
+                      {visibleReportLineGroups.map(
+                        ([reportLine, accounts]) => (
+                          <AccordionItem key={reportLine} value={reportLine}>
+                            <AccordionHeader size="small">
+                              <span className="mapping-report-line-label">
+                                <span>{statutoryLabel(reportLine)}</span>
                                 <Badge size="small" appearance="outline">
-                                  {statutoryLabel(account.normal_balance)}
+                                  {accounts.length}
                                 </Badge>
                               </span>
-                              <small className="mapping-assigned-sources">
-                                {assignedLines.length
-                                  ? assignedLines
-                                      .map((line) => line.account_code)
-                                      .join(", ")
-                                  : "Drop source account here"}
-                              </small>
-                            </FluentButton>
-                          );
-                        })}
-                      </div>
-                    </section>
-                  ),
-                )}
-              </div>
+                            </AccordionHeader>
+                            <AccordionPanel>
+                              {expandedGroups.includes(reportLine) && (
+                                <div className="mapping-target-rows">
+                                  {accounts.map((account) =>
+                                    targetRow(account, reportLine),
+                                  )}
+                                </div>
+                              )}
+                            </AccordionPanel>
+                          </AccordionItem>
+                        ),
+                      )}
+                    </Accordion>
+                    {reportLineGroups.length > visibleReportLineGroups.length && (
+                      <Text className="mapping-result-note" size={200}>
+                        Search to find accounts in the remaining{" "}
+                        {reportLineGroups.length - visibleReportLineGroups.length}
+                        {" "}report lines.
+                      </Text>
+                    )}
+                  </section>
+                </>
+              )}
             </section>
           </div>
         )}
       </section>
-      <aside className="mapping-control" aria-labelledby="mapping-control-title">
-        <Card className="mapping-control-card" appearance="outline">
-          <div className="mapping-control-heading">
-            <InfoRegular aria-hidden="true" />
-            <Text id="mapping-control-title" as="h3" size={300} weight="semibold">
-              Mapping control
-            </Text>
-          </div>
-          <Text className="mapping-control-copy" size={200}>
-            Every source account must be mapped before this period can move to
-            review.
-          </Text>
-          <div className="mapping-control-metrics">
-            <div className="mapping-control-metric">
-              <Text size={200}>Mapped</Text>
-              <Badge appearance="tint" color="success" size="small">
-                {mapped}
-              </Badge>
-            </div>
-            <div className="mapping-control-metric">
-              <Text size={200}>Unmapped</Text>
-              <Badge
-                appearance="tint"
-                color={unmapped ? "warning" : "subtle"}
-                size="small"
-              >
-                {unmapped}
-              </Badge>
-            </div>
-          </div>
-          <Text className="mapping-control-history" size={200}>
-            Mapping changes are recorded in engagement history.
-          </Text>
-        </Card>
-      </aside>
     </div>
   );
 }

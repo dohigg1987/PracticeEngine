@@ -102,13 +102,8 @@ test("pilot preparation journey exposes source, mapping and adjustment evidence"
   await expect(
     page.getByRole("heading", { name: "Account mapping" }),
   ).toBeVisible();
-  await expect(page.getByText("All mapped", { exact: true })).toBeVisible();
-  await expect(
-    page
-      .locator(".mapping-control-metric")
-      .filter({ hasText: "Unmapped" })
-      .getByText("0", { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText("7 mapped", { exact: true })).toBeVisible();
+  await expect(page.getByText("0 unmapped", { exact: true })).toBeVisible();
 
   await openEngagementSection(page, "Journals");
   await expect(page.getByRole("heading", { name: "Journals" })).toBeVisible();
