@@ -11,9 +11,9 @@
   --ink: var(--colorNeutralForeground1);
   --muted: var(--colorNeutralForeground3);
   --border: var(--colorNeutralStroke2);
-  --teal: #0f6cbd;
+  --teal: var(--colorBrandBackground);
   --navy: var(--colorNeutralBackground1);
-  --danger: #c50f1f;
+  --danger: var(--colorStatusDangerForeground1);
 }
 
 body,
@@ -787,9 +787,9 @@ table thead {
   background: var(--colorNeutralBackground2);
 }
 .metrics > div:nth-child(1) { border-top: 3px solid var(--colorBrandStroke1); }
-.metrics > div:nth-child(2) { border-top: 3px solid #008272; }
-.metrics > div:nth-child(3) { border-top: 3px solid #8764b8; }
-.metrics > div:nth-child(4) { border-top: 3px solid #d08300; }
+.metrics > div:nth-child(2) { border-top: 3px solid var(--colorPaletteTealBorderActive); }
+.metrics > div:nth-child(3) { border-top: 3px solid var(--colorPalettePurpleBorderActive); }
+.metrics > div:nth-child(4) { border-top: 3px solid var(--colorPaletteGoldBorderActive); }
 .summary.complete,
 .tag.good {
   background: var(--colorStatusSuccessBackground1);
@@ -1029,7 +1029,7 @@ table thead {
 .app-shell .blocking,
 .app-shell .severity { font-size: 12px !important; letter-spacing: 0; text-transform: none; }
 .app-shell .task-select-native { font-size: var(--fontSizeBase300) !important; }
-.app-shell .permanent-file-section:nth-of-type(2) > header { border-left: 4px solid var(--colorBrandStroke1); background: #eef5fc; }
-.app-shell .permanent-file-section:nth-of-type(3) > header { border-left: 4px solid #008272; background: #edf8f5; }
-.app-shell .permanent-file-section:nth-of-type(4) > header { border-left: 4px solid #8764b8; background: #f6f1fb; }
-.app-shell .permanent-file-section:nth-of-type(5) > header { border-left: 4px solid #ca5010; background: #fff4ed; }
+.app-shell .permanent-file-section:nth-of-type(2) > header { border-left: 4px solid var(--colorBrandStroke1); background: var(--colorBrandBackground2); }
+.app-shell .permanent-file-section:nth-of-type(3) > header { border-left: 4px solid var(--colorPaletteTealBorderActive); background: var(--colorPaletteTealBackground2); }
+.app-shell .permanent-file-section:nth-of-type(4) > header { border-left: 4px solid var(--colorPalettePurpleBorderActive); background: var(--colorPalettePurpleBackground2); }
+.app-shell .permanent-file-section:nth-of-type(5) > header { border-left: 4px solid var(--colorPaletteDarkOrangeBorderActive); background: var(--colorPaletteDarkOrangeBackground2); }
