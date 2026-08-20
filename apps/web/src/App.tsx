@@ -1113,10 +1113,10 @@ function AccountsWorkspace({
             onClick={() => setMobileNavOpen((open) => !open)}
           />
         </Tooltip>
-        <a className="brand" href="/">
+        <FluentLink className="brand" href="/">
           <span>LD</span>
           <b>Ledgerly</b>
-        </a>
+        </FluentLink>
         <div className="global-search">
           <SearchBox
             className="global-search-box"
@@ -3578,29 +3578,37 @@ function JournalsView({
                   {item.lines?.length ? (
                     <TableRow className="journal-lines-row">
                       <TableCell colSpan={6}>
-                        <details>
-                          <summary>View journal lines</summary>
-                          <div className="journal-line-list">
-                            {item.lines.map((line) => (
-                              <div key={line.id || line.line_no}>
-                                <span className="mono">
-                                  {line.canonical_code ||
-                                    line.canonical_account_id}
-                                </span>
-                                <span>
-                                  {line.narrative ||
-                                    line.account_name ||
-                                    "No narrative"}
-                                </span>
-                                <b>
-                                  {money(
-                                    Number(line.debit) - Number(line.credit),
-                                  )}
-                                </b>
+                        <Accordion collapsible className="journal-lines-disclosure">
+                          <AccordionItem value="journal-lines">
+                            <AccordionHeader
+                              button={{ className: "journal-lines-toggle" }}
+                            >
+                              View journal lines
+                            </AccordionHeader>
+                            <AccordionPanel>
+                              <div className="journal-line-list">
+                                {item.lines.map((line) => (
+                                  <div key={line.id || line.line_no}>
+                                    <span className="mono">
+                                      {line.canonical_code ||
+                                        line.canonical_account_id}
+                                    </span>
+                                    <span>
+                                      {line.narrative ||
+                                        line.account_name ||
+                                        "No narrative"}
+                                    </span>
+                                    <b>
+                                      {money(
+                                        Number(line.debit) - Number(line.credit),
+                                      )}
+                                    </b>
+                                  </div>
+                                ))}
                               </div>
-                            ))}
-                          </div>
-                        </details>
+                            </AccordionPanel>
+                          </AccordionItem>
+                        </Accordion>
                       </TableCell>
                     </TableRow>
                   ) : null}
@@ -4200,10 +4208,10 @@ function AuthFrame({ children }: React.PropsWithChildren) {
   return (
     <main className="auth-page">
       <section className="auth-brand">
-        <a className="brand" href="/">
+        <FluentLink className="brand" href="/">
           <span>LD</span>
           <b>Ledgerly</b>
-        </a>
+        </FluentLink>
         <div>
           <p className="eyebrow">Accounts production</p>
           <h1>UK statutory accounts</h1>

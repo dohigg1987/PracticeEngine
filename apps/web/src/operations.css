@@ -36,8 +36,8 @@
 .journal-register th:nth-child(1) { width: 42%; }
 .journal-lines-row td { padding: 0 10px 8px; background: var(--colorNeutralBackground2); }
 .journal-lines-row:hover { background: var(--colorNeutralBackground2) !important; }
-.journal-lines-row details { border-top: 1px solid var(--colorNeutralStroke2); padding-top: 6px; }
-.journal-lines-row summary { width: max-content; color: var(--colorBrandForegroundLink); cursor: pointer; font-size: 12px; font-weight: 600; }
+.journal-lines-disclosure { border-top: 1px solid var(--colorNeutralStroke2); padding-top: 6px; }
+.journal-lines-toggle { width: max-content; color: var(--colorBrandForegroundLink); font-size: 12px; font-weight: 600; }
 .journal-line-list { margin-top: 7px; border: 1px solid var(--colorNeutralStroke2); background: var(--colorNeutralBackground1); }
 .journal-line-list > div { display: grid; grid-template-columns: minmax(120px, 180px) 1fr 120px; gap: 12px; padding: 6px 8px; border-bottom: 1px solid var(--colorNeutralStroke2); font-size: 12px; }
 .journal-line-list > div:last-child { border-bottom: 0; }
