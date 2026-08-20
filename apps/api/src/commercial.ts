@@ -1,5 +1,14 @@
 import postgres, { type Sql, type TransactionSql } from "postgres";
-import { ApiError, parseTrialBalanceCsv, requireObject, requiredString } from "./core.js";
+import {
+  ApiError,
+  decodeTrialBalanceCsv,
+  inspectTrialBalanceCsv,
+  parseTrialBalanceCsv,
+  requireObject,
+  requiredString,
+  trialBalanceColumnMapping,
+  TRIAL_BALANCE_FIELDS,
+} from "./core.js";
 import { LIFECYCLE_TRANSITIONS, safeCommercialConfiguration as checkedCommercialConfiguration } from "./commercial-contracts.js";
 
 type Database = Sql<Record<string, never>>;
@@ -382,8 +391,31 @@ async function normalizeImport(request: Request, env: Env, actorId: string, enga
   if (!file.name.toLowerCase().endsWith(".csv")) throw new ApiError(501, "XLSX_NORMALIZATION_NOT_AVAILABLE", "XLSX normalization is not implemented; upload CSV");
   const sql = database(env);
   try { await withTenant(sql, ctx, async (tx) => { await staffEngagement(tx, ctx, engagementId); }); } finally { await sql.end(); }
-  const parsed = parseTrialBalanceCsv(new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(await file.arrayBuffer()));
-  return json({ item: { sourceType: "CSV", filename: file.name, recordCount: parsed.rows.length, debitTotal: parsed.debitTotal, creditTotal: parsed.creditTotal, balanced: parsed.balanced, columns: ["accountCode", "accountName", "debit", "credit"], preview: parsed.rows.slice(0, 50).map((row) => ({ rowNo: row.rowNo, accountCode: row.accountCode, accountName: row.accountName, debit: row.debit, credit: row.credit })) } });
+  const decoded = decodeTrialBalanceCsv(await file.arrayBuffer());
+  const inspection = inspectTrialBalanceCsv(decoded.text);
+  const requestedMapping = trialBalanceColumnMapping(form.get("mapping"));
+  const candidateMapping = requestedMapping ?? inspection.suggestedMapping;
+  const mappingComplete = TRIAL_BALANCE_FIELDS.every((field) => Number.isInteger(candidateMapping[field]));
+  const parsed = mappingComplete ? parseTrialBalanceCsv(decoded.text, candidateMapping) : null;
+  return json({ item: {
+    sourceType: "CSV",
+    filename: file.name,
+    encoding: decoded.encoding,
+    rowCount: inspection.rowCount,
+    recordCount: inspection.rowCount,
+    headers: inspection.headers,
+    detectedColumns: inspection.headers,
+    columns: TRIAL_BALANCE_FIELDS,
+    suggestedMapping: inspection.suggestedMapping,
+    appliedMapping: parsed ? candidateMapping : null,
+    mappingComplete,
+    debitTotal: parsed?.debitTotal ?? null,
+    creditTotal: parsed?.creditTotal ?? null,
+    balanced: parsed?.balanced ?? null,
+    rawPreview: inspection.rawPreview,
+    preview: parsed?.rows.slice(0, 50).map((row) => ({ rowNo: row.rowNo, accountCode: row.accountCode, accountName: row.accountName, debit: row.debit, credit: row.credit })) ?? [],
+    warnings: mappingComplete ? [] : ["Match the four trial-balance fields to columns before importing."],
+  } });
 }
 
 function notificationItem(row: Record<string, unknown>) {

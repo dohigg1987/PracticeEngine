@@ -740,13 +740,32 @@ export type AccountsPresentation = {
     blocks: string[];
   };
 };
+export type TrialBalanceField = "accountCode" | "accountName" | "debit" | "credit";
+export type TrialBalanceColumnMapping = Record<TrialBalanceField, number>;
 export type NormalizedImportPreview = {
-  detectedColumns?: string[];
-  columns?: string[];
-  rows?: Record<string, unknown>[];
-  preview?: Record<string, unknown>[];
-  rowCount?: number;
-  warnings?: string[];
+  sourceType: "CSV";
+  filename: string;
+  encoding: string;
+  headers: string[];
+  detectedColumns: string[];
+  suggestedMapping: Partial<TrialBalanceColumnMapping>;
+  appliedMapping: Partial<TrialBalanceColumnMapping> | null;
+  mappingComplete: boolean;
+  preview: Array<{
+    rowNo: number;
+    accountCode: string;
+    accountName: string;
+    debit: string;
+    credit: string;
+  }>;
+  rawPreview: Record<string, string>[];
+  rowCount: number;
+  recordCount?: number;
+  columns?: TrialBalanceField[];
+  debitTotal: string | null;
+  creditTotal: string | null;
+  balanced: boolean | null;
+  warnings: string[];
 };
 export type ApiContext = { tenantId: string };
 export class ApiError extends Error {
@@ -1027,9 +1046,15 @@ export const api = {
       `/v1/engagements/${encodeURIComponent(id)}/report`,
       context,
     ),
-  importTrialBalance: (context: ApiContext, id: string, file: File) => {
+  importTrialBalance: (
+    context: ApiContext,
+    id: string,
+    file: File,
+    mapping?: TrialBalanceColumnMapping,
+  ) => {
     const body = new FormData();
     body.append("file", file);
+    if (mapping) body.append("mapping", JSON.stringify(mapping));
     return request<{
       item: {
         id: string;
@@ -1061,9 +1086,15 @@ export const api = {
         }),
       },
     ),
-  normalizeImport: (context: ApiContext, id: string, file: File) => {
+  normalizeImport: (
+    context: ApiContext,
+    id: string,
+    file: File,
+    mapping?: Partial<TrialBalanceColumnMapping>,
+  ) => {
     const body = new FormData();
     body.append("file", file);
+    if (mapping) body.append("mapping", JSON.stringify(mapping));
     return request<{ item: NormalizedImportPreview }>(
       `/v1/engagements/${encodeURIComponent(id)}/imports/normalize`,
       context,

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
 
 async function openEngagementSection(page: Page, label: string) {
   const values: Record<string, string> = {
@@ -491,6 +492,35 @@ test("CSV preview imports the selected file and opens source data", async ({ pag
   });
   await page.getByRole("button", { name: "Preview file" }).click();
   await expect(page.getByText("2 rows detected")).toBeVisible();
+  await page.getByRole("button", { name: "Import trial balance" }).click();
+  await expect(page.getByRole("heading", { name: "Trial balance" })).toBeVisible();
+});
+
+test("CSV preview maps arbitrary headings before trial-balance import", async ({ page }) => {
+  await page
+    .locator(".production-nav-stage-toggle")
+    .filter({ hasText: "Source data" })
+    .click();
+  await page.locator('button[value="integrations"]').click();
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "arbitrary-headings.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from("Ref,Label,Left side,Right side\n1000,Bank,100,\n4000,Income,,100\n"),
+  });
+  await page.getByRole("button", { name: "Preview file" }).click();
+  await expect(page.getByRole("table", { name: "Source CSV preview" })).toBeVisible();
+  await page.getByLabel("Account code").selectOption("0");
+  await page.getByLabel("Account name").selectOption("1");
+  await page.getByLabel("Debit").selectOption("2");
+  await page.getByLabel("Credit").selectOption("3");
+  await page.getByRole("button", { name: "Apply column mapping" }).click();
+  await expect(page.getByRole("table", { name: "Mapped trial balance preview" })).toContainText("Bank");
+  await expect(page.getByText("Debit 100.00 · Credit 100.00 · Balanced")).toBeVisible();
+  const accessibility = await new AxeBuilder({ page })
+    .include(".import-preview")
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(accessibility.violations).toEqual([]);
   await page.getByRole("button", { name: "Import trial balance" }).click();
   await expect(page.getByRole("heading", { name: "Trial balance" })).toBeVisible();
 });

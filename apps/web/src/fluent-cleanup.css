@@ -902,6 +902,7 @@ table thead {
 .sidebar .workspace-nav-toggle[aria-expanded="true"],
 .sidebar nav .production-nav-stage-toggle[aria-expanded="true"] {
   background: var(--colorNeutralBackground3Selected) !important;
+  color: var(--colorNeutralForeground1) !important;
 }
 
 /* Engagement context belongs to the workspace, before the navigation groups. */

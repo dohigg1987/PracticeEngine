@@ -1242,13 +1242,58 @@ export function demoRequest(path: string, init?: RequestInit): unknown {
     };
   }
   if (method === "POST" && path.endsWith("/imports/normalize")) {
+    const form = init?.body instanceof FormData ? init.body : new FormData();
+    const upload = form.get("file");
+    const arbitrary = upload instanceof File && upload.name === "arbitrary-headings.csv";
+    const mappingApplied = typeof form.get("mapping") === "string";
+    if (arbitrary) {
+      return {
+        item: {
+          rowCount: 2,
+          sourceType: "CSV",
+          filename: upload.name,
+          encoding: "UTF-8",
+          headers: ["Ref", "Label", "Left side", "Right side"],
+          detectedColumns: ["Ref", "Label", "Left side", "Right side"],
+          suggestedMapping: {},
+          appliedMapping: mappingApplied ? { accountCode: 0, accountName: 1, debit: 2, credit: 3 } : null,
+          mappingComplete: mappingApplied,
+          debitTotal: mappingApplied ? "100.00" : null,
+          creditTotal: mappingApplied ? "100.00" : null,
+          balanced: mappingApplied ? true : null,
+          preview: mappingApplied ? [
+            { rowNo: 2, accountCode: "1000", accountName: "Bank", debit: "100.00", credit: "0.00" },
+            { rowNo: 3, accountCode: "4000", accountName: "Income", debit: "0.00", credit: "100.00" },
+          ] : [],
+          rawPreview: [
+            { Ref: "1000", Label: "Bank", "Left side": "100.00", "Right side": "" },
+            { Ref: "4000", Label: "Income", "Left side": "", "Right side": "100.00" },
+          ],
+          warnings: mappingApplied ? [] : ["Match the four trial-balance fields to columns before importing."],
+        },
+      };
+    }
     return {
       item: {
         rowCount: 2,
+        sourceType: "CSV",
+        filename: "balanced-trial-balance.csv",
+        encoding: "UTF-8",
+        headers: ["account_code", "account_name", "debit", "credit"],
         detectedColumns: ["account_code", "account_name", "debit", "credit"],
-        rows: [
+        suggestedMapping: { accountCode: 0, accountName: 1, debit: 2, credit: 3 },
+        appliedMapping: { accountCode: 0, accountName: 1, debit: 2, credit: 3 },
+        mappingComplete: true,
+        debitTotal: "100.00",
+        creditTotal: "100.00",
+        balanced: true,
+        preview: [
           { accountCode: "1000", accountName: "Bank", debit: "100.00", credit: "" },
           { accountCode: "4000", accountName: "Income", debit: "", credit: "100.00" },
+        ],
+        rawPreview: [
+          { account_code: "1000", account_name: "Bank", debit: "100.00", credit: "" },
+          { account_code: "4000", account_name: "Income", debit: "", credit: "100.00" },
         ],
         warnings: [],
       },
