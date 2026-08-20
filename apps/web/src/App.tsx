@@ -635,7 +635,12 @@ function AccountsWorkspace({
       setOrganisationLoading(false);
     }
   }, [configured, context]);
-  const loadDetail = useCallback(async () => {
+  const loadDetail = useCallback(async (options?: unknown) => {
+    const background =
+      typeof options === "object" &&
+      options !== null &&
+      "background" in options &&
+      (options as { background?: boolean }).background === true;
     if (!selectedId) {
       setLines([]);
       setEvents([]);
@@ -648,7 +653,7 @@ function AccountsWorkspace({
       return;
     }
     const requestEngagementId = selectedId;
-    setDetailLoading(true);
+    if (!background) setDetailLoading(true);
     setDetailError("");
     setReportError("");
     setHistoryError("");
@@ -691,7 +696,7 @@ function AccountsWorkspace({
     if (versionData.status === "fulfilled")
       setAccountsVersions(versionData.value.items);
     else setAccountsVersions([]);
-    setDetailLoading(false);
+    if (!background) setDetailLoading(false);
   }, [context, selectedId]);
   const loadOperations = useCallback(async () => {
     if (!selectedId) {
@@ -865,7 +870,7 @@ function AccountsWorkspace({
     line: TrialBalanceLine,
     canonicalAccountId: string,
   ) {
-    if (!canonicalAccountId) return;
+    if (!canonicalAccountId) return false;
     setSaving(line.account_code);
     setNotice(null);
     try {
@@ -881,7 +886,8 @@ function AccountsWorkspace({
         engagementId: selectedId,
         text: `${line.account_code} · ${line.account_name} was mapped.`,
       });
-      await loadDetail();
+      await loadDetail({ background: true });
+      return true;
     } catch (e) {
       setNotice({
         good: false,
@@ -889,6 +895,7 @@ function AccountsWorkspace({
         engagementId: selectedId,
         text: e instanceof Error ? e.message : "Mapping failed.",
       });
+      return false;
     } finally {
       setSaving("");
     }
@@ -4862,17 +4869,27 @@ function MappingView({
   mapped: number;
   unmapped: number;
   saving: string;
-  onSave: (line: TrialBalanceLine, code: string) => void;
+  onSave: (line: TrialBalanceLine, code: string) => Promise<boolean>;
   taxonomyError: string;
   onRetryTaxonomy: () => void;
 }) {
-  const [selectedSourceId, setSelectedSourceId] = useState("");
+  const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
   const [sourceQuery, setSourceQuery] = useState("");
   const [canonicalQuery, setCanonicalQuery] = useState("");
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
+  const [draggingSourceIds, setDraggingSourceIds] = useState<string[]>([]);
+  const [activeDropTargetId, setActiveDropTargetId] = useState("");
+  const [lastMapping, setLastMapping] = useState<{
+    lines: TrialBalanceLine[];
+    previousAccountIds: Array<string | null>;
+  } | null>(null);
   const unmappedLines = lines.filter((line) => !line.canonical_account_id);
+  const selectedSourceId = selectedSourceIds.at(-1) ?? "";
   const selectedLine = lines.find(
     (line) => line.source_account_id === selectedSourceId,
+  );
+  const selectedLines = unmappedLines.filter((line) =>
+    selectedSourceIds.includes(line.source_account_id),
   );
   const normalizedSourceQuery = sourceQuery.trim().toLocaleLowerCase();
   const matchingSourceLines = unmappedLines.filter((line) =>
@@ -4900,20 +4917,53 @@ function MappingView({
             term.length > 2 && !["account", "accounts"].includes(term),
         )
     : [];
+  const reportContextTerms = suggestionTerms.flatMap((term) => {
+    const contexts: Record<string, string[]> = {
+      bank: ["cash"],
+      current: ["cash"],
+      cash: ["cash"],
+      debtor: ["debtor", "receivable"],
+      debtors: ["debtor", "receivable"],
+      creditor: ["creditor", "payable"],
+      creditors: ["creditor", "payable"],
+      equipment: ["fixed", "asset"],
+      fixture: ["fixed", "asset"],
+      fixtures: ["fixed", "asset"],
+      donation: ["donation", "income"],
+      donations: ["donation", "income"],
+    };
+    return contexts[term] ?? [];
+  });
   const suggestions = selectedLine
     ? canonicalAccounts
         .map((account) => {
-          const haystack = `${account.canonical_code} ${account.name} ${account.report_line}`.toLocaleLowerCase();
+          const code = account.canonical_code.toLocaleLowerCase();
+          const name = account.name.toLocaleLowerCase();
+          const reportLine = account.report_line.toLocaleLowerCase();
           const termScore = suggestionTerms.reduce(
-            (score, term) => score + (haystack.includes(term) ? 3 : 0),
+            (score, term) =>
+              score +
+              (code.includes(term) ? 8 : 0) +
+              (name.includes(term) ? 6 : 0) +
+              (reportLine.includes(term) ? 4 : 0),
+            0,
+          );
+          const reportContextScore = reportContextTerms.reduce(
+            (score, term) =>
+              score +
+              (reportLine.includes(term) ? 5 : 0) +
+              (name.includes(term) ? 3 : 0),
             0,
           );
           const balanceScore =
             (amount(selectedLine) >= 0 && account.normal_balance === "DEBIT") ||
             (amount(selectedLine) < 0 && account.normal_balance === "CREDIT")
-              ? 1
+              ? 2
               : 0;
-          return { account, score: termScore + balanceScore };
+          return {
+            account,
+            score: termScore + reportContextScore + balanceScore,
+          };
         })
         .sort(
           (left, right) =>
@@ -4937,22 +4987,66 @@ function MappingView({
     ([left], [right]) => left.localeCompare(right),
   );
   const visibleReportLineGroups = reportLineGroups.slice(0, 10);
-  const assign = (line: TrialBalanceLine | undefined, accountId: string) => {
-    if (!line || taxonomyError || saving) return;
-    setSelectedSourceId("");
-    onSave(line, accountId);
+  const assignMany = async (
+    sourceLines: TrialBalanceLine[],
+    accountId: string,
+  ) => {
+    if (!sourceLines.length || !accountId || taxonomyError || saving) return;
+    const uniqueLines = sourceLines.filter(
+      (line, index, candidates) =>
+        candidates.findIndex(
+          (candidate) => candidate.source_account_id === line.source_account_id,
+        ) === index,
+    );
+    const previousAccountIds = uniqueLines.map(
+      (line) => line.canonical_account_id,
+    );
+    const mappedIds: string[] = [];
+    for (const line of uniqueLines) {
+      if (await onSave(line, accountId)) mappedIds.push(line.source_account_id);
+      else break;
+    }
+    if (!mappedIds.length) return;
+    setLastMapping({ lines: uniqueLines.slice(0, mappedIds.length), previousAccountIds });
+    const nextLine = unmappedLines.find(
+      (line) => !mappedIds.includes(line.source_account_id),
+    );
+    setSelectedSourceIds(nextLine ? [nextLine.source_account_id] : []);
+    setDraggingSourceIds([]);
+    setActiveDropTargetId("");
+  };
+  const assign = (line: TrialBalanceLine | undefined, accountId: string) =>
+    void assignMany(line ? [line] : [], accountId);
+  const undoLastMapping = async () => {
+    if (
+      !lastMapping ||
+      lastMapping.previousAccountIds.some((accountId) => !accountId)
+    )
+      return;
+    for (let index = 0; index < lastMapping.lines.length; index += 1) {
+      const previousAccountId = lastMapping.previousAccountIds[index];
+      if (!previousAccountId) return;
+      if (!(await onSave(lastMapping.lines[index]!, previousAccountId))) return;
+    }
+    setLastMapping(null);
   };
   useEffect(() => {
     if (mode !== "model") return;
     if (
-      selectedSourceId &&
-      unmappedLines.some(
-        (line) => line.source_account_id === selectedSourceId,
+      selectedSourceIds.length &&
+      selectedSourceIds.every((sourceId) =>
+        unmappedLines.some((line) => line.source_account_id === sourceId),
       )
     )
       return;
-    setSelectedSourceId(unmappedLines[0]?.source_account_id ?? "");
-  }, [mode, selectedSourceId, unmappedLines]);
+    if (unmappedLines[0])
+      setSelectedSourceIds([unmappedLines[0].source_account_id]);
+    else if (selectedSourceIds.length) setSelectedSourceIds([]);
+  }, [mode, selectedSourceIds, unmappedLines]);
+  const sourcesForLine = (line: TrialBalanceLine) =>
+    selectedSourceIds.includes(line.source_account_id) && selectedLines.length
+      ? selectedLines
+      : [line];
   const targetRow = (account: CanonicalAccount, context: string) => {
     const assignedLines = lines.filter(
       (line) => line.canonical_account_id === account.id,
@@ -4960,11 +5054,28 @@ function MappingView({
     return (
       <FluentButton
         key={`${context}-${account.id}`}
-        className="mapping-canonical-target"
+        className={`mapping-canonical-target${
+          draggingSourceIds.length && (taxonomyError || saving)
+            ? " is-invalid-drop"
+            : draggingSourceIds.length
+              ? " is-valid-drop"
+              : ""
+        }${activeDropTargetId === account.id ? " is-active-drop" : ""}`}
+        data-mapping-target-id={account.id}
         appearance="subtle"
         disabled={Boolean(taxonomyError) || Boolean(saving)}
-        aria-label={`Map to ${account.canonical_code} ${account.name}`}
-        onClick={() => assign(selectedLine, account.id)}
+        aria-label={`${selectedLines.length > 1 ? `Map ${selectedLines.length} accounts` : "Map"} to ${account.canonical_code} ${account.name}`}
+        onClick={() =>
+          void assignMany(
+            selectedLines.length ? selectedLines : selectedLine ? [selectedLine] : [],
+            account.id,
+          )
+        }
+        onDragEnter={() => setActiveDropTargetId(account.id)}
+        onDragLeave={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+            setActiveDropTargetId("");
+        }}
         onDragOver={(event) => {
           if (!taxonomyError && !saving) {
             event.preventDefault();
@@ -4973,9 +5084,19 @@ function MappingView({
         }}
         onDrop={(event) => {
           event.preventDefault();
-          const sourceId = event.dataTransfer.getData("text/plain");
-          assign(
-            lines.find((line) => line.source_account_id === sourceId),
+          const sourceIds = (() => {
+            try {
+              return JSON.parse(
+                event.dataTransfer.getData("application/x-ledgerly-source-ids"),
+              ) as string[];
+            } catch {
+              return [event.dataTransfer.getData("text/plain")];
+            }
+          })();
+          void assignMany(
+            lines.filter((line) =>
+              sourceIds.includes(line.source_account_id),
+            ),
             account.id,
           );
         }}
@@ -5028,6 +5149,24 @@ function MappingView({
                 {canonicalAccounts.length} canonical
               </Badge>
             </div>
+            {lastMapping && (
+              <FluentButton
+                size="small"
+                appearance="subtle"
+                disabled={
+                  Boolean(saving) ||
+                  lastMapping.previousAccountIds.some((accountId) => !accountId)
+                }
+                title={
+                  lastMapping.previousAccountIds.some((accountId) => !accountId)
+                    ? "First-time mappings cannot be undone until the mapping API supports unmapping."
+                    : "Restore the previous canonical mapping"
+                }
+                onClick={() => void undoLastMapping()}
+              >
+                Undo last mapping
+              </FluentButton>
+            )}
           </div>
         </PanelHead>
         {taxonomyError && (
@@ -5070,7 +5209,7 @@ function MappingView({
                         disabled={
                           Boolean(taxonomyError) || saving === line.account_code
                         }
-                        onChange={(e) => onSave(line, e.target.value)}
+                        onChange={(e) => assign(line, e.target.value)}
                       >
                         <option value="">Select canonical account…</option>
                         {line.canonical_account_id &&
@@ -5138,7 +5277,23 @@ function MappingView({
                           </small>
                           <b>{selectedLine.account_name}</b>
                         </span>
-                        <Text size={200}>{money(amount(selectedLine))}</Text>
+                        <span className="mapping-selected-source-meta">
+                          {selectedLines.length > 1 && (
+                            <Badge size="small" appearance="tint" color="brand">
+                              {selectedLines.length} selected
+                            </Badge>
+                          )}
+                          <Text size={200}>
+                            {money(
+                              selectedLines.length > 1
+                                ? selectedLines.reduce(
+                                    (total, line) => total + amount(line),
+                                    0,
+                                  )
+                                : amount(selectedLine),
+                            )}
+                          </Text>
+                        </span>
                       </div>
                       <Select
                         aria-label={`Canonical account for ${selectedLine.account_code} ${selectedLine.account_name}`}
@@ -5148,7 +5303,10 @@ function MappingView({
                           saving === selectedLine.account_code
                         }
                         onChange={(event) =>
-                          assign(selectedLine, event.target.value)
+                          void assignMany(
+                            selectedLines.length ? selectedLines : [selectedLine],
+                            event.target.value,
+                          )
                         }
                       >
                         <option value="">Select canonical account…</option>
@@ -5160,41 +5318,162 @@ function MappingView({
                       </Select>
                     </div>
                   )}
+                  <div className="mapping-queue-toolbar">
+                    <FluentButton
+                      size="small"
+                      appearance="subtle"
+                      disabled={!visibleSourceLines.length || Boolean(saving)}
+                      onClick={() =>
+                        setSelectedSourceIds(
+                          visibleSourceLines.map((line) => line.source_account_id),
+                        )
+                      }
+                    >
+                      Select visible
+                    </FluentButton>
+                    {selectedSourceIds.length > 1 && (
+                      <FluentButton
+                        size="small"
+                        appearance="subtle"
+                        onClick={() =>
+                          setSelectedSourceIds(
+                            selectedLine ? [selectedLine.source_account_id] : [],
+                          )
+                        }
+                      >
+                        Clear multi-select
+                      </FluentButton>
+                    )}
+                  </div>
                   <div className="mapping-source-list">
                     {visibleSourceLines.map((line) => {
-                      const isSelected =
-                        selectedSourceId === line.source_account_id;
+                      const isSelected = selectedSourceIds.includes(
+                        line.source_account_id,
+                      );
                       const isSaving = saving === line.account_code;
                       return (
-                        <FluentButton
+                        <div
                           key={line.source_account_id}
-                          className={`mapping-source-row${isSelected ? " is-selected" : ""}`}
-                          appearance="subtle"
-                          draggable={!taxonomyError && !isSaving}
-                          aria-pressed={isSelected}
-                          disabled={Boolean(taxonomyError) || isSaving}
-                          onClick={() =>
-                            setSelectedSourceId(line.source_account_id)
-                          }
-                          onDragStart={(event) => {
-                            event.dataTransfer.effectAllowed = "move";
-                            event.dataTransfer.setData(
-                              "text/plain",
-                              line.source_account_id,
-                            );
-                            setSelectedSourceId(line.source_account_id);
-                          }}
+                          className={`mapping-source-queue-item${isSelected ? " is-selected" : ""}`}
                         >
-                          <span className="mapping-source-row-code mono">
-                            {line.account_code}
-                          </span>
-                          <span className="mapping-source-row-name">
-                            {line.account_name}
-                          </span>
-                          <span className="mapping-source-row-balance">
-                            {money(amount(line))}
-                          </span>
-                        </FluentButton>
+                          <Checkbox
+                            checked={isSelected}
+                            aria-label={`Include ${line.account_code} ${line.account_name} in bulk mapping`}
+                            disabled={Boolean(taxonomyError) || isSaving}
+                            onChange={(_, data) =>
+                              setSelectedSourceIds((current) =>
+                                data.checked
+                                  ? [
+                                      ...current.filter(
+                                        (sourceId) =>
+                                          sourceId !== line.source_account_id,
+                                      ),
+                                      line.source_account_id,
+                                    ]
+                                  : current.filter(
+                                      (sourceId) =>
+                                        sourceId !== line.source_account_id,
+                                    ),
+                              )
+                            }
+                          />
+                          <FluentButton
+                            className={`mapping-source-row${isSelected ? " is-selected" : ""}`}
+                            appearance="subtle"
+                            draggable={!taxonomyError && !isSaving}
+                            aria-pressed={isSelected}
+                            disabled={Boolean(taxonomyError) || isSaving}
+                            onClick={() =>
+                              setSelectedSourceIds([line.source_account_id])
+                            }
+                            onDragStart={(event) => {
+                              const sourceIds = sourcesForLine(line).map(
+                                (source) => source.source_account_id,
+                              );
+                              event.dataTransfer.effectAllowed = "move";
+                              event.dataTransfer.setData(
+                                "application/x-ledgerly-source-ids",
+                                JSON.stringify(sourceIds),
+                              );
+                              event.dataTransfer.setData(
+                                "text/plain",
+                                line.source_account_id,
+                              );
+                              setSelectedSourceIds(sourceIds);
+                              setDraggingSourceIds(sourceIds);
+                            }}
+                            onDragEnd={() => {
+                              setDraggingSourceIds([]);
+                              setActiveDropTargetId("");
+                            }}
+                            onPointerDown={(event) => {
+                              if (event.pointerType !== "touch") return;
+                              const sourceIds = sourcesForLine(line).map(
+                                (source) => source.source_account_id,
+                              );
+                              setSelectedSourceIds(sourceIds);
+                              setDraggingSourceIds(sourceIds);
+                              try {
+                                event.currentTarget.setPointerCapture(
+                                  event.pointerId,
+                                );
+                              } catch {
+                                // Synthetic pointer tests do not create an active native pointer.
+                              }
+                            }}
+                            onPointerMove={(event) => {
+                              if (event.pointerType !== "touch") return;
+                              const target = (
+                                document.elementFromPoint(
+                                  event.clientX,
+                                  event.clientY,
+                                ) as HTMLElement | null
+                              )?.closest<HTMLElement>(
+                                "[data-mapping-target-id]",
+                              );
+                              setActiveDropTargetId(
+                                target?.dataset.mappingTargetId ?? "",
+                              );
+                              const edge = 72;
+                              if (event.clientY < edge)
+                                window.scrollBy({ top: -18, behavior: "auto" });
+                              else if (event.clientY > window.innerHeight - edge)
+                                window.scrollBy({ top: 18, behavior: "auto" });
+                            }}
+                            onPointerUp={(event) => {
+                              if (event.pointerType !== "touch") return;
+                              const target = (
+                                document.elementFromPoint(
+                                  event.clientX,
+                                  event.clientY,
+                                ) as HTMLElement | null
+                              )?.closest<HTMLElement>(
+                                "[data-mapping-target-id]",
+                              );
+                              const targetId = target?.dataset.mappingTargetId;
+                              if (targetId) {
+                                event.preventDefault();
+                                void assignMany(sourcesForLine(line), targetId);
+                              }
+                              setDraggingSourceIds([]);
+                              setActiveDropTargetId("");
+                            }}
+                            onPointerCancel={() => {
+                              setDraggingSourceIds([]);
+                              setActiveDropTargetId("");
+                            }}
+                          >
+                            <span className="mapping-source-row-code mono">
+                              {line.account_code}
+                            </span>
+                            <span className="mapping-source-row-name">
+                              {line.account_name}
+                            </span>
+                            <span className="mapping-source-row-balance">
+                              {money(amount(line))}
+                            </span>
+                          </FluentButton>
+                        </div>
                       );
                     })}
                   </div>
@@ -5215,6 +5494,16 @@ function MappingView({
             <section
               className="mapping-canonical-model"
               aria-labelledby="canonical-model-title"
+              onDragOver={(event) => {
+                const bounds = event.currentTarget.getBoundingClientRect();
+                const edge = 72;
+                const visibleTop = Math.max(bounds.top, 0);
+                const visibleBottom = Math.min(bounds.bottom, window.innerHeight);
+                if (event.clientY < visibleTop + edge)
+                  window.scrollBy({ top: -18, behavior: "auto" });
+                else if (event.clientY > visibleBottom - edge)
+                  window.scrollBy({ top: 18, behavior: "auto" });
+              }}
             >
               <div className="mapping-model-section-head">
                 <Text
@@ -5228,7 +5517,9 @@ function MappingView({
               </div>
               <Text className="mapping-model-instruction" size={200}>
                 {selectedLine
-                  ? `Choose a target for ${selectedLine.account_code}, or drag the source row.`
+                  ? selectedLines.length > 1
+                    ? `Choose one target for ${selectedLines.length} selected accounts, or drag the selected queue.`
+                    : `Choose a target for ${selectedLine.account_code}, or drag the source row.`
                   : "Select or drag an unmapped source account to begin."}
               </Text>
               <div className="mapping-search-row">

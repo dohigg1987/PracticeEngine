@@ -24,8 +24,12 @@ async function openMappingModel(page: Page) {
       .filter({ hasText: "Source data" })
       .click();
   }
-  await mapping.click();
-  await expect(page.getByRole("heading", { name: "Account mapping" })).toBeVisible();
+  await expect(async () => {
+    await mapping.click();
+    await expect(
+      page.getByRole("heading", { name: "Account mapping" }),
+    ).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Canonical model" })).toBeVisible();
 }
 
@@ -101,6 +105,9 @@ test("large canonical model uses suggestions, search and collapsed report lines"
   await seedUnmappedAccount(page);
   await expect(page.getByText("95 canonical", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: /^Map to / })).toHaveCount(5);
+  await expect(
+    page.getByRole("button", { name: /^Map to / }).first(),
+  ).toHaveAccessibleName(/BS\.CASH.*Cash at bank and in hand/);
 
   await page
     .getByRole("button", { name: "Test Report Line 10 3", exact: true })
@@ -115,6 +122,105 @@ test("large canonical model uses suggestions, search and collapsed report lines"
   ).toBeVisible();
   await expect(page.getByRole("button", { name: /^Map to / })).toHaveCount(1);
   await expect(page.locator("body")).not.toContainText(/Â|Ã|â€¦|â‚¬/);
+});
+
+test("multi-select bulk mapping advances through the compact unmapped queue", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "accounts.demo.unmappedSources",
+      "src-1000,src-1100",
+    );
+    localStorage.setItem("accounts.demo.largeCanonicalModel", "true");
+  });
+  await openMappingModel(page);
+
+  await page
+    .getByRole("checkbox", { name: /Include 1100 Fixtures and equipment/ })
+    .check();
+  await expect(page.getByText("2 selected", { exact: true })).toBeVisible();
+  await page.getByLabel("Search canonical accounts").fill("BS.CASH");
+  await page
+    .getByRole("button", { name: /Map 2 accounts to BS\.CASH/ })
+    .click();
+
+  await expect(page.getByText("All source accounts are mapped.")).toBeVisible();
+});
+
+test("touch pointer drag exposes the active target and maps on release", async ({ page }) => {
+  await seedUnmappedAccount(page);
+  const source = page.getByRole("button", { name: /1000.*Current account/ });
+  const target = page.getByRole("button", { name: /Map to BS.CASH/ });
+  const sourceBox = await source.boundingBox();
+  const targetBox = await target.boundingBox();
+  expect(sourceBox).not.toBeNull();
+  expect(targetBox).not.toBeNull();
+
+  await source.dispatchEvent("pointerdown", {
+    pointerId: 7,
+    pointerType: "touch",
+    isPrimary: true,
+    buttons: 1,
+    clientX: sourceBox!.x + sourceBox!.width / 2,
+    clientY: sourceBox!.y + sourceBox!.height / 2,
+  });
+  await source.dispatchEvent("pointermove", {
+    pointerId: 7,
+    pointerType: "touch",
+    isPrimary: true,
+    buttons: 1,
+    clientX: targetBox!.x + targetBox!.width / 2,
+    clientY: targetBox!.y + targetBox!.height / 2,
+  });
+  await expect(target).toHaveClass(/is-active-drop/);
+  await source.dispatchEvent("pointerup", {
+    pointerId: 7,
+    pointerType: "touch",
+    isPrimary: true,
+    buttons: 0,
+    clientX: targetBox!.x + targetBox!.width / 2,
+    clientY: targetBox!.y + targetBox!.height / 2,
+  });
+
+  await expect(page.getByText(/1000.*Current account was mapped/)).toBeVisible();
+});
+
+test("dragging near the visible model edge requests automatic scrolling", async ({ page }) => {
+  await seedUnmappedAccount(page);
+  await page.evaluate(() => {
+    (window as typeof window & { mappingScrollCalls?: number }).mappingScrollCalls = 0;
+    window.scrollBy = () => {
+      (window as typeof window & { mappingScrollCalls?: number }).mappingScrollCalls! += 1;
+    };
+  });
+
+  await page.locator(".mapping-canonical-model").dispatchEvent("dragover", {
+    clientY: page.viewportSize()!.height - 1,
+  });
+
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as typeof window & { mappingScrollCalls?: number })
+            .mappingScrollCalls ?? 0,
+      ),
+    )
+    .toBeGreaterThan(0);
+});
+
+test("undo restores the previous target for a reversible table remap", async ({ page }) => {
+  await openMappingModel(page);
+  await page.getByRole("tab", { name: "Table" }).click();
+
+  await page
+    .getByLabel("Canonical account for 1000 Current account")
+    .selectOption("ca-income");
+  const undo = page.getByRole("button", { name: "Undo last mapping" });
+  await expect(undo).toBeEnabled();
+  await undo.click();
+  await expect(undo).toHaveCount(0);
 });
 
 test("keyboard selection assigns the chosen source to a canonical target", async ({ page }) => {
@@ -179,8 +285,10 @@ test("canonical model supports text spacing, forced colors, focus and axe", asyn
 
   const source = page.getByRole("button", { name: /1000.*Current account/ });
   await page.getByLabel("Search unmapped source accounts").focus();
-  await page.keyboard.press("Tab");
-  await page.keyboard.press("Tab");
+  for (let step = 0; step < 6; step += 1) {
+    if (await source.evaluate((element) => element === document.activeElement)) break;
+    await page.keyboard.press("Tab");
+  }
   await expect(source).toBeFocused();
   await expect
     .poll(() =>

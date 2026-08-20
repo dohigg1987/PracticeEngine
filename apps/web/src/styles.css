@@ -441,6 +441,7 @@ tfoot td {
 }
 .mapping-view-actions {
   gap: 12px;
+  flex-wrap: wrap;
 }
 .mapping-model {
   display: grid;
@@ -611,6 +612,9 @@ tfoot td {
   width: 100%;
 }
 .mapping-selected-source {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   display: grid;
   gap: 8px;
   margin-top: 12px;
@@ -628,6 +632,19 @@ tfoot td {
   display: grid;
   min-width: 0;
 }
+.mapping-selected-source-summary > .mapping-selected-source-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.mapping-queue-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
 .mapping-source-list,
 .mapping-target-rows {
   display: grid;
@@ -637,6 +654,17 @@ tfoot td {
   max-height: 360px;
   margin-top: 10px;
   overflow-y: auto;
+}
+.mapping-source-queue-item {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: 4px;
+  border: 1px solid transparent;
+}
+.mapping-source-queue-item.is-selected {
+  border-color: var(--colorBrandStroke1);
+  background: var(--colorBrandBackground2);
 }
 .mapping-source-row,
 .mapping-canonical-target {
@@ -655,6 +683,8 @@ tfoot td {
 }
 .mapping-source-row {
   cursor: grab;
+  min-height: 44px;
+  touch-action: none;
 }
 .mapping-source-row:active {
   cursor: grabbing;
@@ -713,7 +743,22 @@ tfoot td {
   padding: 4px;
 }
 .mapping-canonical-target {
+  min-height: 48px;
   border-bottom-color: var(--colorNeutralStroke3);
+}
+.mapping-canonical-target.is-valid-drop {
+  border-color: var(--colorBrandStroke2);
+  background: var(--colorNeutralBackground2);
+}
+.mapping-canonical-target.is-active-drop {
+  border-color: var(--colorBrandStroke1);
+  background: var(--colorBrandBackground2);
+  box-shadow: inset 0 0 0 1px var(--colorBrandStroke1);
+}
+.mapping-canonical-target.is-invalid-drop {
+  border-color: var(--colorStatusDangerBorder1);
+  color: var(--colorStatusDangerForeground1);
+  cursor: not-allowed;
 }
 .mapping-target-code,
 .mapping-target-name,
