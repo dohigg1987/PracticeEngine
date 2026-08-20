@@ -3037,6 +3037,7 @@ function FilingEvidence({
         <fieldset>
           <legend>Prepare a filing record</legend>
         <Field
+          className="filing-prepare-field filing-accounts-version-field"
           label="Final accounts version"
           hint={
             !eligible.length
@@ -3064,7 +3065,11 @@ function FilingEvidence({
             )}
           </Select>
         </Field>
-        <Field label="Regulator" required>
+        <Field
+          className="filing-prepare-field filing-regulator-field"
+          label="Regulator"
+          required
+        >
           <Select
             value={regulator}
             onChange={(event) => setRegulator(event.target.value)}
@@ -3078,14 +3083,16 @@ function FilingEvidence({
             )}
           </Select>
         </Field>
-        <Button
-          appearance="primary"
-          type="submit"
-          disabled={!accountsVersionId || busy === "prepare"}
-          disabledFocusable={!accountsVersionId && busy !== "prepare"}
-        >
-          {busy === "prepare" ? "Preparing…" : "Prepare filing payload"}
-        </Button>
+        <div className="filing-prepare-action">
+          <Button
+            appearance="primary"
+            type="submit"
+            disabled={!accountsVersionId || busy === "prepare"}
+            disabledFocusable={!accountsVersionId && busy !== "prepare"}
+          >
+            {busy === "prepare" ? "Preparing…" : "Prepare filing payload"}
+          </Button>
+        </div>
         </fieldset>
       </form>
       {actionError && (

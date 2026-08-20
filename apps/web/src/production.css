@@ -940,12 +940,23 @@
 .filing-prepare fieldset {
   display: grid;
   grid-template-columns: minmax(260px, 1.25fr) minmax(200px, 0.8fr) auto;
-  align-items: end;
+  align-items: start;
   gap: 12px;
   min-width: 0;
   margin: 0;
   padding: 0;
   border: 0;
+}
+.filing-prepare-field {
+  min-width: 0;
+}
+.filing-prepare-action {
+  align-self: start;
+  margin-top: calc(
+    var(--lineHeightBase300, 20px) +
+    var(--spacingVerticalXS, 4px) +
+    var(--spacingVerticalXXS, 2px)
+  );
 }
 .filing-prepare legend {
   grid-column: 1 / -1;
@@ -1208,8 +1219,9 @@ td {
   .filing-prepare fieldset {
     grid-template-columns: 1fr;
   }
-  .filing-prepare button {
+  .filing-prepare-action {
     justify-self: start;
+    margin-top: 0;
   }
   .filing-register > header {
     align-items: flex-start;

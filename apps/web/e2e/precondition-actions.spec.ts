@@ -76,6 +76,45 @@ test("filing evidence action remains focusable until evidence is selected", asyn
   );
 });
 
+test("filing preparation fields align and reflow without clipping", async ({ page }) => {
+  await openEngagementSection(page, "Submission", "filing");
+
+  const accounts = page.locator(".filing-accounts-version-field select");
+  const regulator = page.locator(".filing-regulator-field select");
+  const action = page.getByRole("button", { name: "Prepare filing payload" });
+  const [accountsBox, regulatorBox, actionBox] = await Promise.all([
+    accounts.boundingBox(),
+    regulator.boundingBox(),
+    action.boundingBox(),
+  ]);
+  expect(accountsBox).not.toBeNull();
+  expect(regulatorBox).not.toBeNull();
+  expect(actionBox).not.toBeNull();
+  expect(Math.abs(accountsBox!.y - regulatorBox!.y)).toBeLessThanOrEqual(1);
+  expect(Math.abs(accountsBox!.y - actionBox!.y)).toBeLessThanOrEqual(1);
+
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    const [accountsField, regulatorField, compactAction] = await Promise.all([
+      page.locator(".filing-accounts-version-field").boundingBox(),
+      page.locator(".filing-regulator-field").boundingBox(),
+      action.boundingBox(),
+    ]);
+    expect(accountsField).not.toBeNull();
+    expect(regulatorField).not.toBeNull();
+    expect(compactAction).not.toBeNull();
+    expect(Math.abs(accountsField!.x - regulatorField!.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(accountsField!.width - regulatorField!.width)).toBeLessThanOrEqual(1);
+    expect(regulatorField!.y).toBeGreaterThan(accountsField!.y + accountsField!.height);
+    expect(compactAction!.y).toBeGreaterThan(regulatorField!.y + regulatorField!.height);
+    const widths = await page.evaluate(() => ({
+      viewport: document.documentElement.clientWidth,
+      root: document.documentElement.scrollWidth,
+    }));
+    expect(widths.root).toBeLessThanOrEqual(widths.viewport + 1);
+  }
+});
+
 test("terminal filing actions share hierarchy and retain distinct confirmations", async ({
   page,
 }) => {
