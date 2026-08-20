@@ -204,7 +204,7 @@ pre,
   min-height: 28px;
   margin: 0 0 3px;
   padding: 7px 8px 5px;
-  border-bottom: 1px solid #dedede;
+  border-bottom: 1px solid var(--colorNeutralStroke2);
   background: var(--colorNeutralBackground3);
   color: var(--colorNeutralForeground2);
   font-size: 12px;
@@ -282,8 +282,8 @@ pre,
   padding: 8px 10px 8px 12px;
   border: 0;
   border-radius: 0;
-  background: #edebe9 !important;
-  color: #323130;
+  background: var(--colorNeutralBackground3) !important;
+  color: var(--colorNeutralForeground1);
   font: inherit;
   font-size: 13px;
   font-weight: 600;
@@ -298,12 +298,12 @@ pre,
 
 .production-nav-stage-toggle:hover,
 .workspace-nav-toggle:hover {
-  background: #e5e5e5 !important;
+  background: var(--colorNeutralBackground3Hover) !important;
 }
 
 .production-nav-stage-toggle[aria-expanded="true"],
 .workspace-nav-toggle[aria-expanded="true"] {
-  background: #e1dfdd !important;
+  background: var(--colorNeutralBackground3Selected) !important;
 }
 
 .production-nav-stage-toggle:focus-visible,
@@ -345,7 +345,7 @@ pre,
 .administration-navigation {
   margin-top: 8px;
   padding-top: 10px;
-  border-top: 1px solid #e5e5e5;
+  border-top: 1px solid var(--colorNeutralStroke2);
 }
 
 .eyebrow {
@@ -406,7 +406,7 @@ textarea,
 .metrics > div,
 .auth-card,
 .accounts-builder-shell {
-  border-color: #d6d6d6;
+  border-color: var(--colorNeutralStroke2);
 }
 
 .sidebar {
@@ -483,7 +483,7 @@ textarea,
 }
 .production-spine {
   margin: 0;
-  border: 1px solid #d6d6d6;
+  border: 1px solid var(--colorNeutralStroke2);
 }
 .production-spine [role="tab"] {
   align-items: center;
@@ -541,7 +541,7 @@ textarea,
 
 .stage-detail {
   padding-left: 6px;
-  border-left: 1px solid #c8c6c4;
+  border-left: 1px solid var(--colorNeutralStroke1);
 }
 
 .production-stage-menu {
@@ -550,7 +550,7 @@ textarea,
   margin: 0 0 16px;
   padding: 0 8px;
   overflow-x: auto;
-  border: 1px solid #d6d6d6;
+  border: 1px solid var(--colorNeutralStroke2);
   border-top: 0;
   background: var(--colorNeutralBackground2);
 }
@@ -602,7 +602,7 @@ tbody tr:hover {
   height: 12px;
   margin-bottom: 12px;
   border-radius: 2px;
-  background: #ededed;
+  background: var(--colorNeutralBackground3);
   animation: none;
 }
 
@@ -645,7 +645,7 @@ tbody tr:hover {
 }
 .auth-message {
   background: var(--colorNeutralBackground3);
-  border-color: #d6d6d6;
+  border-color: var(--colorNeutralStroke2);
   color: var(--colorNeutralForeground1);
 }
 
@@ -658,7 +658,7 @@ tbody tr:hover {
 .accounts-review,
 .version-comparison {
   background: var(--colorNeutralBackground2);
-  border-color: #d6d6d6;
+  border-color: var(--colorNeutralStroke2);
   color: var(--colorNeutralForeground1);
 }
 .file-card > span,
@@ -671,7 +671,7 @@ tbody tr:hover {
 }
 .task-board > section > header span,
 .severity {
-  background: #ededed;
+  background: var(--colorNeutralBackground3);
   color: var(--colorNeutralForeground2);
 }
 
@@ -681,7 +681,7 @@ tbody tr:hover {
 .balance-control.balanced b {
   background: var(--colorNeutralBackground3);
   color: var(--colorNeutralForeground1);
-  border-color: #d6d6d6;
+  border-color: var(--colorNeutralStroke2);
 }
 .tag.warning,
 .summary.pending,
@@ -994,7 +994,7 @@ table thead {
 .sidebar .accounts-production-nav-items .progress {
   margin: 12px 8px 4px;
   padding: 12px 4px 4px;
-  border-top: 1px solid #e5e5e5;
+  border-top: 1px solid var(--colorNeutralStroke2);
 }
 
 @media (max-width: 900px) {
