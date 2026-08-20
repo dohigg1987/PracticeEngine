@@ -49,7 +49,7 @@ Record the build commit, tenant, engagement, tester roles, browser, start/end ti
 
 ## Production web hosting handoff
 
-Do not deploy until the owner has chosen the Cloudflare account, Pages project name, production hostname and API hostname. `VITE_API_URL` and `VITE_NEON_AUTH_URL` are public browser configuration, not secrets, but they must point to the production services before Vite builds the immutable assets.
+Do not deploy until the owner has chosen the Cloudflare account, Pages project name and production hostname. The owner has temporarily approved the exact API origin documented below while a custom API hostname is arranged. `VITE_API_URL` and `VITE_NEON_AUTH_URL` are public browser configuration, not secrets, but they must point to the production services before Vite builds the immutable assets.
 
 ### Pages production-branch correction
 
@@ -62,10 +62,11 @@ control**. The guarded release always supplies `--branch main` and the exact
 Git SHA; if the remote project still treats another branch as production, the
 upload will be only a preview and must not be promoted as a release.
 
-The current web-only release remains pinned to the audited Pages, Workers and
-Neon Auth endpoints below. This does not relax the API release gate: an API
-deployment still requires the controlled custom domain and `workers_dev=false`.
-Build from the repository root in a clean checkout:
+The temporary production release is pinned to the exact Pages, Workers and Neon
+Auth endpoints below. The owner has approved API deployment to this one
+workers.dev Worker while a controlled custom domain is arranged; the release
+guard does not accept another Worker name, route or origin. Build from the
+repository root in a clean checkout:
 
 ```powershell
 $env:VITE_API_URL="https://uk-accounts-api-production.dennis-ohiggins.workers.dev"

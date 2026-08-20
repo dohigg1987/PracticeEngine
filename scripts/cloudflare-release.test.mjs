@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   expectedWebApiOrigin,
+  isTemporaryWorkersDevProduction,
   pagesDeploymentInvocation,
   productionConfigErrors,
   releaseContextErrors,
@@ -22,6 +23,15 @@ const config = {
   r2_buckets: [{ binding: "ARTEFACTS", bucket_name: "uk-accounts-prod-artefacts" }],
   hyperdrive: [{ binding: "HYPERDRIVE", id: "reviewed-id" }],
 };
+const workersDevConfig = {
+  ...config,
+  workers_dev: true,
+  routes: undefined,
+  vars: {
+    WEB_ORIGIN: "https://ledgerly-accounts.pages.dev",
+    NEON_AUTH_URL: "https://ep-wispy-thunder-zatp3scz.neonauth.c-2.eu-west-2.aws.neon.tech/neondb/auth",
+  },
+};
 
 test("requires a clean main worktree at the exact origin/main SHA", () => {
   assert.deepEqual(releaseContextErrors({ status: "", branch: "main", sha, originSha: sha }), []);
@@ -37,9 +47,34 @@ test("requires a clean main worktree at the exact origin/main SHA", () => {
 
 test("requires a hardened exact-domain Worker configuration", () => {
   assert.deepEqual(productionConfigErrors(config), []);
-  const errors = productionConfigErrors({ ...config, workers_dev: true, routes: [] });
-  assert.ok(errors.includes("workers_dev must be false"));
-  assert.ok(errors.includes("Exactly one custom-domain route is required"));
+  const errors = productionConfigErrors({ ...config, workers_dev: true });
+  assert.ok(errors.some((error) => error.includes("custom domain")));
+});
+
+test("allows only the exact approved temporary workers.dev production Worker", () => {
+  assert.equal(isTemporaryWorkersDevProduction(workersDevConfig), true);
+  assert.deepEqual(productionConfigErrors(workersDevConfig), []);
+  assert.equal(
+    expectedWebApiOrigin(workersDevConfig),
+    "https://uk-accounts-api-production.dennis-ohiggins.workers.dev",
+  );
+
+  const wrongName = { ...workersDevConfig, name: "another-production-worker" };
+  assert.equal(isTemporaryWorkersDevProduction(wrongName), false);
+  assert.equal(expectedWebApiOrigin(wrongName), undefined);
+  assert.ok(productionConfigErrors(wrongName).some((error) => error.includes("Worker name")));
+  assert.ok(productionConfigErrors({
+    ...workersDevConfig,
+    routes: [{ pattern: "example.com/*" }],
+  }).some((error) => error.includes("approved temporary workers.dev")));
+  assert.ok(productionConfigErrors({
+    ...workersDevConfig,
+    vars: { ...workersDevConfig.vars, WEB_ORIGIN: "https://other.invalid" },
+  }).some((error) => error.includes("ledgerly-accounts.pages.dev")));
+  assert.ok(productionConfigErrors({
+    ...workersDevConfig,
+    preview_urls: true,
+  }).includes("preview_urls must be false"));
 });
 
 test("locks the web build origins to the API production configuration", () => {
@@ -57,15 +92,6 @@ test("locks the web build origins to the API production configuration", () => {
 });
 
 test("allows the audited workers.dev origin for a web-only release", () => {
-  const workersDevConfig = {
-    ...config,
-    workers_dev: true,
-    routes: undefined,
-    vars: {
-      WEB_ORIGIN: "https://ledgerly-accounts.pages.dev",
-      NEON_AUTH_URL: "https://ep-wispy-thunder-zatp3scz.neonauth.c-2.eu-west-2.aws.neon.tech/neondb/auth",
-    },
-  };
   const environment = {
     WEB_ORIGIN: workersDevConfig.vars.WEB_ORIGIN,
     VITE_API_URL: "https://uk-accounts-api-production.dennis-ohiggins.workers.dev",

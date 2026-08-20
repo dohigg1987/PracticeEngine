@@ -12,6 +12,12 @@ const currentWorkersDevApiOrigin = "https://uk-accounts-api-production.dennis-oh
 const currentNeonAuthUrl =
   "https://ep-wispy-thunder-zatp3scz.neonauth.c-2.eu-west-2.aws.neon.tech/neondb/auth";
 
+export function isTemporaryWorkersDevProduction(config) {
+  return config.name === "uk-accounts-api-production" &&
+    config.workers_dev === true &&
+    !config.routes?.length;
+}
+
 export function exactHttpsOrigin(value, name) {
   if (typeof value !== "string" || !value.trim()) return `${name} is required`;
   try {
@@ -55,12 +61,15 @@ export function releaseContextErrors({ status, branch, sha, originSha }) {
 export function productionConfigErrors(config) {
   const errors = [];
   if (config.name !== "uk-accounts-api-production") errors.push("Production Worker name is invalid");
-  if (config.workers_dev !== false) errors.push("workers_dev must be false");
   if (config.preview_urls !== false) errors.push("preview_urls must be false");
-  if (config.routes?.length !== 1 || config.routes[0]?.custom_domain !== true)
-    errors.push("Exactly one custom-domain route is required");
+  const temporaryWorkersDev = isTemporaryWorkersDevProduction(config);
+  const customDomain = config.workers_dev === false &&
+    config.routes?.length === 1 &&
+    config.routes[0]?.custom_domain === true;
+  if (!temporaryWorkersDev && !customDomain)
+    errors.push("Production must use one exact custom domain or the approved temporary workers.dev Worker");
   const routePattern = config.routes?.[0]?.pattern;
-  if (typeof routePattern !== "string" || routePattern.includes("/") || routePattern.includes("*") || !routePattern.includes("."))
+  if (customDomain && (typeof routePattern !== "string" || routePattern.includes("/") || routePattern.includes("*") || !routePattern.includes(".")))
     errors.push("The production route must be one exact hostname");
   if (config.r2_buckets?.length !== 1 || config.r2_buckets[0]?.bucket_name !== "uk-accounts-prod-artefacts")
     errors.push("Production must bind only uk-accounts-prod-artefacts");
@@ -70,6 +79,10 @@ export function productionConfigErrors(config) {
   if (webOriginError) errors.push(webOriginError);
   const authUrlError = secureHttpsUrl(config.vars?.NEON_AUTH_URL, "NEON_AUTH_URL");
   if (authUrlError) errors.push(authUrlError);
+  if (temporaryWorkersDev && config.vars?.WEB_ORIGIN !== currentProductionWebOrigin)
+    errors.push(`Temporary workers.dev production must use WEB_ORIGIN ${currentProductionWebOrigin}`);
+  if (temporaryWorkersDev && config.vars?.NEON_AUTH_URL !== currentNeonAuthUrl)
+    errors.push("Temporary workers.dev production must use the provisioned production auth service");
   if (/[<>]|PLACEHOLDER|REPLACE|\.example\b/i.test(JSON.stringify(config)))
     errors.push("Production config contains an unresolved placeholder");
   return errors;
@@ -92,7 +105,7 @@ export function webReleaseConfigErrors(config) {
 }
 
 export function expectedWebApiOrigin(config) {
-  if (config.workers_dev === true && !config.routes?.length) return currentWorkersDevApiOrigin;
+  if (isTemporaryWorkersDevProduction(config)) return currentWorkersDevApiOrigin;
   const route = config.routes?.[0];
   if (config.workers_dev === false && config.routes?.length === 1 && route?.custom_domain === true)
     return `https://${route.pattern}`;

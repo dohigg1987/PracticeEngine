@@ -1,8 +1,9 @@
 # API production promotion
 
-Production deployment is intentionally blocked until Cloudflare authentication, a
-controlled API hostname, and the exact HTTPS web origin are available. Never bind
-production to `uk-accounts-dev-artefacts`.
+An exact custom domain remains the preferred production route. The owner has
+temporarily approved only
+`https://uk-accounts-api-production.dennis-ohiggins.workers.dev` while that
+domain is being arranged. Never bind production to `uk-accounts-dev-artefacts`.
 
 ## One-time Cloudflare preparation
 
@@ -40,6 +41,16 @@ contains migrations `0001` through `0017`, including the `accounts_app` grants.
 The config contains no secrets. Hyperdrive owns the database credential and the
 Neon Auth URL is public configuration.
 
+### Temporary approved workers.dev route
+
+The committed production config may temporarily retain `workers_dev: true` with
+no routes only for the exact `uk-accounts-api-production` Worker, the exact
+`https://ledgerly-accounts.pages.dev` web origin, the provisioned Neon Auth
+service, `preview_urls: false`, and the reviewed production R2 and Hyperdrive
+bindings. Any other Worker name, route, origin or binding fails the release
+guard. Replace this temporary topology with the controlled custom-domain config
+above as soon as the hostname is available.
+
 ## Non-deploying checks
 
 ```powershell
@@ -55,10 +66,10 @@ Inspect the dry-run binding table. It must show the production Worker name, the
 production R2 bucket, the expected Hyperdrive ID, the exact web origin, and the
 public Neon Auth URL.
 
-The template check validates the committed placeholder template. The production
-verification command intentionally fails until the materialised config has no
-placeholder domain/origin, uses the production bucket, disables all Cloudflare
-preview URLs, and retains observability.
+The template check validates the custom-domain placeholder template. Production
+verification accepts either that fully materialised custom-domain topology or
+the single temporary workers.dev topology above; both require the production
+bucket, reviewed Hyperdrive binding, disabled preview URLs and observability.
 
 ## Deploy and read-only smoke test
 
@@ -76,11 +87,12 @@ Do not call `wrangler deploy` directly for a production release.
 
 Set the deployed API origin and a short-lived pilot user's Neon Auth token in
 process environment variables. The verification script refuses non-HTTPS URLs,
-paths, redirects, or a hostname that differs from the configured custom domain.
+paths, redirects, or a hostname that differs from the configured production
+Worker origin.
 It does not write application or Cloudflare data.
 
 ```powershell
-$env:PILOT_API_BASE = "https://<CONTROLLED_API_HOST>"
+$env:PILOT_API_BASE = "https://uk-accounts-api-production.dennis-ohiggins.workers.dev" # or the configured controlled API host
 $env:PILOT_ACCESS_TOKEN = "<SHORT_LIVED_NEON_AUTH_ACCESS_TOKEN>"
 npm run verify:production --workspace apps/api -- --remote
 Remove-Item Env:PILOT_ACCESS_TOKEN
