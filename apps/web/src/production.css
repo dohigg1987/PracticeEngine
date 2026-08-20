@@ -263,6 +263,20 @@
 .governance-link-grid > button {
   justify-self: start;
 }
+.governance-link-grid > *,
+.risk-create-form > *,
+.evidence-upload-form > * {
+  min-width: 0;
+  max-width: 100%;
+}
+.governance-link-grid select,
+.risk-create-form select,
+.evidence-upload-form input,
+.evidence-upload-form textarea {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
 .risk-create-form,
 .evidence-upload-form {
   display: grid;
