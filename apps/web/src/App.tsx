@@ -1773,6 +1773,7 @@ function AccountsWorkspace({
                 <OperationsView
                   view={view}
                   context={context}
+                  currentActorId={user.id}
                   engagementId={selectedId}
                   dashboard={dashboard}
                   journals={journals}
@@ -3108,6 +3109,7 @@ type OperationsProps = {
 function OperationsView({
   view,
   context,
+  currentActorId,
   engagementId,
   dashboard,
   journals,
@@ -3120,6 +3122,7 @@ function OperationsView({
   reload,
 }: OperationsProps & {
   view: View;
+  currentActorId: string;
   dashboard: Dashboard;
   journals: Journal[];
   reconciliations: Reconciliation[];
@@ -3165,6 +3168,7 @@ function OperationsView({
       ) : view === "tasks" ? (
         <TasksView
           context={context}
+          currentActorId={currentActorId}
           engagementId={engagementId}
           reload={reload}
           items={tasks}
@@ -3870,14 +3874,31 @@ function ReconciliationsView({
 function TasksView({
   context,
   engagementId,
+  currentActorId,
   reload,
   items,
-}: OperationsProps & { items: WorkflowTask[] }) {
+}: OperationsProps & { currentActorId: string; items: WorkflowTask[] }) {
   const [titleValue, setTitleValue] = useState("");
   const [taskType, setTaskType] = useState("PREPARATION");
+  const [assignedTo, setAssignedTo] = useState("");
+  const [dueDate, setDueDate] = useState("");
   const [blocking, setBlocking] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [editingTask, setEditingTask] = useState<WorkflowTask | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editAssignedTo, setEditAssignedTo] = useState("");
+  const [editDueDate, setEditDueDate] = useState("");
+  const [editBlocking, setEditBlocking] = useState(false);
+  const dueAt = (value: string) =>
+    value ? `${value}T12:00:00.000Z` : null;
+  const dueDateValue = (value?: string | null) => {
+    if (!value) return "";
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.valueOf())
+      ? ""
+      : parsed.toISOString().slice(0, 10);
+  };
   async function create(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
@@ -3887,8 +3908,11 @@ function TasksView({
         taskType,
         title: titleValue,
         blocking,
+        assignedTo: assignedTo || undefined,
+        dueAt: dueAt(dueDate) || undefined,
       });
       setTitleValue("");
+      setDueDate("");
       await reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not create task.");
@@ -3907,13 +3931,48 @@ function TasksView({
       setBusy(false);
     }
   }
+  function beginEdit(item: WorkflowTask) {
+    setEditingTask(item);
+    setEditTitle(item.title);
+    setEditAssignedTo(item.assigned_to || "");
+    setEditDueDate(dueDateValue(item.due_at));
+    setEditBlocking(Boolean(item.blocking));
+  }
+  async function saveEdit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!editingTask) return;
+    setBusy(true);
+    setError("");
+    try {
+      await api.updateWorkflowTask(context, engagementId, editingTask.id, {
+        title: editTitle.trim(),
+        assignedTo: editAssignedTo || null,
+        dueAt: dueAt(editDueDate),
+        blocking: editBlocking,
+      });
+      setEditingTask(null);
+      await reload();
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Could not update task details.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
   const columns: WorkflowTaskStatus[] = [
     "OPEN",
     "IN_PROGRESS",
     "BLOCKED",
     "COMPLETE",
   ];
-  const statusOptions: WorkflowTaskStatus[] = [...columns, "CANCELLED"];
+  const statusTransitions: Record<WorkflowTaskStatus, WorkflowTaskStatus[]> = {
+    OPEN: ["IN_PROGRESS", "BLOCKED", "CANCELLED"],
+    IN_PROGRESS: ["BLOCKED", "COMPLETE", "CANCELLED"],
+    BLOCKED: ["IN_PROGRESS", "CANCELLED"],
+    COMPLETE: [],
+    CANCELLED: [],
+  };
   const taskTypes = ["PREPARATION", "ACCOUNTS", "REVIEW"] as const;
   const visibleItems = items.filter((item) => columns.includes(item.status));
   return (
@@ -3924,9 +3983,10 @@ function TasksView({
           heading="Task board"
           body="Assign, prioritise and complete engagement work."
         />
-        <form className="compact-form" onSubmit={create}>
-          <Field label="Task title" required>
+        <form className="compact-form task-create-form" onSubmit={create}>
+          <Field className="task-title-field" label="Task title" required>
             <Input
+              size="medium"
               value={titleValue}
               onChange={(e) => setTitleValue(e.target.value)}
               required
@@ -3935,7 +3995,7 @@ function TasksView({
           <Field label="Task type" required>
             <Select
               className="task-type-select"
-              select={{ className: "task-select-native" }}
+              size="medium"
               value={taskType}
               onChange={(e) => setTaskType(e.target.value)}
               required
@@ -3946,6 +4006,26 @@ function TasksView({
                 </option>
               ))}
             </Select>
+          </Field>
+          <Field label="Assignee">
+            <Select
+              aria-label="Task assignee"
+              size="medium"
+              value={assignedTo}
+              onChange={(e) => setAssignedTo(e.target.value)}
+            >
+              <option value="">Unassigned</option>
+              <option value={currentActorId}>Assign to me</option>
+            </Select>
+          </Field>
+          <Field label="Due date">
+            <Input
+              aria-label="Task due date"
+              size="medium"
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+            />
           </Field>
           <Checkbox
               className="check"
@@ -4005,27 +4085,49 @@ function TasksView({
                         <h4>{item.title}</h4>
                         <small>
                           {title(item.task_type || "TASK")}
+                          {item.assigned_to
+                            ? item.assigned_to === currentActorId
+                              ? " · Assigned to you"
+                              : " · Assigned team member"
+                            : " · Unassigned"}
                           {item.due_at
                             ? ` · Due ${fullDate.format(new Date(item.due_at))}`
                             : ""}
                         </small>
                       </div>
-                      <Select
-                        className="task-status-select"
-                        select={{ className: "task-select-native" }}
-                        aria-label={`Status for ${item.title}`}
-                        value={item.status}
-                        disabled={busy}
-                        onChange={(e) =>
-                          move(item, e.target.value as WorkflowTaskStatus)
-                        }
-                      >
-                        {statusOptions.map((value) => (
-                          <option key={value} value={value}>
-                            {title(value)}
-                          </option>
-                        ))}
-                      </Select>
+                      <div className="task-card-actions">
+                        <Select
+                          className="task-status-select"
+                          aria-label={`Status for ${item.title}`}
+                          size="medium"
+                          value={item.status}
+                          disabled={
+                            busy || !statusTransitions[item.status].length
+                          }
+                          onChange={(e) =>
+                            move(item, e.target.value as WorkflowTaskStatus)
+                          }
+                        >
+                          {[item.status, ...statusTransitions[item.status]].map(
+                            (value) => (
+                              <option key={value} value={value}>
+                                {title(value)}
+                              </option>
+                            ),
+                          )}
+                        </Select>
+                        {item.status !== "COMPLETE" && (
+                          <FluentButton
+                            appearance="subtle"
+                            disabled={busy}
+                            size="small"
+                            type="button"
+                            onClick={() => beginEdit(item)}
+                          >
+                            Edit details
+                          </FluentButton>
+                        )}
+                      </div>
                     </Card>
                   ))}
                 </div>
@@ -4034,6 +4136,80 @@ function TasksView({
           })}
         </div>
       )}
+      <Dialog
+        open={Boolean(editingTask)}
+        onOpenChange={(_, data) => {
+          if (!data.open && !busy) setEditingTask(null);
+        }}
+      >
+        <DialogSurface className="task-edit-dialog">
+          <DialogBody>
+            <DialogTitle>Edit task details</DialogTitle>
+            <DialogContent>
+              <form
+                className="task-edit-form"
+                id="task-edit-form"
+                onSubmit={saveEdit}
+              >
+                <Field label="Task title" required>
+                  <Input
+                    autoFocus
+                    required
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                  />
+                </Field>
+                <Field label="Assignee">
+                  <Select
+                    value={editAssignedTo}
+                    onChange={(e) => setEditAssignedTo(e.target.value)}
+                  >
+                    <option value="">Unassigned</option>
+                    <option value={currentActorId}>Assign to me</option>
+                    {editingTask?.assigned_to &&
+                      editingTask.assigned_to !== currentActorId && (
+                        <option value={editingTask.assigned_to}>
+                          Assigned team member
+                        </option>
+                      )}
+                  </Select>
+                </Field>
+                <Field label="Due date">
+                  <Input
+                    type="date"
+                    value={editDueDate}
+                    onChange={(e) => setEditDueDate(e.target.value)}
+                  />
+                </Field>
+                <Checkbox
+                  label="Blocking"
+                  checked={editBlocking}
+                  onChange={(_, data) =>
+                    setEditBlocking(Boolean(data.checked))
+                  }
+                />
+              </form>
+            </DialogContent>
+            <DialogActions>
+              <FluentButton
+                appearance="secondary"
+                disabled={busy}
+                onClick={() => setEditingTask(null)}
+              >
+                Cancel
+              </FluentButton>
+              <FluentButton
+                appearance="primary"
+                disabled={busy || !editTitle.trim()}
+                form="task-edit-form"
+                type="submit"
+              >
+                Save changes
+              </FluentButton>
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
     </>
   );
 }

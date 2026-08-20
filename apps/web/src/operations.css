@@ -63,9 +63,28 @@
   .balance-control > span { text-align: right; }
 }
 /* Task board */
+/* Fluent controls own their native input/select metrics. Legacy form rules above
+   predate the migration and otherwise double their padding and borders. */
+.journal-editor input,
+.journal-editor select,
+.compact-form input,
+.compact-form select,
+.review-create select,
+.task-board select {
+  height: 100%;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+}
 .task-create .compact-form {
-  grid-template-columns: minmax(240px, 1fr) minmax(160px, 220px) auto auto;
+  grid-template-columns: minmax(240px, 1.6fr) minmax(140px, .7fr) minmax(150px, .8fr) minmax(150px, .7fr) auto auto;
   align-items: end;
+}
+.task-create-form > * {
+  min-width: 0;
 }
 .task-create .check,
 .task-create .compact-form > button {
@@ -76,15 +95,8 @@
 }
 .task-type-select,
 .task-status-select {
+  min-width: 0;
   width: 100%;
-}
-.task-create .task-select-native,
-.task-board .task-select-native {
-  border: 0;
-  background: transparent;
-}
-.task-board .task-select-native {
-  margin-top: 0;
 }
 .task-board-empty {
   gap: 2px;
@@ -128,16 +140,46 @@
   color: var(--colorNeutralForeground3);
   font-size: var(--fontSizeBase200);
 }
+.task-card-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+}
+.task-edit-dialog {
+  max-width: 560px;
+}
+.task-edit-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  padding-top: 4px;
+}
+.task-edit-form > :first-child,
+.task-edit-form > :last-child {
+  grid-column: 1 / -1;
+}
 @media (max-width: 900px) {
   .task-create .compact-form {
-    grid-template-columns: minmax(220px, 1fr) minmax(160px, 220px);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 @media (max-width: 620px) {
   .task-create .compact-form {
     grid-template-columns: 1fr;
   }
+  .task-board {
+    grid-template-columns: 1fr;
+    overflow: visible;
+  }
   .task-create .compact-form > button {
+    justify-self: start;
+  }
+  .task-card-actions,
+  .task-edit-form {
+    grid-template-columns: 1fr;
+  }
+  .task-card-actions > button {
     justify-self: start;
   }
 }
