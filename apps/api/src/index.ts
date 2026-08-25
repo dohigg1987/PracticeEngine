@@ -23,6 +23,7 @@ import { authenticateRequest, neonAccessTokenVerifier } from "./auth.js";
 import { handleCommercialRoute } from "./commercial.js";
 import { handlePermanentFileRoute } from "./permanent-file.js";
 import { handlePlatformCoreRoute } from "./platform-core.js";
+import { handlePracticeManagementRoute } from "./practice-management.js";
 import {
   MAX_WORKING_PAPER_EVIDENCE_BYTES,
   WORKING_PAPER_ASSERTIONS,
@@ -431,6 +432,7 @@ async function appendScopedEvents(
   objectType: string,
   objectId: string,
   metadata: JsonMetadata,
+  domainEventType?: string,
 ): Promise<void> {
   // Serialise the per-tenant ledger so concurrent writes cannot create two audit heads.
   await tx`select id from tenant where id=${ctx.tenantId} for update`;
@@ -458,9 +460,10 @@ async function appendScopedEvents(
   await tx`
     insert into audit_event(event_id,occurred_at_utc,recorded_at_utc,tenant_id,organisation_id,engagement_id,actor_type,actor_id,event_type,object_type,object_id,previous_hash,correlation_id,metadata,event_hash)
     values(${eventId},${occurredAt},${occurredAt},${ctx.tenantId},${scope.organisationId},${scope.engagementId},'USER',${ctx.actorId},${eventType},${objectType},${objectId},${previousHash},${ctx.correlationId},${tx.json(metadata)},${eventHash})`;
-  const idempotencyKey = `${ctx.correlationId}:${eventType}:${objectType}:${objectId}`;
+  const outboxEventType = domainEventType ?? eventType;
+  const idempotencyKey = `${ctx.correlationId}:${outboxEventType}:${objectType}:${objectId}`;
   await tx`insert into outbox_event(id,tenant_id,aggregate_type,aggregate_id,event_type,payload,correlation_id,idempotency_key)
-    values(${crypto.randomUUID()},${ctx.tenantId},${objectType},${objectId},${eventType},${tx.json(metadata)},${ctx.correlationId},${idempotencyKey})`;
+    values(${crypto.randomUUID()},${ctx.tenantId},${objectType},${objectId},${outboxEventType},${tx.json(metadata)},${ctx.correlationId},${idempotencyKey})`;
 }
 async function appendEvents(
   tx: Transaction,
@@ -470,6 +473,7 @@ async function appendEvents(
   objectType: string,
   objectId: string,
   metadata: JsonMetadata,
+  domainEventType?: string,
 ): Promise<void> {
   return appendScopedEvents(
     tx,
@@ -479,6 +483,7 @@ async function appendEvents(
     objectType,
     objectId,
     metadata,
+    domainEventType,
   );
 }
 
@@ -1084,6 +1089,7 @@ async function createEngagement(
         "ENGAGEMENT",
         engagementId,
         { periodStart, periodEnd, framework, sectorProfile },
+        "ledgerly.workspace.created",
       );
       return inserted[0]!;
     });
@@ -4518,6 +4524,7 @@ async function generateAccountsVersion(
           contentHash,
           comparativeAccountsVersionId: comparativeAccountsVersionId ?? null,
         },
+        version === 1 ? "ledgerly.accounts.started" : undefined,
       );
       return (await accountsVersionItems(tx, ctx, engagementId, id))[0]!;
     });
@@ -4613,6 +4620,7 @@ async function transitionAccountsVersion(
         "ACCOUNTS_VERSION",
         accountsVersionId,
         { from: current, to: next, reason },
+        next === "FINAL" ? "ledgerly.accounts.completed" : undefined,
       );
       return updated[0]!;
     });
@@ -5314,6 +5322,7 @@ async function patchFilingAttempt(
           regulatorReference:
             regulatorReference ?? rows[0]!.regulator_reference,
         },
+        next === "SUBMITTED" ? "ledgerly.filing.submitted" : undefined,
       );
       return updated[0]!;
     });
@@ -5601,6 +5610,9 @@ export default {
       const platformCoreResponse = actorId
         ? await handlePlatformCoreRoute(request, env, actorId)
         : null;
+      const practiceManagementResponse = actorId
+        ? await handlePracticeManagementRoute(request, env, actorId)
+        : null;
       let response: Response;
       if (url.pathname === "/health")
         response = json({ status: "ok", service: SERVICE_NAME });
@@ -5650,6 +5662,11 @@ export default {
             "canonical-client-master",
             "shared-settings",
             "commercial-entitlements",
+            "practice-service-catalogue",
+            "practice-engagements",
+            "practice-work-management",
+            "work-templates",
+            "ledgerly-work-link",
           ],
           limitations: {
             externalConnectors: "not-configured",
@@ -5661,6 +5678,8 @@ export default {
       else if (permanentFileResponse) response = permanentFileResponse;
       else if (commercialResponse) response = commercialResponse;
       else if (platformCoreResponse) response = platformCoreResponse;
+      else if (practiceManagementResponse)
+        response = practiceManagementResponse;
       else if (request.method === "GET" && url.pathname === "/v1/me/tenants")
         response = await listMyTenants(env, actorId);
       else if (request.method === "POST" && url.pathname === "/v1/me/tenants")

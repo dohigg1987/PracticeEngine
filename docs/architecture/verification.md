@@ -10,10 +10,11 @@
 - Guarded releases from a clean, exact `main` commit.
 - This branch adds `npm run verify:architecture` for required architecture sources, basic forbidden dependency directions, package-name licensing conditionals and the PM-001 tenant/RLS inventory.
 - PM-001 API contract tests verify identity/membership separation, tenant-safe foreign keys, permission and entitlement checks, client compatibility, contact relationships, entitlement precedence, mutation audit coverage and explicit audit immutability.
+- PM-002 architecture checks inventory every Practice Management tenant table, permission and required architecture source. Focused API/UI tests cover lifecycle transitions, tenant-qualified access, entitlement enforcement, audit/outbox facts, work filtering and the Ledgerly compatibility link.
 
 ## What is not yet enforced
 
-- The PM-001 entitlement kernel has contract coverage; live effective-date and RLS behaviour still requires disposable-database integration coverage.
+- Production entitlement and RLS behaviour is never inferred from source tests; PM-002 includes a disposable-Neon-branch verification script and records its execution separately from the offline gate.
 - The initial permission catalogue exists, but there is not yet a generated route-to-permission policy matrix.
 - Audit-event expectation coverage is route/test-specific, not a mutation-wide static guarantee.
 - Module boundaries are logical documentation plus a minimal import-direction guard; no package-level platform/practice/module topology exists yet.
@@ -31,7 +32,7 @@ CI runs the quick architecture guard in the non-browser job. Migration safety, t
 ## Next checks to add
 
 1. Schema-head verification in `/ready` and the release preflight.
-2. Generated privilege/RLS inventory compared against all tenant-owned tables.
+2. Generate the privilege/RLS inventory from migration metadata instead of maintaining the current explicit controlled list.
 3. Contract tests requiring audit/outbox append for every registered command handler.
 4. Explicit module manifests and import graph when Platform/Practice packages are created.
 5. Generate route-to-permission and permission-to-role decision matrices from the implemented catalogue.

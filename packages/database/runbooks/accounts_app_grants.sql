@@ -266,7 +266,6 @@ GRANT INSERT,UPDATE ON
   tenant_role,tenant_role_permission,tenant_member_role,team,team_member,
   contact,client_contact_relationship,address,client_address,tenant_setting
 TO accounts_app;
-GRANT INSERT,UPDATE ON tenant_entitlement_override TO accounts_app;
 GRANT INSERT(id,tenant_id,legal_name,legal_form,jurisdiction,display_name,
   entity_type,client_code,responsible_member_id,responsible_team_id,
   primary_contact_id,primary_address_id,communication_preferences,created_by,updated_by)
@@ -276,6 +275,34 @@ GRANT UPDATE(legal_name,legal_form,jurisdiction,display_name,entity_type,
   primary_address_id,communication_preferences,updated_by,updated_at,version)
 ON organisation TO accounts_app;
 GRANT EXECUTE ON FUNCTION tenant_actor_is_active(uuid),actor_has_permission(text),tenant_feature_decision(text)
+TO accounts_app;
+
+-- PM-002 Practice Management. Operational records are lifecycle-managed; the
+-- runtime role intentionally receives no DELETE privilege.
+GRANT SELECT ON
+  practice_service,client_service,practice_engagement,
+  practice_engagement_service,work_template,work_template_task,
+  work_item,practice_task,work_item_ledgerly_link
+TO accounts_app;
+GRANT INSERT ON
+  practice_service,client_service,practice_engagement,
+  work_template,work_template_task,work_item,practice_task
+TO accounts_app;
+GRANT UPDATE(name,description,category,status,default_frequency,responsible_team_id,
+  default_work_template_id,specialist_module_key,required_entitlement_feature_key,updated_by,updated_at)
+  ON practice_service TO accounts_app;
+GRANT UPDATE(status,end_date,updated_by,updated_at) ON client_service TO accounts_app;
+GRANT UPDATE(reference,name,status,start_date,end_date,responsible_owner_id,responsible_team_id,updated_by,updated_at)
+  ON practice_engagement TO accounts_app;
+GRANT UPDATE(name,status,updated_by,updated_at) ON work_template TO accounts_app;
+GRANT UPDATE(title,period_reference,engagement_id,priority,assigned_member_id,assigned_team_id,
+  planned_start_date,due_date,status,completed_at,specialist_module_key,specialist_record_reference,updated_by,updated_at)
+  ON work_item TO accounts_app;
+GRANT UPDATE(title,description,status,assignee_member_id,team_id,sequence,due_date,completed_at,
+  reviewer_member_id,updated_by,updated_at) ON practice_task TO accounts_app;
+GRANT INSERT ON practice_engagement_service,work_item_ledgerly_link
+TO accounts_app;
+GRANT EXECUTE ON FUNCTION tenant_feature_is_enabled(uuid,text),work_item_ledgerly_update_allowed(uuid,uuid,text,uuid)
 TO accounts_app;
 
 COMMIT;

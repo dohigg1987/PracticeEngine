@@ -20,6 +20,12 @@ const requiredDocuments = [
   "docs/architecture/entitlements.md",
   "docs/architecture/audit.md",
   "docs/architecture/ledgerly-client-compatibility.md",
+  "docs/architecture/practice-management.md",
+  "docs/architecture/services.md",
+  "docs/architecture/engagements.md",
+  "docs/architecture/work-management.md",
+  "docs/architecture/module-work-integration.md",
+  "docs/architecture/infrastructure.md",
   "docs/design/DESIGN-CONSTITUTION.md",
   "docs/design/ANTI-PATTERNS.md",
   "AGENTS.md",
@@ -127,6 +133,26 @@ if (platformMigrationName) {
   }
   for (const required of ["actor_has_permission", "tenant_feature_decision", "audit_event_immutable"])
     if (!platformMigration.includes(required)) failures.push(`${platformMigrationName} is missing ${required}`);
+}
+
+const practiceMigrationName = migrations.find((name) => name.includes("practice_management_work_foundation"));
+if (practiceMigrationName) {
+  const practiceMigration = await readFile(path.join(migrationDirectory, practiceMigrationName), "utf8");
+  const tenantOwnedTables = [
+    "practice_service", "client_service", "practice_engagement", "practice_engagement_service",
+    "work_template", "work_template_task", "work_item", "practice_task", "work_item_ledgerly_link"
+  ];
+  for (const table of tenantOwnedTables) {
+    const declaration = new RegExp(`CREATE TABLE ${table}\\([\\s\\S]*?tenant_id uuid NOT NULL`, "i");
+    if (!declaration.test(practiceMigration)) failures.push(`${practiceMigrationName}: ${table} lacks a required tenant_id`);
+    if (!practiceMigration.includes(`'${table}'`)) failures.push(`${practiceMigrationName}: ${table} is missing from the forced-RLS inventory`);
+  }
+  for (const permission of [
+    "services.view", "services.manage", "engagements.view", "engagements.manage",
+    "work.view", "work.create", "work.edit", "work.assign", "work.complete",
+    "tasks.view", "tasks.manage", "worktemplates.manage"
+  ])
+    if (!practiceMigration.includes(`'${permission}'`)) failures.push(`${practiceMigrationName} is missing ${permission}`);
 }
 
 if (failures.length) {

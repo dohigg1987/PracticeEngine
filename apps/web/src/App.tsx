@@ -243,6 +243,7 @@ function WorkspaceSearchIcon({
 }
 const EngagementProduction = lazy(() => import("./EngagementProduction"));
 const CommercialWorkspace = lazy(() => import("./CommercialWorkspace"));
+const PracticeManagement = lazy(() => import("./PracticeManagement"));
 type CsvRow = {
   accountCode: string;
   accountName: string;
@@ -449,8 +450,20 @@ function AccountsWorkspace({
   const [membershipLoading, setMembershipLoading] = useState(true);
   const [membershipError, setMembershipError] = useState("");
   const [workspacePage, setWorkspacePage] = useState<
-    "engagement" | "clients" | "team" | "integrations" | "inbox" | "settings"
+    | "engagement"
+    | "clients"
+    | "work"
+    | "team"
+    | "integrations"
+    | "inbox"
+    | "settings"
+    | "practice-settings"
   >("engagement");
+  const [practiceView, setPracticeView] = useState<
+    "work" | "work-detail" | "client-summary"
+  >("work");
+  const [practiceWorkItemId, setPracticeWorkItemId] = useState("");
+  const [practiceClientId, setPracticeClientId] = useState("");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [inviteToken, setInviteToken] = useState(() => {
     const token = inviteTokenFromHash(window.location.hash);
@@ -544,9 +557,17 @@ function AccountsWorkspace({
     if (workspacePage === "engagement" || workspacePage === "integrations")
       setAccountsProductionNavOpen(true);
     if (workspacePage === "integrations") setOpenProductionNavStage("source");
-    if (workspacePage === "clients" || workspacePage === "team")
+    if (
+      workspacePage === "clients" ||
+      workspacePage === "work" ||
+      workspacePage === "team"
+    )
       setPracticeNavOpen(true);
-    if (workspacePage === "inbox" || workspacePage === "settings")
+    if (
+      workspacePage === "inbox" ||
+      workspacePage === "settings" ||
+      workspacePage === "practice-settings"
+    )
       setAdministrationNavOpen(true);
   }, [workspacePage]);
   const hasDiscoveredMembership = memberships.some(
@@ -1025,6 +1046,14 @@ function AccountsWorkspace({
       open: () => setWorkspacePage("clients"),
     },
     {
+      id: "workspace-work",
+      label: "Work",
+      description: "Practice management",
+      keywords: "jobs tasks deadlines services assignments",
+      category: "Workspace" as const,
+      open: () => setWorkspacePage("work"),
+    },
+    {
       id: "workspace-integrations",
       label: "Imports and integrations",
       description: "Workspace",
@@ -1054,6 +1083,14 @@ function AccountsWorkspace({
       : []),
     ...(["OWNER", "ADMIN"].includes(selectedMembership?.role_code || "")
       ? [
+          {
+            id: "workspace-practice-settings",
+            label: "Practice Management settings",
+            description: "Administration",
+            keywords: "services work templates practice configuration",
+            category: "Workspace" as const,
+            open: () => setWorkspacePage("practice-settings" as const),
+          },
           {
             id: "workspace-settings",
             label: "Workspace settings",
@@ -1359,6 +1396,17 @@ function AccountsWorkspace({
                     >
                       Clients
                     </NavItem>
+                    <NavItem
+                      className="workspace-nav-item"
+                      value="work"
+                      icon={<DocumentRegular />}
+                      onClick={() => {
+                        setWorkspacePage("work");
+                        setMobileNavOpen(false);
+                      }}
+                    >
+                      Work
+                    </NavItem>
                     {["OWNER", "ADMIN"].includes(
                       selectedMembership?.role_code || "",
                     ) && (
@@ -1520,6 +1568,21 @@ function AccountsWorkspace({
                     ) && (
                       <NavItem
                         className="workspace-nav-item"
+                        value="practice-settings"
+                        icon={<DocumentRegular />}
+                        onClick={() => {
+                          setWorkspacePage("practice-settings");
+                          setMobileNavOpen(false);
+                        }}
+                      >
+                        Practice Management
+                      </NavItem>
+                    )}
+                    {["OWNER", "ADMIN"].includes(
+                      selectedMembership?.role_code || "",
+                    ) && (
+                      <NavItem
+                        className="workspace-nav-item"
                         value="settings"
                         icon={<DocumentRegular />}
                         onClick={() => {
@@ -1566,6 +1629,29 @@ function AccountsWorkspace({
               memberships={memberships}
               onSelect={selectWorkspace}
             />
+          ) : workspacePage === "work" ||
+            workspacePage === "practice-settings" ? (
+            <RoutePanelBoundary resetKey={workspacePage}>
+              <Suspense fallback={<Skeleton />}>
+                <PracticeManagement
+                  view={
+                    workspacePage === "work" ? practiceView : "settings"
+                  }
+                  context={context}
+                  workItemId={practiceWorkItemId}
+                  clientId={practiceClientId}
+                  onOpenWork={(workItemId) => {
+                    setPracticeWorkItemId(workItemId);
+                    setPracticeView("work-detail");
+                  }}
+                  onOpenClient={(clientId) => {
+                    setPracticeClientId(clientId);
+                    setPracticeView("client-summary");
+                  }}
+                  onBack={() => setPracticeView("work")}
+                />
+              </Suspense>
+            </RoutePanelBoundary>
           ) : workspacePage === "clients" ? (
             <ClientsView
               context={context}

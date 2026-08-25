@@ -15,7 +15,10 @@ WITH required_tables(table_name) AS (VALUES
   ('contact'),('relationship_type_definition'),('client_contact_relationship'),
   ('address'),('client_address'),('product_definition'),('module_definition'),
   ('feature_definition'),('tenant_entitlement'),('tenant_entitlement_override'),
-  ('tenant_setting')
+  ('tenant_setting'),('practice_service'),('client_service'),
+  ('practice_engagement'),('practice_engagement_service'),('work_template'),
+  ('work_template_task'),('work_item'),('practice_task'),
+  ('work_item_ledgerly_link')
 ), state AS (
   SELECT c.relname,c.relrowsecurity,c.relforcerowsecurity
   FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
@@ -76,3 +79,8 @@ ROLLBACK;
 -- SELECT * FROM tenant_feature_decision('ledgerly.enabled');
 -- Expected: a boolean permission decision and one transitional/override-backed
 -- Ledgerly decision for existing tenants.
+
+-- 8. PM-002 decisions and RLS behavior are exercised end-to-end by
+-- practice_management_disposable_verification.sql on a disposable Neon branch.
+-- The expected migration head is 0030 and accounts_app must have no DELETE
+-- privilege on any Practice Management table.

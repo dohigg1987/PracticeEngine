@@ -32,11 +32,14 @@ Events describe completed facts. Consumers must be idempotent by `eventId`. Sens
 | `service.activated` | Practice Management | Service enabled for client; service/client IDs, effective date. |
 | `service.terminated` | Practice Management | Service ended; service/client IDs, effective date and reason category. |
 | `engagement.created` | Practice Management | Generic engagement created; client, service and engagement IDs. |
-| `engagement.accepted` | Practice Management | Acceptance decision recorded; engagement ID and decision version. |
-| `engagement.closed` | Practice Management | Engagement closed; ID, closure time and outcome category. |
-| `job.created` | Practice Management | Operational job created; job, engagement/service/client IDs and due date. |
-| `job.completed` | Practice Management | Job completion accepted; job ID, completion time and version. |
-| `task.completed` | Practice Management | Task completed; task/job IDs and completion actor/time. |
+| `engagement.activated` | Practice Management | Engagement activated; engagement ID, client ID and effective date. |
+| `engagement.completed` | Practice Management | Engagement completed; ID, completion time and version. |
+| `engagement.terminated` | Practice Management | Engagement terminated; ID, effective time and reason category where recorded. |
+| `work.created` | Practice Management | Operational work created; work, engagement/service/client IDs and due date. |
+| `work.assigned` | Practice Management | Work responsibility changed; work ID and member/team references. |
+| `work.status_changed` | Practice Management | Work status changed; work ID, prior/current states and version. |
+| `work.completed` | Practice Management | Work completion accepted; work ID, completion time and version. |
+| `task.completed` | Practice Management | Task completed; task/work IDs and completion actor/time. |
 | `document.uploaded` | Platform Core | Authorized document version stored; document/version IDs, classification, hash, byte size. No storage key in public payloads. |
 | `proposal.accepted` | QuoteBench or owning proposal module | Proposal accepted; proposal/client IDs and accepted version. |
 | `ledgerly.workspace.created` | Ledgerly | Ledgerly capability initialized for tenant/client context; module workspace and shared reference IDs. |

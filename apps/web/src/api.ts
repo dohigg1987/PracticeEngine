@@ -768,6 +768,104 @@ export type NormalizedImportPreview = {
   warnings: string[];
 };
 export type ApiContext = { tenantId: string };
+export type PracticeService = {
+  id: string;
+  name: string;
+  description?: string | null;
+  category?: string | null;
+  status: "active" | "inactive";
+  default_frequency?: string | null;
+  responsible_team_id?: string | null;
+  specialist_module_key?: string | null;
+  entitlement_feature_key?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+export type ClientService = {
+  id: string;
+  client_id: string;
+  service_id: string;
+  service_name?: string;
+  status: "active" | "inactive" | "terminated";
+  start_date?: string | null;
+  end_date?: string | null;
+  frequency?: string | null;
+  responsible_member_id?: string | null;
+  responsible_team_id?: string | null;
+  specialist_module_key?: string | null;
+};
+export type PracticeEngagement = {
+  id: string;
+  client_id: string;
+  client_name?: string;
+  reference: string;
+  name: string;
+  status: "draft" | "proposed" | "active" | "suspended" | "completed" | "terminated";
+  acceptance_state: "not_required" | "pending" | "accepted" | "declined";
+  start_date?: string | null;
+  end_date?: string | null;
+  responsible_owner_id?: string | null;
+  responsible_team_id?: string | null;
+};
+export type PracticeWorkStatus = "not_started" | "ready" | "in_progress" | "waiting_on_client" | "waiting_internal" | "review" | "completed" | "cancelled";
+export type PracticeWorkItem = {
+  id: string;
+  client_id: string;
+  client_name?: string;
+  client_service_id: string;
+  service_name?: string;
+  engagement_id?: string | null;
+  engagement_name?: string | null;
+  title: string;
+  period_reference?: string | null;
+  status: PracticeWorkStatus;
+  priority: "low" | "normal" | "high" | "urgent";
+  assigned_member_id?: string | null;
+  assigned_member_name?: string | null;
+  assigned_team_id?: string | null;
+  assigned_team_name?: string | null;
+  planned_start_date?: string | null;
+  due_date?: string | null;
+  completed_at?: string | null;
+  specialist_module_key?: string | null;
+  specialist_record_reference?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+export type PracticeTask = {
+  id: string;
+  work_item_id: string;
+  title: string;
+  description?: string | null;
+  status: "not_started" | "in_progress" | "blocked" | "review" | "completed" | "skipped";
+  assignee_member_id?: string | null;
+  assignee_name?: string | null;
+  team_id?: string | null;
+  team_name?: string | null;
+  reviewer_member_id?: string | null;
+  sequence: number;
+  due_date?: string | null;
+  completed_at?: string | null;
+};
+export type PracticeWorkTemplate = {
+  id: string;
+  name: string;
+  service_id?: string | null;
+  service_name?: string | null;
+  version: number;
+  status: "active" | "inactive";
+  tasks?: Array<{ id?: string; title: string; description?: string | null; sequence: number; dueDateOffsetDays?: number | null; mandatory: boolean }>;
+};
+export type PracticeClientSummary = {
+  client: { id: string; legal_name?: string; name?: string };
+  services: ClientService[];
+  engagements: PracticeEngagement[];
+  workItems: PracticeWorkItem[];
+  upcomingTasks: PracticeTask[];
+};
+export function practiceClientSummaryItem(response: { item: PracticeClientSummary }): PracticeClientSummary {
+  return response.item;
+}
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -779,7 +877,10 @@ export class ApiError extends Error {
 }
 const apiBase = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 const demoTransport =
-  import.meta.env.DEV && import.meta.env.VITE_DEMO_MODE === "true";
+  (import.meta.env.VITE_PM_PROGRESS_PREVIEW === "true" &&
+    typeof window !== "undefined" &&
+    window.location.hostname === "pm-002-progress.ledgerly-accounts.pages.dev") ||
+  (import.meta.env.DEV && import.meta.env.VITE_DEMO_MODE === "true");
 
 async function request<T>(
   path: string,
@@ -1928,4 +2029,32 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  practiceServices: (context: ApiContext) =>
+    request<{ items: PracticeService[] }>("/v1/practice/services", context),
+  createPracticeService: (context: ApiContext, body: Record<string, unknown>) =>
+    request<{ item: PracticeService }>("/v1/practice/services", context, { method: "POST", body: JSON.stringify(body) }),
+  updatePracticeService: (context: ApiContext, id: string, body: Record<string, unknown>) =>
+    request<{ item: PracticeService }>(`/v1/practice/services/${encodeURIComponent(id)}`, context, { method: "PATCH", body: JSON.stringify(body) }),
+  clientServices: (context: ApiContext, clientId: string) =>
+    request<{ items: ClientService[] }>(`/v1/clients/${encodeURIComponent(clientId)}/services`, context),
+  practiceEngagements: (context: ApiContext, clientId?: string) =>
+    request<{ items: PracticeEngagement[] }>(`/v1/practice/engagements${clientId ? `?clientId=${encodeURIComponent(clientId)}` : ""}`, context),
+  practiceWork: (context: ApiContext, filters: { clientId?: string; serviceId?: string; status?: string; assignedMemberId?: string; dueBefore?: string } = {}) => {
+    const query = new URLSearchParams(Object.entries(filters).filter((entry): entry is [string, string] => Boolean(entry[1]))).toString();
+    return request<{ items: PracticeWorkItem[] }>(`/v1/practice/work${query ? `?${query}` : ""}`, context);
+  },
+  practiceWorkItem: (context: ApiContext, id: string) =>
+    request<{ item: PracticeWorkItem }>(`/v1/practice/work/${encodeURIComponent(id)}`, context),
+  updatePracticeWorkStatus: (context: ApiContext, id: string, status: PracticeWorkStatus) =>
+    request<{ item: PracticeWorkItem }>(`/v1/practice/work/${encodeURIComponent(id)}/status`, context, { method: "POST", body: JSON.stringify({ status }) }),
+  practiceTasks: (context: ApiContext, workId: string) =>
+    request<{ items: PracticeTask[] }>(`/v1/practice/work/${encodeURIComponent(workId)}/tasks`, context),
+  updatePracticeTaskStatus: (context: ApiContext, id: string, status: PracticeTask["status"]) =>
+    request<{ item: PracticeTask }>(`/v1/practice/tasks/${encodeURIComponent(id)}/status`, context, { method: "POST", body: JSON.stringify({ status }) }),
+  practiceWorkTemplates: (context: ApiContext) =>
+    request<{ items: PracticeWorkTemplate[] }>("/v1/practice/work-templates", context),
+  createPracticeWorkTemplate: (context: ApiContext, body: Record<string, unknown>) =>
+    request<{ item: PracticeWorkTemplate }>("/v1/practice/work-templates", context, { method: "POST", body: JSON.stringify(body) }),
+  practiceClientSummary: async (context: ApiContext, clientId: string) =>
+    practiceClientSummaryItem(await request<{ item: PracticeClientSummary }>(`/v1/practice/clients/${encodeURIComponent(clientId)}/summary`, context)),
 };

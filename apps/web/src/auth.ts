@@ -1,7 +1,13 @@
 import { createAuthClient } from "@neondatabase/neon-js/auth";
 
 const authUrl = import.meta.env.VITE_NEON_AUTH_URL?.trim() ?? "";
-export const demoMode = import.meta.env.DEV && import.meta.env.VITE_DEMO_MODE === "true";
+const progressPreview =
+  import.meta.env.VITE_PM_PROGRESS_PREVIEW === "true" &&
+  typeof window !== "undefined" &&
+  window.location.hostname === "pm-002-progress.ledgerly-accounts.pages.dev";
+export const demoMode =
+  progressPreview ||
+  (import.meta.env.DEV && import.meta.env.VITE_DEMO_MODE === "true");
 
 export const authConfigured = demoMode || Boolean(authUrl);
 const browserOrigin = typeof window === "undefined" ? "http://127.0.0.1" : window.location.origin;

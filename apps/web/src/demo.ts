@@ -3,6 +3,10 @@ import type {
   OrganisationPermanentFile,
   PermanentFileAdviser,
   PermanentFileOfficer,
+  PracticeService,
+  PracticeTask,
+  PracticeWorkItem,
+  PracticeWorkTemplate,
   WorkingPaper,
   WorkingPaperAttachment,
   WorkingPaperCategory,
@@ -13,6 +17,24 @@ import type {
 } from "./api";
 
 const now = "2027-03-18T09:30:00.000Z";
+let demoPracticeServices: PracticeService[] = [
+  { id: "service-accounts", name: "Annual accounts", description: "Statutory accounts preparation and filing support", category: "accounts", status: "active", default_frequency: "annual", specialist_module_key: "ledgerly", entitlement_feature_key: "ledgerly.accounts" },
+  { id: "service-vat", name: "VAT returns", description: "Periodic VAT return preparation", category: "tax", status: "active", default_frequency: "quarterly" },
+  { id: "service-advisory", name: "Advisory", description: "General business advisory engagements", category: "advisory", status: "active" },
+];
+let demoPracticeWork: PracticeWorkItem[] = [
+  { id: "work-accounts-2026", client_id: "demo-org", client_name: "Northstar Community Foundation", client_service_id: "client-service-accounts", service_name: "Annual accounts", engagement_id: "practice-engagement-1", engagement_name: "2026 accounts engagement", title: "2026 Annual Accounts", period_reference: "Year ended 31 December 2026", status: "in_progress", priority: "high", assigned_member_id: "member-demo", assigned_member_name: "Demo Partner", assigned_team_name: "Accounts", planned_start_date: "2027-01-08", due_date: "2027-09-30", specialist_module_key: "ledgerly", specialist_record_reference: "demo-engagement" },
+  { id: "work-vat-q1", client_id: "demo-org-2", client_name: "Harbour Trading Ltd", client_service_id: "client-service-vat", service_name: "VAT returns", title: "Q1 VAT Return", period_reference: "Quarter ended 31 March 2027", status: "waiting_on_client", priority: "urgent", assigned_member_name: "Demo Partner", assigned_team_name: "Business services", planned_start_date: "2027-04-02", due_date: "2027-05-07" },
+  { id: "work-advisory", client_id: "demo-org", client_name: "Northstar Community Foundation", client_service_id: "client-service-advisory", service_name: "Advisory", title: "Funding model review", status: "ready", priority: "normal", assigned_team_name: "Advisory", due_date: "2027-04-15" },
+];
+let demoPracticeTasks: PracticeTask[] = [
+  { id: "pm-task-1", work_item_id: "work-accounts-2026", title: "Confirm engagement scope", status: "completed", assignee_name: "Demo Partner", sequence: 10, due_date: "2027-01-10", completed_at: now },
+  { id: "pm-task-2", work_item_id: "work-accounts-2026", title: "Prepare accounts", description: "Complete Ledgerly accounts-production work", status: "in_progress", assignee_name: "Demo Partner", team_name: "Accounts", sequence: 20, due_date: "2027-08-31" },
+  { id: "pm-task-3", work_item_id: "work-accounts-2026", title: "Partner review", status: "not_started", reviewer_member_id: "member-reviewer", sequence: 30, due_date: "2027-09-15" },
+];
+const demoPracticeTemplates: PracticeWorkTemplate[] = [
+  { id: "template-accounts", name: "Annual accounts delivery", service_id: "service-accounts", service_name: "Annual accounts", version: 1, status: "active", tasks: [{ title: "Confirm scope", sequence: 10, mandatory: true }, { title: "Prepare accounts", sequence: 20, mandatory: true }, { title: "Partner review", sequence: 30, mandatory: true }] },
+];
 const engagement = {
   id: "demo-engagement",
   organisation_id: "demo-org",
@@ -1221,8 +1243,53 @@ const reads: Array<[RegExp, unknown]> = [
   ],
 ];
 
+function practiceDemoRead(path: string): unknown | undefined {
+  if (path === "/v1/practice/services") return { items: structuredClone(demoPracticeServices) };
+  if (path === "/v1/practice/work-templates") return { items: structuredClone(demoPracticeTemplates) };
+  if (path.startsWith("/v1/practice/work?" ) || path === "/v1/practice/work") return { items: structuredClone(demoPracticeWork) };
+  const workMatch = path.match(/^\/v1\/practice\/work\/([^/]+)$/);
+  if (workMatch) return { item: structuredClone(demoPracticeWork.find((item) => item.id === workMatch[1])) };
+  const tasksMatch = path.match(/^\/v1\/practice\/work\/([^/]+)\/tasks$/);
+  if (tasksMatch) return { items: structuredClone(demoPracticeTasks.filter((item) => item.work_item_id === tasksMatch[1])) };
+  const summaryMatch = path.match(/^\/v1\/practice\/clients\/([^/]+)\/summary$/);
+  if (summaryMatch) {
+    const clientId = summaryMatch[1];
+    const clientName = clientId === "demo-org-2" ? "Harbour Trading Ltd" : "Northstar Community Foundation";
+    return { item: {
+      client: { id: clientId, legal_name: clientName },
+      services: demoPracticeServices.slice(0, clientId === "demo-org-2" ? 2 : 3).map((service, index) => ({ id: `client-${service.id}`, client_id: clientId, service_id: service.id, service_name: service.name, status: "active", frequency: service.default_frequency, responsible_team_id: index ? null : "team-accounts", specialist_module_key: service.specialist_module_key })),
+      engagements: [{ id: "practice-engagement-1", client_id: clientId, client_name: clientName, reference: "PE-2027-001", name: "2027 professional services", status: "active", acceptance_state: "accepted", start_date: "2027-01-01", responsible_owner_id: "member-demo" }],
+      workItems: structuredClone(demoPracticeWork.filter((item) => item.client_id === clientId)),
+      upcomingTasks: structuredClone(demoPracticeTasks.filter((item) => item.status !== "completed")),
+    } };
+  }
+  return undefined;
+}
+
 export function demoRequest(path: string, init?: RequestInit): unknown {
   const method = init?.method ?? "GET";
+  if (method === "GET") {
+    const practiceRead = practiceDemoRead(path);
+    if (practiceRead !== undefined) return practiceRead;
+  }
+  if (method === "POST" && path === "/v1/practice/services") {
+    const body = JSON.parse(String(init?.body || "{}")) as Partial<PracticeService>;
+    const item: PracticeService = { id: `service-${Date.now()}`, name: body.name || "New service", description: body.description, category: body.category, status: body.status || "active", default_frequency: body.default_frequency, specialist_module_key: body.specialist_module_key };
+    demoPracticeServices = [...demoPracticeServices, item];
+    return { item: structuredClone(item) };
+  }
+  const workStatusMatch = path.match(/^\/v1\/practice\/work\/([^/]+)\/status$/);
+  if (method === "POST" && workStatusMatch) {
+    const body = JSON.parse(String(init?.body || "{}")) as { status: PracticeWorkItem["status"] };
+    demoPracticeWork = demoPracticeWork.map((item) => item.id === workStatusMatch[1] ? { ...item, status: body.status, completed_at: body.status === "completed" ? now : item.completed_at } : item);
+    return { item: structuredClone(demoPracticeWork.find((item) => item.id === workStatusMatch[1])) };
+  }
+  const taskStatusMatch = path.match(/^\/v1\/practice\/tasks\/([^/]+)\/status$/);
+  if (method === "POST" && taskStatusMatch) {
+    const body = JSON.parse(String(init?.body || "{}")) as { status: PracticeTask["status"] };
+    demoPracticeTasks = demoPracticeTasks.map((item) => item.id === taskStatusMatch[1] ? { ...item, status: body.status, completed_at: body.status === "completed" ? now : item.completed_at } : item);
+    return { item: structuredClone(demoPracticeTasks.find((item) => item.id === taskStatusMatch[1])) };
+  }
   if (method === "POST" && path.endsWith("/mappings")) {
     const body = JSON.parse(String(init?.body || "{}")) as {
       sourceAccountId?: string;
