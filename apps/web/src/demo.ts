@@ -7,6 +7,7 @@ import type {
   PracticeTask,
   PracticeWorkItem,
   PracticeWorkTemplate,
+  RecurringWorkSchedule,
   WorkingPaper,
   WorkingPaperAttachment,
   WorkingPaperCategory,
@@ -33,7 +34,11 @@ let demoPracticeTasks: PracticeTask[] = [
   { id: "pm-task-3", work_item_id: "work-accounts-2026", title: "Partner review", status: "not_started", reviewer_member_id: "member-reviewer", sequence: 30, due_date: "2027-09-15" },
 ];
 const demoPracticeTemplates: PracticeWorkTemplate[] = [
-  { id: "template-accounts", name: "Annual accounts delivery", service_id: "service-accounts", service_name: "Annual accounts", version: 1, status: "active", tasks: [{ title: "Confirm scope", sequence: 10, mandatory: true }, { title: "Prepare accounts", sequence: 20, mandatory: true }, { title: "Partner review", sequence: 30, mandatory: true }] },
+  { id: "template-accounts", name: "Annual accounts delivery", service_id: "service-accounts", service_name: "Annual accounts", version: 1, status: "published", tasks: [{ title: "Confirm scope", sequence: 10, mandatory: true }, { title: "Prepare accounts", sequence: 20, mandatory: true }, { title: "Partner review", sequence: 30, mandatory: true }] },
+];
+const demoRecurringSchedules: RecurringWorkSchedule[] = [
+  { id: "schedule-accounts", client_id: "demo-org", client_name: "Northstar Community Foundation", client_service_id: "client-service-accounts", service_name: "Annual accounts", work_template_id: "template-accounts", template_name: "Annual accounts delivery", recurrence_rule: { frequency: "annually" }, next_occurrence_date: "2027-12-31", next_due_date: "2028-09-30", owner_name: "Demo Partner", team_name: "Accounts", specialist_module_key: "ledgerly", status: "active" },
+  { id: "schedule-vat", client_id: "demo-org-2", client_name: "Harbour Trading Ltd", client_service_id: "client-service-vat", service_name: "VAT returns", work_template_id: "template-accounts", template_name: "Quarterly VAT delivery", recurrence_rule: { frequency: "quarterly" }, next_occurrence_date: "2027-06-30", next_due_date: "2027-08-07", team_name: "Business services", status: "active" },
 ];
 const engagement = {
   id: "demo-engagement",
@@ -1246,6 +1251,7 @@ const reads: Array<[RegExp, unknown]> = [
 function practiceDemoRead(path: string): unknown | undefined {
   if (path === "/v1/practice/services") return { items: structuredClone(demoPracticeServices) };
   if (path === "/v1/practice/work-templates") return { items: structuredClone(demoPracticeTemplates) };
+  if (path === "/v1/practice/recurring-schedules") return { items: structuredClone(demoRecurringSchedules) };
   if (path.startsWith("/v1/practice/work?" ) || path === "/v1/practice/work") return { items: structuredClone(demoPracticeWork) };
   const workMatch = path.match(/^\/v1\/practice\/work\/([^/]+)$/);
   if (workMatch) return { item: structuredClone(demoPracticeWork.find((item) => item.id === workMatch[1])) };

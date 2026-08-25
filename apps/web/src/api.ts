@@ -826,6 +826,12 @@ export type PracticeWorkItem = {
   assigned_team_name?: string | null;
   planned_start_date?: string | null;
   due_date?: string | null;
+  calculated_due_date?: string | null;
+  due_date_overridden?: boolean;
+  due_date_override_reason?: string | null;
+  due_date_calculation?: Record<string, unknown>;
+  source_template_id?: string | null;
+  source_template_version?: number | null;
   completed_at?: string | null;
   specialist_module_key?: string | null;
   specialist_record_reference?: string | null;
@@ -853,8 +859,15 @@ export type PracticeWorkTemplate = {
   service_id?: string | null;
   service_name?: string | null;
   version: number;
-  status: "active" | "inactive";
+  status: "draft" | "published" | "superseded" | "archived";
   tasks?: Array<{ id?: string; title: string; description?: string | null; sequence: number; dueDateOffsetDays?: number | null; mandatory: boolean }>;
+};
+export type RecurringWorkSchedule = {
+  id: string; client_id: string; client_name?: string; client_service_id: string; service_name?: string;
+  work_template_id: string; template_name?: string; recurrence_rule: { frequency?: string; interval?: number };
+  next_occurrence_date?: string | null; next_due_date?: string | null; owner_name?: string | null; team_name?: string | null;
+  specialist_module_key?: string | null; status: "active" | "suspended" | "blocked_entitlement" | "archived";
+  generation_block_reason?: string | null;
 };
 export type PracticeClientSummary = {
   client: { id: string; legal_name?: string; name?: string };
@@ -862,6 +875,7 @@ export type PracticeClientSummary = {
   engagements: PracticeEngagement[];
   workItems: PracticeWorkItem[];
   upcomingTasks: PracticeTask[];
+  recurringSchedules?: RecurringWorkSchedule[];
 };
 export function practiceClientSummaryItem(response: { item: PracticeClientSummary }): PracticeClientSummary {
   return response.item;
@@ -2055,6 +2069,16 @@ export const api = {
     request<{ items: PracticeWorkTemplate[] }>("/v1/practice/work-templates", context),
   createPracticeWorkTemplate: (context: ApiContext, body: Record<string, unknown>) =>
     request<{ item: PracticeWorkTemplate }>("/v1/practice/work-templates", context, { method: "POST", body: JSON.stringify(body) }),
+  publishPracticeWorkTemplate: (context: ApiContext, id: string) =>
+    request<{ item: PracticeWorkTemplate }>(`/v1/practice/work-templates/${encodeURIComponent(id)}/publish`, context, { method: "POST", body: "{}" }),
+  recurringSchedules: (context: ApiContext) =>
+    request<{ items: RecurringWorkSchedule[] }>("/v1/practice/recurring-schedules", context),
+  generateRecurringSchedule: (context: ApiContext, id: string) =>
+    request<{ generated: number; workItemIds: string[] }>(`/v1/practice/recurring-schedules/${encodeURIComponent(id)}/generate`, context, { method: "POST", body: "{}" }),
+  overridePracticeDeadline: (context: ApiContext, id: string, dueDate: string, reason: string) =>
+    request<{ item: PracticeWorkItem }>(`/v1/practice/work/${encodeURIComponent(id)}/deadline-override`, context, { method: "POST", body: JSON.stringify({ dueDate, reason }) }),
+  recalculatePracticeDeadline: (context: ApiContext, id: string) =>
+    request<{ item: PracticeWorkItem }>(`/v1/practice/work/${encodeURIComponent(id)}/deadline-recalculate`, context, { method: "POST", body: "{}" }),
   practiceClientSummary: async (context: ApiContext, clientId: string) =>
     practiceClientSummaryItem(await request<{ item: PracticeClientSummary }>(`/v1/practice/clients/${encodeURIComponent(clientId)}/summary`, context)),
 };

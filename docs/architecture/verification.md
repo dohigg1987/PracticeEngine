@@ -3,6 +3,7 @@
 ## What is enforced now
 
 - Sequential migration filenames, baseline migration recording and production binding lockstep: `npm run verify:lockstep`.
+- Disposable Neon migration execution and database security invariants: `npm run verify:neon-migrations`. It requires an explicitly confirmed non-production Neon owner URL and executes each migration file as one complete PostgreSQL script.
 - Domain/API/web type and test gates: existing npm scripts and CI.
 - Fluent source-debt ceilings, prohibited native controls/internal selectors and token rules: web UI quality guard.
 - Security-header generation and validation.

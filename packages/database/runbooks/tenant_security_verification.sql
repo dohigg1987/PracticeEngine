@@ -82,5 +82,5 @@ ROLLBACK;
 
 -- 8. PM-002 decisions and RLS behavior are exercised end-to-end by
 -- practice_management_disposable_verification.sql on a disposable Neon branch.
--- The expected migration head is 0030 and accounts_app must have no DELETE
+-- The expected migration head is 0031 and accounts_app must have no DELETE
 -- privilege on any Practice Management table.

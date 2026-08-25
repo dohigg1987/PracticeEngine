@@ -8,7 +8,7 @@ The model is intentionally profession-neutral. Annual accounts, bookkeeping, VAT
 
 ## Client services
 
-`client_service` records that a canonical client receives a catalogue service. It retains effective dates, frequency, responsible member/team, specialist module and bounded structured configuration. A client can hold multiple active services. PM-002 does not yet prevent duplicate simultaneous activation of the same catalogue service; callers must surface existing assignments before creating another.
+`client_service` records that a canonical client receives a catalogue service. It retains effective dates, frequency, responsible member/team, specialist module and bounded structured configuration. PM-003 prevents overlapping active instances of the same service at the database level. Legitimate parallel delivery uses an explicit `instance_key`, preserving engagement-specific or otherwise discriminated configurations.
 
 Activation validates the client and catalogue service inside the authenticated tenant. Any service-required entitlement is evaluated server-side. Ledgerly-backed services additionally require `ledgerly.enabled` and their configured feature entitlement. Activation and termination append immutable audit evidence and normalized `service.activated` or `service.terminated` outbox events.
 

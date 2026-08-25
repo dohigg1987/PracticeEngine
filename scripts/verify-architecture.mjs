@@ -26,6 +26,11 @@ const requiredDocuments = [
   "docs/architecture/work-management.md",
   "docs/architecture/module-work-integration.md",
   "docs/architecture/infrastructure.md",
+  "docs/architecture/recurring-work.md",
+  "docs/architecture/deadline-engine.md",
+  "docs/architecture/work-template-versioning.md",
+  "docs/architecture/work-generation.md",
+  "docs/architecture/cloudflare-scheduling.md",
   "docs/design/DESIGN-CONSTITUTION.md",
   "docs/design/ANTI-PATTERNS.md",
   "AGENTS.md",
@@ -153,6 +158,20 @@ if (practiceMigrationName) {
     "tasks.view", "tasks.manage", "worktemplates.manage"
   ])
     if (!practiceMigration.includes(`'${permission}'`)) failures.push(`${practiceMigrationName} is missing ${permission}`);
+}
+
+const recurringMigrationName = migrations.find((name) => name.includes("recurring_work_deadline_engine"));
+if (recurringMigrationName) {
+  const recurringMigration = await readFile(path.join(migrationDirectory, recurringMigrationName), "utf8");
+  for (const table of ["deadline_rule", "recurring_work_schedule", "recurrence_generation", "practice_task_dependency"]) {
+    const declaration = new RegExp(`CREATE TABLE ${table}\\([\\s\\S]*?tenant_id uuid NOT NULL`, "i");
+    if (!declaration.test(recurringMigration)) failures.push(`${recurringMigrationName}: ${table} lacks a required tenant_id`);
+    if (!recurringMigration.includes(`'${table}'`)) failures.push(`${recurringMigrationName}: ${table} is missing from the forced-RLS inventory`);
+  }
+  for (const permission of ["recurrence.view", "recurrence.manage", "deadlines.view", "deadlines.override", "work.generate", "worktemplates.publish"])
+    if (!recurringMigration.includes(`'${permission}'`)) failures.push(`${recurringMigrationName} is missing ${permission}`);
+  for (const invariant of ["client_service_active_period_excl", "recurring_schedule_id,occurrence_date", "due_date_override_reason"])
+    if (!recurringMigration.includes(invariant)) failures.push(`${recurringMigrationName} is missing ${invariant}`);
 }
 
 if (failures.length) {

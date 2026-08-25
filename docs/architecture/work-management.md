@@ -14,7 +14,7 @@ Task reads require `tasks.view`; task creation, assignment and transitions requi
 
 ## Templates
 
-`work_template` and ordered `work_template_task` records provide configuration-driven reusable task structures for one service. Templates are versioned and can define default role/team, due-date offsets and mandatory/optional tasks. PM-002 provides template definition and management; work/task instantiation from templates is deferred. Recurrence, deadline rules, automation and visual workflow design are also excluded.
+`work_template` and ordered `work_template_task` records provide configuration-driven reusable task structures for one service. Templates define default role/team, due-date offsets and mandatory/optional tasks. PM-003 publishes immutable historical versions and instantiates work/tasks with source provenance. Recurrence and deadline rules are separate application services; arbitrary automation and visual workflow design remain excluded.
 
 ## UI
 

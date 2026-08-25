@@ -16,7 +16,7 @@ PM-002 introduces no alternative host, database, identity provider or event brok
 
 ## Database change control
 
-Migration `0030` is forward-only and additive. Every new tenant table has a tenant key, tenant-safe foreign keys, indexes, forced RLS and least-privilege `accounts_app` grants. A disposable-Neon verification script covers representative existing schema/data, cross-tenant denial, entitlement enforcement and migration-head checks; remote execution is pending because the current Neon baseline does not yet include migration `0029`. This implementation task does not promote the migration to production.
+Migration `0031` is forward-only and additive. Every new tenant table has a tenant key, tenant-safe foreign keys, indexes, forced RLS and least-privilege `accounts_app` grants. `npm run verify:neon-migrations` executes complete SQL scripts and behavioral fixtures on an explicitly confirmed disposable Neon target. PM-003 validated `0029`-`0031` remotely and does not promote them to production.
 
 ## Runtime and release control
 

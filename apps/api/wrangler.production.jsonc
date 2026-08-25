@@ -8,7 +8,8 @@
   "preview_urls": false,
   "vars": {
     "WEB_ORIGIN": "https://ledgerly-accounts.pages.dev",
-    "NEON_AUTH_URL": "https://ep-wispy-thunder-zatp3scz.neonauth.c-2.eu-west-2.aws.neon.tech/neondb/auth"
+    "NEON_AUTH_URL": "https://ep-wispy-thunder-zatp3scz.neonauth.c-2.eu-west-2.aws.neon.tech/neondb/auth",
+    "RECURRENCE_EXECUTION_CONTEXTS": "[]"
   },
   "observability": {
     "enabled": true,

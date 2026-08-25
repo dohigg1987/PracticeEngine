@@ -16,8 +16,10 @@ Practice records are tenant owned, permission checked in the Worker, entitlement
 
 The web shell adds Practice Management work, client summary and configuration surfaces using Fluent UI React v9. Browser visibility remains presentational; the Worker and Postgres remain the security boundaries.
 
+PM-003 adds published template instantiation, recurring schedules, deterministic recurrence/deadline evaluation, bounded idempotent generation, deadline override provenance and member display labels. Recurrence and deadline rules remain separate. The Cloudflare scheduled adapter is present but no production Cron Trigger is deployed.
+
 ## Compatibility and rollback
 
 The current `organisation` identifier remains the client key. The current Ledgerly `engagement` remains the accounts-production workspace and can be linked one-to-one to a Practice work item through an explicit tenant-safe relation. Existing Ledgerly tasks and review points remain intact.
 
-Rollback is to stop routing the new application service and restore the disposable/pre-migration Neon branch or PITR point. Migration `0030` is additive and no previous table, column, route, event or object is removed.
+Rollback is to stop routing the new application service and restore the disposable/pre-migration Neon branch or PITR point. Migrations `0030` and `0031` are additive and no previous table, column, route, event or object is removed.

@@ -13,7 +13,7 @@ The API never treats UI visibility as authorization. Canonical client operations
 
 ## Initial permission catalogue
 
-The catalogue includes client view/create/edit/archive, contact management, user management, team management, settings management, audit view, Ledgerly view/edit and entitlement view. Standard owner/admin roles receive all PM-001 permissions. The transitional member role receives client view, Ledgerly view and entitlement view. Custom tenant roles can be added without changing application code.
+The catalogue includes client view/create/edit/archive, contact management, user management, team management, settings management, audit view, Ledgerly view/edit, entitlement view, recurrence view/manage, deadline view/override, work generation and template publication. Standard owner/admin roles receive all permissions. The transitional member role receives read-only Practice recurrence/deadline access alongside its existing client, work, task, Ledgerly and entitlement views. Custom tenant roles can be added without changing application code.
 
 Legacy routes still use existing OWNER/ADMIN and engagement-role checks. A compatibility trigger mirrors changes to `tenant_member.role_code` into the new assignment table, so those routes can migrate incrementally.
 

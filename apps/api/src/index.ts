@@ -23,7 +23,7 @@ import { authenticateRequest, neonAccessTokenVerifier } from "./auth.js";
 import { handleCommercialRoute } from "./commercial.js";
 import { handlePermanentFileRoute } from "./permanent-file.js";
 import { handlePlatformCoreRoute } from "./platform-core.js";
-import { handlePracticeManagementRoute } from "./practice-management.js";
+import { handlePracticeManagementRoute, runScheduledRecurringGeneration } from "./practice-management.js";
 import {
   MAX_WORKING_PAPER_EVIDENCE_BYTES,
   WORKING_PAPER_ASSERTIONS,
@@ -5549,6 +5549,10 @@ async function canonicalAccounts(
 }
 
 export default {
+  async scheduled(controller: ScheduledController, env: Env): Promise<void> {
+    const result = await runScheduledRecurringGeneration(env);
+    console.log(JSON.stringify({ message: "recurrence generation completed", scheduledTime: controller.scheduledTime, cron: controller.cron, ...result }));
+  },
   async fetch(request: Request, env: Env): Promise<Response> {
     const startedAt = performance.now();
     const correlationId = requestCorrelationId(

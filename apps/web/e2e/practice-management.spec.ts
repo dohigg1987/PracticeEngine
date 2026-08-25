@@ -35,3 +35,13 @@ test("practice settings exposes service and template configuration at narrow wid
   expect(widths.root).toBeLessThanOrEqual(widths.viewport + 1);
   expect(widths.body).toBeLessThanOrEqual(widths.viewport + 1);
 });
+
+test("recurring work exposes the operational schedule table", async ({ page }) => {
+  await start(page);
+  await openNav(page);
+  await page.locator('button[value="work"]').click();
+  await page.getByRole("tab", { name: "Recurring work" }).click();
+  await expect(page.getByRole("heading", { name: "Recurring work" })).toBeVisible();
+  await expect(page.getByRole("table", { name: "Recurring work schedules" })).toContainText("Northstar Community Foundation");
+  await expect(page.getByRole("table", { name: "Recurring work schedules" })).toContainText("Annually");
+});

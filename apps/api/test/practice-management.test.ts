@@ -6,6 +6,7 @@ const service = await readFile(new URL("../src/practice-management.ts", import.m
 const platform = await readFile(new URL("../src/platform-core.ts", import.meta.url), "utf8");
 const dispatcher = await readFile(new URL("../src/index.ts", import.meta.url), "utf8");
 const migration = await readFile(new URL("../../../packages/database/migrations/0030_practice_management_work_foundation.sql", import.meta.url), "utf8");
+const pm003Migration = await readFile(new URL("../../../packages/database/migrations/0031_recurring_work_deadline_engine.sql", import.meta.url), "utf8");
 
 test("exposes the complete Practice Management route surface", () => {
   for (const route of [
@@ -76,9 +77,39 @@ test("rejects malformed identifiers dates and duplicate lifecycle facts", () => 
   assert.match(service, /current\[0\]!\.status !== "completed" && rows\[0\]!\.status === "completed"/);
 });
 
-test("returns safe team and service labels without exposing authentication subjects", () => {
+test("returns member-profile, team and service labels without exposing authentication subjects", () => {
   assert.doesNotMatch(service, /actor_id assigned_member_name/);
-  assert.doesNotMatch(service, /assigned_member_name/);
+  assert.match(service, /am\.display_name assigned_member_name/);
+  assert.match(service, /tm\.display_name owner_name/);
   assert.match(service, /assigned_team_name/);
   assert.match(service, /s\.name service_name/);
+});
+
+test("implements PM-003 recurrence deadline and template generation contracts", () => {
+  for (const route of ["recurring-schedules", "deadline-rules", "generate", "publish", "deadline-override", "deadline-recalculate"])
+    assert.ok(service.includes(route), route);
+  for (const permission of ["recurrence.view", "recurrence.manage", "deadlines.view", "deadlines.override", "work.generate", "worktemplates.publish"])
+    assert.ok(pm003Migration.includes(`'${permission}'`), permission);
+  for (const event of ["recurring_schedule.created", "work.generated", "work.deadline_calculated", "work.deadline_overridden", "work.deadline_recalculated", "work.template_instantiated", "task.generated"])
+    assert.ok(service.includes(`"${event}"`), event);
+});
+
+test("enforces database idempotency duplicate controls provenance and PM-003 RLS", () => {
+  assert.match(pm003Migration, /client_service_active_period_excl/);
+  assert.match(pm003Migration, /EXCLUDE USING gist/);
+  assert.match(pm003Migration, /UNIQUE\(tenant_id,recurring_schedule_id,occurrence_date\)/);
+  assert.match(pm003Migration, /source_template_version/);
+  assert.match(pm003Migration, /due_date_override_reason/);
+  for (const table of ["deadline_rule", "recurring_work_schedule", "recurrence_generation", "practice_task_dependency"])
+    assert.ok(pm003Migration.includes(`'${table}'`), table);
+  assert.match(service, /TEMPLATE_VERSION_IMMUTABLE/);
+  assert.match(service, /due_date=case when due_date_overridden then due_date else/);
+});
+
+test("Cloudflare scheduled generation reuses tenant-aware authorization", () => {
+  assert.match(dispatcher, /async scheduled\(controller: ScheduledController, env: Env\)/);
+  assert.match(dispatcher, /runScheduledRecurringGeneration\(env\)/);
+  assert.match(service, /RECURRENCE_EXECUTION_CONTEXTS/);
+  assert.match(service, /"x-tenant-id": tenantId/);
+  assert.match(service, /"work.generate"/);
 });

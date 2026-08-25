@@ -39,6 +39,14 @@ Events describe completed facts. Consumers must be idempotent by `eventId`. Sens
 | `work.assigned` | Practice Management | Work responsibility changed; work ID and member/team references. |
 | `work.status_changed` | Practice Management | Work status changed; work ID, prior/current states and version. |
 | `work.completed` | Practice Management | Work completion accepted; work ID, completion time and version. |
+| `recurring_schedule.created` | Practice Management | Recurring definition created; schedule, client-service and template-version references. |
+| `recurring_schedule.generation_blocked` | Practice Management | Generation blocked without deleting history; schedule ID and bounded reason category. |
+| `work.generated` | Practice Management | Idempotent occurrence generated; schedule/work IDs, period and occurrence date. |
+| `work.template_instantiated` | Practice Management | Historical template version instantiated; work/template IDs, version and task count. |
+| `work.deadline_calculated` | Practice Management | Deadline calculated; work/rule IDs and calculated date. |
+| `work.deadline_overridden` | Practice Management | Effective deadline manually overridden; work ID, prior/calculated date and bounded reason. |
+| `work.deadline_recalculated` | Practice Management | Calculated deadline refreshed; work ID, result and whether an override was preserved. |
+| `task.generated` | Practice Management | Template task instantiated; task/work/template-task IDs and sequence. |
 | `task.completed` | Practice Management | Task completed; task/work IDs and completion actor/time. |
 | `document.uploaded` | Platform Core | Authorized document version stored; document/version IDs, classification, hash, byte size. No storage key in public payloads. |
 | `proposal.accepted` | QuoteBench or owning proposal module | Proposal accepted; proposal/client IDs and accepted version. |

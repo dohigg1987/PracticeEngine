@@ -3,6 +3,11 @@
 -- The transaction always rolls back its fixtures.
 BEGIN;
 
+-- Neon owner roles are intentionally not implicit members of runtime roles.
+-- Grant only inside this rollback-only transaction so SET LOCAL ROLE exercises
+-- the real accounts_app grants and RLS policies without a persistent role change.
+GRANT accounts_app TO neondb_owner;
+
 DO $$ BEGIN
  IF NOT EXISTS(SELECT 1 FROM schema_migration WHERE version='0030') THEN
   RAISE EXCEPTION 'migration 0030 is not recorded';
@@ -19,12 +24,12 @@ DO $$ BEGIN
  ) THEN RAISE EXCEPTION 'PM-002 forced-RLS inventory is incomplete'; END IF;
 END $$;
 
-INSERT INTO tenant(id,name) VALUES
- ('30000000-0000-0000-0000-000000000001','PM002 tenant A'),
- ('30000000-0000-0000-0000-000000000002','PM002 tenant B');
-INSERT INTO tenant_member(id,tenant_id,actor_id,role_code) VALUES
- ('31000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000001','pm002-a','OWNER'),
- ('31000000-0000-0000-0000-000000000002','30000000-0000-0000-0000-000000000002','pm002-b','OWNER');
+INSERT INTO tenant(id,name,legal_name) VALUES
+ ('30000000-0000-0000-0000-000000000001','PM002 tenant A','PM002 tenant A'),
+ ('30000000-0000-0000-0000-000000000002','PM002 tenant B','PM002 tenant B');
+INSERT INTO tenant_member(id,tenant_id,actor_id,role_code,display_name) VALUES
+ ('31000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000001','pm002-a','OWNER','PM002 Owner A'),
+ ('31000000-0000-0000-0000-000000000002','30000000-0000-0000-0000-000000000002','pm002-b','OWNER','PM002 Owner B');
 INSERT INTO organisation(id,tenant_id,legal_name,legal_form,jurisdiction,display_name,entity_type,created_by,updated_by) VALUES
  ('32000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000001','Client A','COMPANY','UK','Client A','COMPANY','pm002-a','pm002-a'),
  ('32000000-0000-0000-0000-000000000002','30000000-0000-0000-0000-000000000002','Client B','COMPANY','UK','Client B','COMPANY','pm002-b','pm002-b');
