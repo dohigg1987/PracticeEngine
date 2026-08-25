@@ -1,31 +1,35 @@
-# Ledgerly UI implementation requirements
+# Repository instructions
 
-These requirements apply to every change under `apps/web`.
+## Read first
 
-## Fluent UI is the default
+- Current implementation: `docs/architecture/current-state.md`
+- Target and ownership: `docs/architecture/target-platform.md`, `domain-boundaries.md`
+- Ledgerly preservation: `docs/architecture/ledgerly-integration.md`
+- Migration plan: `docs/architecture/migration-roadmap.md`
+- Design rules: `docs/design/DESIGN-CONSTITUTION.md`, `ANTI-PATTERNS.md`
+- Verification truth: `docs/architecture/verification.md`
 
-- Use official Fluent UI React v9 components and tokens before writing bespoke controls or visual treatments.
-- Do not create custom elements that merely resemble a Fluent button, link, field, dialog, table, menu, tab, badge, message bar, accordion, or navigation item.
-- The same action must use the same component, label, size, and appearance wherever it appears in the same workflow.
-- Text actions must be visibly interactive. Use `Button` for commands and `Link` for navigation; never style an action as unadorned body text.
+## Architecture map
 
-## Hierarchy and density
+Platform Core owns identity, tenancy, authorization, audit, files, notifications and common settings. Commercial Core owns products, features, subscriptions and entitlements. Practice Management owns the client and operational work relationship. Ledgerly owns accounting and accounts production. Dependencies point toward lower shared layers through explicit contracts.
 
-- Use at most one primary action in a page header or form action group. Use secondary, subtle, or transparent actions according to Fluent guidance.
-- Default to compact application density: small row actions, standard 32px controls, restrained page headers, and concise supporting text.
-- Avoid large empty panels, repeated explanatory copy, decorative cards, rounded pills, gradients, marketing language, and ornamental status colours.
-- Do not expose internal IDs, hashes, storage keys, renderer versions, environment variables, or infrastructure terminology in normal user workflows.
+## Preservation and change control
 
-## Navigation and layout
+- Preserve tag `pre-platform-refactor-baseline` and branch `legacy/current-product-baseline`; never rewrite their history.
+- Develop platform work on `platform/modular-practice-foundation` or a focused branch from it, never directly on production `main`.
+- Do not delete, rename or relocate working Ledgerly code for architectural aesthetics.
+- Use additive, reversible changes and compatibility adapters. No destructive data consolidation without later explicit approval and verified rollback.
+- Do not deploy or mutate production data unless the specific task authorizes it and repository release guards pass.
 
-- Practice, accounts-production stages, and administration use one consistent accordion/header geometry.
-- All sidebar destination rows use the same icon size, text size, padding, and vertical alignment.
-- Client records drill into a permanent file; annual engagements drill into accounts production.
-- Preserve keyboard navigation, focus visibility, accessible names, and responsive overflow.
+## Mandatory engineering rules
 
-## Required verification
+- Enforce tenant isolation, authorization and entitlements server-side. UI gating is not security.
+- Separate functional permission from commercial entitlement; never branch on package names.
+- Every auditable mutation appends an immutable audit event; use the transactional outbox for external effects requiring reliable publication.
+- Keep module data ownership explicit; no uncontrolled shared-table fields or direct writes into another module.
+- Fluent UI React v9 is authoritative for application UI; use public components, semantic tokens, accessible keyboard/focus behaviour and established patterns.
+- Preserve existing conventions and add focused tests for changed behaviour.
 
-- Visually inspect every touched screen at desktop and narrow/mobile widths in the live app.
-- Compare repeated components side by side; do not accept different rendering for the same semantic action.
-- Run strict TypeScript, unit tests, relevant Playwright journeys, and the production build before handoff.
-- A change is not complete if it merely compiles but remains visually inconsistent with Fluent UI.
+## Completion
+
+Run `npm run verify:architecture` for documentation/boundary changes and the smallest relevant gates while iterating. Before handoff run `npm run verify` unless the task explicitly limits scope; report any pre-existing failure separately. Completion requires code, tests, docs, tenant/auth/audit/entitlement implications and rollback to be accounted for.

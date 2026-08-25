@@ -22,16 +22,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run verify:lockstep
-      - run: npm run test:release-guard
-      - run: npm run test:core
-      - run: npm test --workspace apps/api
-      - run: npm run check --workspace apps/api
-      - run: npm run typecheck --workspace apps/web
-      - run: npm test --workspace apps/web
-      - run: npm run test:ui-quality --workspace apps/web
-      - run: npm run test:headers --workspace apps/web
-      - run: npm run build --workspace apps/web
+      - run: npm run verify:fast
 
   chromium_e2e:
     name: Chromium E2E (shard ${{ matrix.shard }}/2)

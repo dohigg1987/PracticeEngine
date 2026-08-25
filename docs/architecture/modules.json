@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "modules": [
+    { "id": "web-shell", "layer": "composition", "root": "apps/web/src" },
+    { "id": "api-composition", "layer": "composition", "root": "apps/api/src" },
+    { "id": "ledgerly-domain", "layer": "specialist", "root": "packages/domain/src" },
+    { "id": "ledgerly-reporting", "layer": "specialist", "root": "packages/reporting/src" },
+    { "id": "ledgerly-rules", "layer": "specialist", "root": "packages/rules/src" },
+    { "id": "database-baseline", "layer": "persistence", "root": "packages/database" }
+  ]
+}
