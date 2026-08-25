@@ -22,6 +22,7 @@ import {
 import { authenticateRequest, neonAccessTokenVerifier } from "./auth.js";
 import { handleCommercialRoute } from "./commercial.js";
 import { handlePermanentFileRoute } from "./permanent-file.js";
+import { handlePlatformCoreRoute } from "./platform-core.js";
 import {
   MAX_WORKING_PAPER_EVIDENCE_BYTES,
   WORKING_PAPER_ASSERTIONS,
@@ -653,7 +654,16 @@ async function createMyTenant(
           "WORKSPACE_ONBOARDING_FAILED",
           "Workspace onboarding returned an invalid result",
         );
-      return rows[0]!;
+      const provisioned = rows[0]!;
+      if (Boolean(provisioned.created)) {
+        const tenantId = String(provisioned.tenant_id);
+        await tx`select set_config('app.tenant_id',${tenantId},true)`;
+        const auditContext = { tenantId,actorId,correlationId:request.headers.get("x-correlation-id") ?? crypto.randomUUID() };
+        await appendScopedEvents(tx,auditContext,{organisationId:null,engagementId:null},"TENANT_CREATED","TENANT",tenantId,{name:String(provisioned.name)});
+        const memberships = await tx`select id from tenant_member where tenant_id=${tenantId} and actor_id=${actorId}`;
+        await appendScopedEvents(tx,auditContext,{organisationId:null,engagementId:null},"TENANT_MEMBERSHIP_CREATED","TENANT_MEMBER",String(memberships[0]!.id),{role:String(provisioned.role_code),source:"SELF_SERVICE_ONBOARDING"});
+      }
+      return provisioned;
     });
     const created = Boolean(row.created);
     return json(
@@ -980,6 +990,10 @@ async function acceptTeamInvitation(
             memberCreated: Boolean(row.member_created),
           },
         );
+        if (Boolean(row.member_created)) {
+          const memberships = await tx`select id from tenant_member where tenant_id=${tenantId} and actor_id=${actorId}`;
+          await appendScopedEvents(tx,{tenantId,actorId,correlationId:request.headers.get("x-correlation-id") ?? crypto.randomUUID()},{organisationId:null,engagementId:null},"TENANT_MEMBERSHIP_CREATED","TENANT_MEMBER",String(memberships[0]!.id),{role:row.role_code,source:"INVITATION"});
+        }
       }
       return {
         item: {
@@ -5584,6 +5598,9 @@ export default {
       const permanentFileResponse = actorId
         ? await handlePermanentFileRoute(request, env, actorId)
         : null;
+      const platformCoreResponse = actorId
+        ? await handlePlatformCoreRoute(request, env, actorId)
+        : null;
       let response: Response;
       if (url.pathname === "/health")
         response = json({ status: "ok", service: SERVICE_NAME });
@@ -5628,6 +5645,11 @@ export default {
             "tenant-lifecycle",
             "tenant-export-requests",
             "comparative-presentation",
+            "platform-authorization",
+            "platform-teams",
+            "canonical-client-master",
+            "shared-settings",
+            "commercial-entitlements",
           ],
           limitations: {
             externalConnectors: "not-configured",
@@ -5638,6 +5660,7 @@ export default {
         });
       else if (permanentFileResponse) response = permanentFileResponse;
       else if (commercialResponse) response = commercialResponse;
+      else if (platformCoreResponse) response = platformCoreResponse;
       else if (request.method === "GET" && url.pathname === "/v1/me/tenants")
         response = await listMyTenants(env, actorId);
       else if (request.method === "POST" && url.pathname === "/v1/me/tenants")

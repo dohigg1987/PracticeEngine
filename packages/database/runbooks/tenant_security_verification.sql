@@ -9,7 +9,13 @@ WITH required_tables(table_name) AS (VALUES
   ('engagement'),('engagement_member'),('import_batch'),('import_row'),
   ('import_snapshot'),('source_account'),('account_mapping'),('trial_balance'),
   ('trial_balance_line'),('audit_event'),('outbox_event'),
-  ('canonical_account'),('canonical_report_line')
+  ('canonical_account'),('canonical_report_line'),
+  ('platform_user'),('permission_definition'),('tenant_role'),
+  ('tenant_role_permission'),('tenant_member_role'),('team'),('team_member'),
+  ('contact'),('relationship_type_definition'),('client_contact_relationship'),
+  ('address'),('client_address'),('product_definition'),('module_definition'),
+  ('feature_definition'),('tenant_entitlement'),('tenant_entitlement_override'),
+  ('tenant_setting')
 ), state AS (
   SELECT c.relname,c.relrowsecurity,c.relforcerowsecurity
   FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
@@ -21,7 +27,8 @@ SELECT
                     OR NOT coalesce(state.relforcerowsecurity,false)) AS incorrectly_configured_count
 FROM required_tables LEFT JOIN state ON state.relname=required_tables.table_name;
 
--- 2. Policy inventory. Expect 19 policies, all scoped to accounts_app.
+-- 2. Policy inventory. Every runtime policy must be scoped to accounts_app;
+-- owner policies are administrative recovery paths only.
 SELECT tablename,policyname,cmd,roles,qual IS NOT NULL AS has_using,
        with_check IS NOT NULL AS has_with_check
 FROM pg_policies
@@ -63,3 +70,9 @@ ROLLBACK;
 
 -- 6. Cross-tenant check: keep actor_id from tenant A but set tenant_id to tenant
 -- B. Tenant-owned and canonical queries must return 0 rows.
+
+-- 7. PM-001 authorization and entitlement decisions (authorized context).
+-- SELECT actor_has_permission('clients.view') AS can_view_clients;
+-- SELECT * FROM tenant_feature_decision('ledgerly.enabled');
+-- Expected: a boolean permission decision and one transitional/override-backed
+-- Ledgerly decision for existing tenants.

@@ -254,6 +254,30 @@ GRANT EXECUTE ON FUNCTION organisation_actor_can_manage(uuid,uuid)
 GRANT EXECUTE ON FUNCTION archive_authenticated_organisation(uuid,text)
   TO accounts_app;
 
+-- PM-001 Platform Core, canonical client and entitlement kernel.
+GRANT SELECT ON
+  platform_user,permission_definition,tenant_role,tenant_role_permission,
+  tenant_member_role,team,team_member,contact,relationship_type_definition,
+  client_contact_relationship,address,client_address,product_definition,
+  module_definition,feature_definition,tenant_entitlement,
+  tenant_entitlement_override,tenant_setting
+TO accounts_app;
+GRANT INSERT,UPDATE ON
+  tenant_role,tenant_role_permission,tenant_member_role,team,team_member,
+  contact,client_contact_relationship,address,client_address,tenant_setting
+TO accounts_app;
+GRANT INSERT,UPDATE ON tenant_entitlement_override TO accounts_app;
+GRANT INSERT(id,tenant_id,legal_name,legal_form,jurisdiction,display_name,
+  entity_type,client_code,responsible_member_id,responsible_team_id,
+  primary_contact_id,primary_address_id,communication_preferences,created_by,updated_by)
+ON organisation TO accounts_app;
+GRANT UPDATE(legal_name,legal_form,jurisdiction,display_name,entity_type,
+  client_code,responsible_member_id,responsible_team_id,primary_contact_id,
+  primary_address_id,communication_preferences,updated_by,updated_at,version)
+ON organisation TO accounts_app;
+GRANT EXECUTE ON FUNCTION tenant_actor_is_active(uuid),actor_has_permission(text),tenant_feature_decision(text)
+TO accounts_app;
+
 COMMIT;
 
 -- Verification: every row should show only the expected privileges.
