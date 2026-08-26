@@ -3,6 +3,8 @@ import { loadEnv } from "vite";
 
 export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
+  const portArgument = process.argv.indexOf("--port");
+  const isolatedPort = portArgument >= 0 ? process.argv[portArgument + 1] : undefined;
   const configuredAuthUrl = env.VITE_NEON_AUTH_URL?.trim();
   let authProxy: Record<string, unknown> | undefined;
   if (command === "serve" && configuredAuthUrl) {
@@ -27,6 +29,7 @@ export default defineConfig(({ command, mode }) => {
     };
   }
   return {
+  cacheDir: isolatedPort ? `node_modules/.vite-${isolatedPort}` : undefined,
   test: { include: ["src/**/*.test.{ts,tsx}"] },
   server: { proxy: authProxy ? { "/neon-auth": authProxy } : undefined },
   build: {
