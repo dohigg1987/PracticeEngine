@@ -9,9 +9,9 @@ const edgeInstalled = [
 
 export default defineConfig({
   testDir: "./e2e",
-  fullyParallel: false,
+  fullyParallel: true,
   retries: process.env.CI ? 2 : 0,
-  workers: 1,
+  workers: Number(process.env.PLAYWRIGHT_WORKERS || 4),
   reporter: process.env.CI ? [["line"], ["html", { open: "never" }]] : "line",
   use: {
     baseURL: "http://127.0.0.1:51873",
@@ -34,7 +34,7 @@ export default defineConfig({
     {
       command: `${viteCommand} --host 127.0.0.1 --port 51873 --strictPort`,
       url: "http://127.0.0.1:51873",
-      reuseExistingServer: false,
+      reuseExistingServer: !process.env.CI,
       env: {
         VITE_DEMO_MODE: "true",
         VITE_NEON_AUTH_URL: "https://example.invalid/neondb/auth",
@@ -43,7 +43,7 @@ export default defineConfig({
     {
       command: `${viteCommand} --host 127.0.0.1 --port 51874 --strictPort`,
       url: "http://127.0.0.1:51874",
-      reuseExistingServer: false,
+      reuseExistingServer: !process.env.CI,
       env: { VITE_DEMO_MODE: "false", VITE_NEON_AUTH_URL: "" },
     },
   ],

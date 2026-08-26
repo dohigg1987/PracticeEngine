@@ -45,3 +45,23 @@ test("recurring work exposes the operational schedule table", async ({ page }) =
   await expect(page.getByRole("table", { name: "Recurring work schedules" })).toContainText("Northstar Community Foundation");
   await expect(page.getByRole("table", { name: "Recurring work schedules" })).toContainText("Annually");
 });
+
+test("workflow detail exposes stages blockers and operational review points",async({page})=>{
+  await start(page);await openNav(page);await page.locator('button[value="work"]').click();
+  await page.getByRole("button",{name:/2026 Annual Accounts/}).click();
+  await expect(page.getByRole("table",{name:"Operational workflow stages"})).toContainText("Partner review");
+  await expect(page.getByRole("table",{name:"Work tasks"})).toContainText("Review");
+  await expect(page.getByRole("table",{name:"Work operational reviews"})).toContainText("Confirm the operational delivery checklist");
+});
+
+test("review queue and recurrence operations provide practical controls",async({page})=>{
+  await start(page);await openNav(page);await page.locator('button[value="work"]').click();
+  await page.getByRole("tab",{name:"Review queue"}).click();await expect(page.getByRole("table",{name:"Practice review queue"})).toContainText("Review Partner");
+  await page.getByRole("tab",{name:"Generation operations"}).click();await expect(page.getByRole("table",{name:"Recurrence execution history"})).toBeVisible();
+  await page.getByRole("button",{name:"Dry run"}).click();await expect(page.getByRole("table",{name:"Recurrence execution history"})).toContainText("Dry Run");
+});
+
+test("automation settings use constrained table controls",async({page})=>{
+  await start(page);await openNav(page);await page.getByRole("button",{name:"Administration",exact:true}).click();await page.locator('button[value="practice-settings"]').click();
+  await page.getByRole("tab",{name:"Automation"}).click();const table=page.getByRole("table",{name:"Practice automation rules"});await expect(table).toContainText("Assign urgent work to service team");await expect(table).toContainText("Assign Team");
+});

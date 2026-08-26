@@ -12,6 +12,7 @@
 - This branch adds `npm run verify:architecture` for required architecture sources, basic forbidden dependency directions, package-name licensing conditionals and the PM-001 tenant/RLS inventory.
 - PM-001 API contract tests verify identity/membership separation, tenant-safe foreign keys, permission and entitlement checks, client compatibility, contact relationships, entitlement precedence, mutation audit coverage and explicit audit immutability.
 - PM-002 architecture checks inventory every Practice Management tenant table, permission and required architecture source. Focused API/UI tests cover lifecycle transitions, tenant-qualified access, entitlement enforcement, audit/outbox facts, work filtering and the Ledgerly compatibility link.
+- PM-004 uses timed development, integration and full-pilot gates. The authoritative command matrix, Playwright isolation rationale and test classifications are in `docs/engineering/verification-strategy.md`.
 
 ## What is not yet enforced
 

@@ -4,6 +4,10 @@ import type {
   PermanentFileAdviser,
   PermanentFileOfficer,
   PracticeService,
+  PracticeReview,
+  PracticeWorkStage,
+  AutomationRule,
+  RecurrenceExecution,
   PracticeTask,
   PracticeWorkItem,
   PracticeWorkTemplate,
@@ -40,6 +44,13 @@ const demoRecurringSchedules: RecurringWorkSchedule[] = [
   { id: "schedule-accounts", client_id: "demo-org", client_name: "Northstar Community Foundation", client_service_id: "client-service-accounts", service_name: "Annual accounts", work_template_id: "template-accounts", template_name: "Annual accounts delivery", recurrence_rule: { frequency: "annually" }, next_occurrence_date: "2027-12-31", next_due_date: "2028-09-30", owner_name: "Demo Partner", team_name: "Accounts", specialist_module_key: "ledgerly", status: "active" },
   { id: "schedule-vat", client_id: "demo-org-2", client_name: "Harbour Trading Ltd", client_service_id: "client-service-vat", service_name: "VAT returns", work_template_id: "template-accounts", template_name: "Quarterly VAT delivery", recurrence_rule: { frequency: "quarterly" }, next_occurrence_date: "2027-06-30", next_due_date: "2027-08-07", team_name: "Business services", status: "active" },
 ];
+let demoWorkStages:PracticeWorkStage[]=[
+  {id:"stage-prep",work_item_id:"work-accounts-2026",name:"Preparation",sequence:10,stage_type:"preparation",status:"active",source_template_version:1},
+  {id:"stage-review",work_item_id:"work-accounts-2026",name:"Partner review",sequence:20,stage_type:"approval",status:"not_started",source_template_version:1},
+];
+let demoPracticeReviews:PracticeReview[]=[{id:"practice-review-1",work_item_id:"work-accounts-2026",work_title:"2026 Annual Accounts",client_name:"Northstar Community Foundation",service_name:"Annual accounts",stage_name:"Partner review",preparer_name:"Demo Partner",reviewer_name:"Review Partner",due_date:"2027-09-15",status:"requested",requested_at:now,waiting_hours:4,review_points:[{id:"practice-point-1",description:"Confirm the operational delivery checklist is complete",status:"open"}]}];
+let demoAutomationRules:AutomationRule[]=[{id:"automation-1",name:"Assign urgent work to service team",enabled:true,trigger_type:"work.created",conditions:[{field:"workStatus",operator:"equals",value:"ready"}],actions:[{type:"assign_team",teamId:"team-accounts"}],priority:100,recent_executions:[]}];
+let demoRecurrenceExecutions:RecurrenceExecution[]=[{id:"recurrence-run-1",trigger_type:"scheduled",status:"succeeded",schedules_evaluated:2,work_generated:1,blocked_entitlement:0,skipped_idempotent:1,failures:0,started_at:now,completed_at:now}];
 const engagement = {
   id: "demo-engagement",
   organisation_id: "demo-org",
@@ -1252,9 +1263,13 @@ function practiceDemoRead(path: string): unknown | undefined {
   if (path === "/v1/practice/services") return { items: structuredClone(demoPracticeServices) };
   if (path === "/v1/practice/work-templates") return { items: structuredClone(demoPracticeTemplates) };
   if (path === "/v1/practice/recurring-schedules") return { items: structuredClone(demoRecurringSchedules) };
+  if (path.startsWith("/v1/practice/reviews")) return {items:structuredClone(demoPracticeReviews)};
+  if (path === "/v1/practice/automation-rules") return {items:structuredClone(demoAutomationRules)};
+  if (path === "/v1/practice/recurrence-operations") return {items:structuredClone(demoRecurrenceExecutions)};
   if (path.startsWith("/v1/practice/work?" ) || path === "/v1/practice/work") return { items: structuredClone(demoPracticeWork) };
   const workMatch = path.match(/^\/v1\/practice\/work\/([^/]+)$/);
-  if (workMatch) return { item: structuredClone(demoPracticeWork.find((item) => item.id === workMatch[1])) };
+  if (workMatch) {const item=demoPracticeWork.find((entry)=>entry.id===workMatch[1]);return { item: structuredClone(item?{...item,tasks:demoPracticeTasks.filter(task=>task.work_item_id===item.id),stages:demoWorkStages.filter(stage=>stage.work_item_id===item.id),reviews:demoPracticeReviews.filter(review=>review.work_item_id===item.id)}:undefined) };}
+  const workflowMatch=path.match(/^\/v1\/practice\/work\/([^/]+)\/workflow$/);if(workflowMatch)return {items:structuredClone(demoWorkStages.filter(stage=>stage.work_item_id===workflowMatch[1]))};
   const tasksMatch = path.match(/^\/v1\/practice\/work\/([^/]+)\/tasks$/);
   if (tasksMatch) return { items: structuredClone(demoPracticeTasks.filter((item) => item.work_item_id === tasksMatch[1])) };
   const summaryMatch = path.match(/^\/v1\/practice\/clients\/([^/]+)\/summary$/);
@@ -1284,6 +1299,11 @@ export function demoRequest(path: string, init?: RequestInit): unknown {
     demoPracticeServices = [...demoPracticeServices, item];
     return { item: structuredClone(item) };
   }
+  const stageMatch=path.match(/^\/v1\/practice\/workflow-stages\/([^/]+)\/advance$/);if(method==="POST"&&stageMatch){const body=JSON.parse(String(init?.body||"{}")) as {status:PracticeWorkStage["status"]};demoWorkStages=demoWorkStages.map(stage=>stage.id===stageMatch[1]?{...stage,status:body.status}:stage);return {item:structuredClone(demoWorkStages.find(stage=>stage.id===stageMatch[1]))};}
+  const reviewMatch=path.match(/^\/v1\/practice\/reviews\/([^/]+)\/decision$/);if(method==="POST"&&reviewMatch){const body=JSON.parse(String(init?.body||"{}")) as {status:PracticeReview["status"]};demoPracticeReviews=demoPracticeReviews.map(review=>review.id===reviewMatch[1]?{...review,status:body.status}:review);return {item:structuredClone(demoPracticeReviews.find(review=>review.id===reviewMatch[1]))};}
+  if(method==="POST"&&path==="/v1/practice/automation-rules"){const body=JSON.parse(String(init?.body||"{}")) as Record<string,unknown>;const item:AutomationRule={id:`automation-${Date.now()}`,name:String(body.name||"New automation"),enabled:body.enabled===true,trigger_type:String(body.triggerType||"work.created"),conditions:Array.isArray(body.conditions)?body.conditions as Array<Record<string,unknown>>:[],actions:Array.isArray(body.actions)?body.actions as Array<Record<string,unknown>>:[{type:"mark_blocked"}],priority:Number(body.priority||100),recent_executions:[]};demoAutomationRules=[...demoAutomationRules,item];return {item:structuredClone(item)};}
+  const automationMatch=path.match(/^\/v1\/practice\/automation-rules\/([^/]+)$/);if(method==="PATCH"&&automationMatch){const body=JSON.parse(String(init?.body||"{}")) as {enabled?:boolean};demoAutomationRules=demoAutomationRules.map(rule=>rule.id===automationMatch[1]?{...rule,...body}:rule);return {item:structuredClone(demoAutomationRules.find(rule=>rule.id===automationMatch[1]))};}
+  if(method==="POST"&&(path==="/v1/practice/recurrence-operations/dry-run"||path==="/v1/practice/recurrence-operations/replay")){const body=JSON.parse(String(init?.body||"{}")) as {from:string;to:string},replay=path.endsWith("replay"),item:RecurrenceExecution={id:`recurrence-${Date.now()}`,trigger_type:replay?"replay":"dry_run",status:"succeeded",range_from:body.from,range_to:body.to,schedules_evaluated:demoRecurringSchedules.length,work_generated:replay?1:0,blocked_entitlement:0,skipped_idempotent:1,failures:0,started_at:now,completed_at:now};demoRecurrenceExecutions=[item,...demoRecurrenceExecutions];return {item:structuredClone(item)};}
   const workStatusMatch = path.match(/^\/v1\/practice\/work\/([^/]+)\/status$/);
   if (method === "POST" && workStatusMatch) {
     const body = JSON.parse(String(init?.body || "{}")) as { status: PracticeWorkItem["status"] };

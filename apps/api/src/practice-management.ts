@@ -10,6 +10,7 @@ import {
   type PlatformTX,
 } from "./platform-core.js";
 import { addDays, addMonths, calculateDeadline, dateInTimeZone, evaluateRecurrence, validateRecurrenceRule, type DeadlineRule, type RecurrenceRule } from "./practice-scheduling.js";
+import { DEPENDENCY_TYPES, REVIEW_POINT_STATUSES, REVIEW_STATUSES, STAGE_STATUSES, STAGE_TYPES, OrchestrationError, assertAutomationChain, assertReviewPointTransition, assertReviewTransition, assertStageTransition, automationConditionsMatch, boundedReplayRange, evaluateStageGates, validateAutomationDefinition, wouldCreateDependencyCycle, type AutomationAction, type AutomationCondition } from "./practice-orchestration.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SERVICE_STATUSES = new Set(["active", "inactive"]);
@@ -31,6 +32,8 @@ const ENGAGEMENT_TRANSITIONS: Record<string, ReadonlySet<string>> = {
 
 const response = (data: unknown, status = 200) =>
   Response.json(data, { status, headers: { "cache-control": "no-store" } });
+
+function orchestrate<T>(operation:()=>T):T { try{return operation();}catch(error){if(error instanceof OrchestrationError)throw new ApiError(error.status,error.code,error.message);throw error;} }
 
 async function body(request: Request): Promise<Record<string, unknown>> {
   if (!(request.headers.get("content-type") ?? "").toLowerCase().includes("application/json"))
@@ -320,8 +323,10 @@ async function workItem(request: Request, env: Env, actorId: string, workId: str
       await assertPlatformPermission(tx, "tasks.view");
       const rows = await tx`select w.*,l.ledgerly_engagement_id,l.required_feature_key,o.display_name client_name,s.name service_name,e.name engagement_name,am.display_name assigned_member_name,at.name assigned_team_name from work_item w left join work_item_ledgerly_link l on l.tenant_id=w.tenant_id and l.work_item_id=w.id join organisation o on o.tenant_id=w.tenant_id and o.id=w.client_id join client_service cs on cs.tenant_id=w.tenant_id and cs.id=w.client_service_id join practice_service s on s.tenant_id=cs.tenant_id and s.id=cs.service_id left join practice_engagement e on e.tenant_id=w.tenant_id and e.id=w.engagement_id left join tenant_member am on am.tenant_id=w.tenant_id and am.id=w.assigned_member_id left join team at on at.tenant_id=w.tenant_id and at.id=w.assigned_team_id where w.tenant_id=${ctx.tenantId} and w.id=${workId}`;
       if (!rows.length) throw new ApiError(404, "NOT_FOUND", "Work item not found");
-      const tasks = await tx`select * from practice_task where tenant_id=${ctx.tenantId} and work_item_id=${workId} order by sequence,id`;
-      return response({ item: { ...rows[0], tasks } });
+      const tasks = await tx`select t.*,coalesce(json_agg(json_build_object('predecessorTaskId',d.predecessor_task_id,'dependencyType',d.dependency_type,'blockingReason',d.blocking_reason,'resolvedAt',d.resolved_at)) filter(where d.predecessor_task_id is not null),'[]') blockers from practice_task t left join practice_task_dependency d on d.tenant_id=t.tenant_id and d.successor_task_id=t.id and d.resolved_at is null where t.tenant_id=${ctx.tenantId} and t.work_item_id=${workId} group by t.id order by t.sequence,t.id`;
+      const stages = await tx`select * from work_stage where tenant_id=${ctx.tenantId} and work_item_id=${workId} order by sequence,id`;
+      const reviews = await tx`select r.*,coalesce(json_agg(rp order by rp.created_at) filter(where rp.id is not null),'[]') review_points from practice_review r left join practice_review_point rp on rp.tenant_id=r.tenant_id and rp.review_id=r.id where r.tenant_id=${ctx.tenantId} and r.work_item_id=${workId} group by r.id order by r.requested_at desc`;
+      return response({ item: { ...rows[0], tasks, stages, reviews } });
     }
     const current = await tx`select specialist_module_key from work_item where tenant_id=${ctx.tenantId} and id=${workId}`;
     if (!current.length) throw new ApiError(404, "NOT_FOUND", "Work item not found");
@@ -353,6 +358,17 @@ async function workAction(request: Request, env: Env, actorId: string, workId: s
     }
     const status = action === "complete" ? "completed" : enumValue(input, "status", WORK_STATUSES), completedAt = status === "completed" ? new Date().toISOString() : null;
     if (status === "completed" && action !== "complete") await assertPlatformPermission(tx, "work.complete");
+    if (status === "completed") {
+      const openStages = await tx`select 1 from work_stage where tenant_id=${ctx.tenantId} and work_item_id=${workId} and status not in ('completed','skipped') limit 1`;
+      const pendingReviews = await tx`select 1 from practice_review where tenant_id=${ctx.tenantId} and work_item_id=${workId} and status not in ('approved','completed') limit 1`;
+      const missingReviews = await tx`select 1 from practice_task t where t.tenant_id=${ctx.tenantId} and t.work_item_id=${workId} and t.review_required and not exists(select 1 from practice_review r where r.tenant_id=t.tenant_id and r.practice_task_id=t.id and r.status in ('approved','completed')) limit 1`;
+      if (openStages.length || pendingReviews.length || missingReviews.length) {
+        const overrideReason = optional(input, "overrideReason", 500);
+        if (!overrideReason) throw new ApiError(409, "WORK_APPROVAL_GATES_NOT_MET", "Workflow stages and required reviews must be complete before work completion");
+        await assertPlatformPermission(tx, "review.override");
+        await recordMutation(tx, ctx, "WORK_COMPLETION_OVERRIDDEN", "WORK_ITEM", workId, String(current[0]!.client_id), { reason: overrideReason, openStageGate: Boolean(openStages.length), pendingReviewGate: Boolean(pendingReviews.length), missingRequiredReviewGate:Boolean(missingReviews.length) }, "review.completion_overridden");
+      }
+    }
     if (String(current[0]!.status) === status) throw new ApiError(409, "INVALID_STATUS_TRANSITION", `Work is already ${status}`);
     if (String(current[0]!.status) === "completed") throw new ApiError(409, "INVALID_STATUS_TRANSITION", "Completed work cannot be reopened");
     const rows = await tx`update work_item set status=${status},completed_at=${completedAt},updated_by=${ctx.actorId},updated_at=now() where tenant_id=${ctx.tenantId} and id=${workId} returning *`;
@@ -391,6 +407,10 @@ async function taskAction(request: Request, env: Env, actorId: string, taskId: s
     } else {
       const status = action === "complete" ? "completed" : enumValue(input, "status", TASK_STATUSES);
       if (String(current[0]!.status) === status) throw new ApiError(409, "INVALID_STATUS_TRANSITION", `Task is already ${status}`);
+      if (status === "in_progress") {
+        const blockers = await tx`select d.dependency_type,p.status predecessor_status from practice_task_dependency d join practice_task p on p.tenant_id=d.tenant_id and p.id=d.predecessor_task_id where d.tenant_id=${ctx.tenantId} and d.successor_task_id=${taskId} and d.resolved_at is null and ((d.dependency_type in ('finish_to_start','blocks') and p.status not in ('completed','skipped')) or (d.dependency_type='start_to_start' and p.status='not_started'))`;
+        if (blockers.length) throw new ApiError(409, "TASK_BLOCKED_BY_DEPENDENCY", "Task dependencies prevent work from starting");
+      }
       changes.status = status; changes.completed_at = ["completed", "skipped"].includes(status) ? new Date().toISOString() : null;
     }
     if (Object.keys(changes).length === 2) throw new ApiError(400, "INVALID_REQUEST", "No supported changes were supplied");
@@ -404,19 +424,31 @@ async function taskAction(request: Request, env: Env, actorId: string, taskId: s
 async function templateCollection(request: Request, env: Env, actorId: string) {
   const input = request.method === "POST" ? await body(request) : null;
   return within(request, env, actorId, "worktemplates.manage", "practice.workflow", async (tx, ctx) => {
-    if (request.method === "GET") return response({ items: await tx`select wt.*,s.name service_name,coalesce(json_agg(wtt order by wtt.sequence) filter(where wtt.id is not null),'[]') tasks from work_template wt join practice_service s on s.tenant_id=wt.tenant_id and s.id=wt.service_id left join work_template_task wtt on wtt.tenant_id=wt.tenant_id and wtt.work_template_id=wt.id where wt.tenant_id=${ctx.tenantId} group by wt.id,s.name order by wt.name,wt.version desc` });
+    if (request.method === "GET") return response({ items: await tx`select wt.*,s.name service_name,(select coalesce(json_agg(wtt order by wtt.sequence),'[]') from work_template_task wtt where wtt.tenant_id=wt.tenant_id and wtt.work_template_id=wt.id) tasks,(select coalesce(json_agg(wts order by wts.sequence),'[]') from work_template_stage wts where wts.tenant_id=wt.tenant_id and wts.work_template_id=wt.id) stages from work_template wt join practice_service s on s.tenant_id=wt.tenant_id and s.id=wt.service_id where wt.tenant_id=${ctx.tenantId} order by wt.name,wt.version desc` });
     const id = crypto.randomUUID(), serviceId = uuid(required(input!, "serviceId", 36), "Service");
     const version = input!.version ?? 1; if (!Number.isInteger(version) || Number(version) < 1) throw new ApiError(400, "INVALID_REQUEST", "version must be a positive integer");
     const rows = await tx`insert into work_template(id,tenant_id,name,service_id,status,version,template_family_id,created_by,updated_by) values(${id},${ctx.tenantId},${required(input!, "name", 180)},${serviceId},${enumValue(input!, "status", TEMPLATE_STATUSES, "draft")},${Number(version)},${optional(input!, "templateFamilyId", 36) ?? id},${ctx.actorId},${ctx.actorId}) returning *`;
+    const stageDefinitions = input!.stages ?? [];
+    if (!Array.isArray(stageDefinitions)) throw new ApiError(400, "INVALID_REQUEST", "stages must be an array");
+    const stageIds = new Map<number, string>();
+    for (const [index, raw] of stageDefinitions.entries()) {
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new ApiError(400, "INVALID_REQUEST", "Each workflow stage must be an object");
+      const item = raw as Record<string, unknown>, sequence = item.sequence ?? index + 1, stageType = enumValue(item, "stageType", STAGE_TYPES);
+      if (!Number.isInteger(sequence) || Number(sequence) < 1) throw new ApiError(400, "INVALID_REQUEST", "Workflow stage sequence is invalid");
+      const stageId = crypto.randomUUID(); stageIds.set(Number(sequence), stageId);
+      await tx`insert into work_template_stage(id,tenant_id,work_template_id,name,sequence,stage_type,default_assignee_role_id,default_reviewer_role_id,entry_criteria,completion_criteria,status,skippable,created_by,updated_by) values(${stageId},${ctx.tenantId},${id},${required(item,"name",180)},${Number(sequence)},${stageType},${optional(item,"defaultAssigneeRoleId",36) ?? null},${optional(item,"defaultReviewerRoleId",36) ?? null},${tx.json((item.entryCriteria ?? {}) as postgres.JSONValue)},${tx.json((item.completionCriteria ?? {}) as postgres.JSONValue)},'active',${item.skippable === true},${ctx.actorId},${ctx.actorId})`;
+    }
     const definitions = input!.tasks ?? [];
     if (!Array.isArray(definitions)) throw new ApiError(400, "INVALID_REQUEST", "tasks must be an array");
     for (const [index, raw] of definitions.entries()) {
       if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new ApiError(400, "INVALID_REQUEST", "Each template task must be an object");
       const item = raw as Record<string, unknown>, sequence = item.sequence ?? index + 1;
       if (!Number.isInteger(sequence) || Number(sequence) < 1) throw new ApiError(400, "INVALID_REQUEST", "Template task sequence is invalid");
-      await tx`insert into work_template_task(id,tenant_id,work_template_id,title,description,sequence,default_assignee_role_id,default_team_id,due_date_offset_days,mandatory,created_by,updated_by) values(${crypto.randomUUID()},${ctx.tenantId},${id},${required(item, "title", 240)},${optional(item, "description", 2000) ?? null},${Number(sequence)},${optional(item, "defaultAssigneeRoleId", 36) ?? null},${optional(item, "defaultTeamId", 36) ?? null},${Number.isInteger(item.dueDateOffsetDays) ? Number(item.dueDateOffsetDays) : null},${item.mandatory !== false},${ctx.actorId},${ctx.actorId})`;
+      const stageSequence = item.stageSequence === undefined ? null : Number(item.stageSequence);
+      if (stageSequence !== null && (!Number.isInteger(stageSequence) || !stageIds.has(stageSequence))) throw new ApiError(400, "INVALID_REQUEST", "Template task stageSequence is invalid");
+      await tx`insert into work_template_task(id,tenant_id,work_template_id,title,description,sequence,default_assignee_role_id,default_team_id,due_date_offset_days,mandatory,work_template_stage_id,review_required,created_by,updated_by) values(${crypto.randomUUID()},${ctx.tenantId},${id},${required(item, "title", 240)},${optional(item, "description", 2000) ?? null},${Number(sequence)},${optional(item, "defaultAssigneeRoleId", 36) ?? null},${optional(item, "defaultTeamId", 36) ?? null},${Number.isInteger(item.dueDateOffsetDays) ? Number(item.dueDateOffsetDays) : null},${item.mandatory !== false},${stageSequence === null ? null : stageIds.get(stageSequence) ?? null},${item.reviewRequired === true},${ctx.actorId},${ctx.actorId})`;
     }
-    await recordMutation(tx, ctx, "WORK_TEMPLATE_CREATED", "WORK_TEMPLATE", id, null, { serviceId, version: Number(version), taskCount: definitions.length });
+    await recordMutation(tx, ctx, "WORK_TEMPLATE_CREATED", "WORK_TEMPLATE", id, null, { serviceId, version: Number(version), taskCount: definitions.length, stageCount: stageDefinitions.length });
     return response({ item: rows[0] }, 201);
   });
 }
@@ -427,7 +459,7 @@ async function templateItem(request: Request, env: Env, actorId: string, templat
     if (request.method === "GET") {
       const rows = await tx`select * from work_template where tenant_id=${ctx.tenantId} and id=${templateId}`;
       if (!rows.length) throw new ApiError(404, "NOT_FOUND", "Work template not found");
-      return response({ item: { ...rows[0], tasks: await tx`select * from work_template_task where tenant_id=${ctx.tenantId} and work_template_id=${templateId} order by sequence,id` } });
+      return response({ item: { ...rows[0], tasks: await tx`select * from work_template_task where tenant_id=${ctx.tenantId} and work_template_id=${templateId} order by sequence,id`, stages: await tx`select * from work_template_stage where tenant_id=${ctx.tenantId} and work_template_id=${templateId} order by sequence,id` } });
     }
     const existing = await tx`select status from work_template where tenant_id=${ctx.tenantId} and id=${templateId} for update`;
     if (!existing.length) throw new ApiError(404, "NOT_FOUND", "Work template not found");
@@ -445,6 +477,12 @@ async function templateItem(request: Request, env: Env, actorId: string, templat
     await recordMutation(tx, ctx, "WORK_TEMPLATE_UPDATED", "WORK_TEMPLATE", templateId, null, { changedFields: columns });
     return response({ item: rows[0] });
   });
+}
+
+function jsonArray(input: Record<string, unknown>, key: string): unknown[] {
+  const value = input[key];
+  if (!Array.isArray(value)) throw new ApiError(400, "INVALID_REQUEST", `${key} must be an array`);
+  return value;
 }
 
 async function publishTemplate(request: Request, env: Env, actorId: string, templateId: string) {
@@ -519,6 +557,17 @@ async function instantiateOccurrence(tx: PlatformTX, ctx: PlatformContext, sched
   } else if (schedule.due_date_rule && Object.keys(schedule.due_date_rule as object).length) deadline = calculateDeadline(schedule.due_date_rule as unknown as DeadlineRule, { periodEnd: occurrence.periodEnd });
   const workId = crypto.randomUUID();
   await tx`insert into work_item(id,tenant_id,client_id,client_service_id,engagement_id,title,period_reference,period_start,period_end,status,assigned_member_id,assigned_team_id,due_date,calculated_due_date,due_date_rule_id,due_date_calculation,source_template_id,source_template_version,recurring_schedule_id,generation_id,specialist_module_key,created_by,updated_by) values(${workId},${ctx.tenantId},${schedule.client_id},${schedule.client_service_id},${schedule.engagement_id},${`${template[0]!.name} – period ended ${occurrence.periodEnd}`},${`Period ended ${occurrence.periodEnd}`},${occurrence.periodStart},${occurrence.periodEnd},'not_started',${schedule.default_assignee_member_id},${schedule.default_team_id},${deadline?.date ?? null},${deadline?.date ?? null},${schedule.deadline_rule_id},${tx.json((deadline?.provenance ?? {}) as postgres.JSONValue)},${template[0]!.id},${template[0]!.version},${schedule.id},${markerId},${schedule.specialist_module_key},${ctx.actorId},${ctx.actorId})`;
+  const stageDefinitions = await tx`select * from work_template_stage where tenant_id=${ctx.tenantId} and work_template_id=${template[0]!.id} and status='active' order by sequence,id`;
+  const stageInstances = new Map<string, string>();
+  for (const definition of stageDefinitions) {
+    const resolveRole = async (roleId: unknown) => {
+      if (!roleId) return null;
+      const members = await tx`select tm.id from tenant_member tm join tenant_member_role mr on mr.tenant_id=tm.tenant_id and mr.tenant_member_id=tm.id where tm.tenant_id=${ctx.tenantId} and mr.role_id=${String(roleId)} and tm.membership_status='ACTIVE' order by tm.created_at,tm.id limit 1`;
+      return members[0]?.id ?? null;
+    };
+    const stageId = crypto.randomUUID(); stageInstances.set(String(definition.id), stageId);
+    await tx`insert into work_stage(id,tenant_id,work_item_id,source_template_stage_id,source_template_id,source_template_version,name,sequence,stage_type,status,assignee_member_id,reviewer_member_id,entry_criteria,completion_criteria,skippable,created_by,updated_by) values(${stageId},${ctx.tenantId},${workId},${definition.id},${template[0]!.id},${template[0]!.version},${definition.name},${definition.sequence},${definition.stage_type},'not_started',${await resolveRole(definition.default_assignee_role_id)},${await resolveRole(definition.default_reviewer_role_id)},${tx.json(definition.entry_criteria as postgres.JSONValue)},${tx.json(definition.completion_criteria as postgres.JSONValue)},${definition.skippable},${ctx.actorId},${ctx.actorId})`;
+  }
   const definitions = await tx`select * from work_template_task where tenant_id=${ctx.tenantId} and work_template_id=${template[0]!.id} order by sequence,id`;
   for (const definition of definitions) {
     let assignee = schedule.default_assignee_member_id;
@@ -527,11 +576,11 @@ async function instantiateOccurrence(tx: PlatformTX, ctx: PlatformContext, sched
       assignee = resolved[0]?.id ?? assignee;
     }
     const taskId = crypto.randomUUID();
-    await tx`insert into practice_task(id,tenant_id,work_item_id,title,description,status,assignee_member_id,team_id,sequence,due_date,source_template_task_id,mandatory,created_by,updated_by) values(${taskId},${ctx.tenantId},${workId},${definition.title},${definition.description},'not_started',${assignee},${definition.default_team_id ?? schedule.default_team_id},${definition.sequence},${definition.due_date_offset_days === null ? null : addDays(deadline?.date ?? occurrence.periodEnd, Number(definition.due_date_offset_days))},${definition.id},${definition.mandatory},${ctx.actorId},${ctx.actorId})`;
+    await tx`insert into practice_task(id,tenant_id,work_item_id,title,description,status,assignee_member_id,team_id,sequence,due_date,source_template_task_id,mandatory,work_stage_id,review_required,created_by,updated_by) values(${taskId},${ctx.tenantId},${workId},${definition.title},${definition.description},'not_started',${assignee},${definition.default_team_id ?? schedule.default_team_id},${definition.sequence},${definition.due_date_offset_days === null ? null : addDays(deadline?.date ?? occurrence.periodEnd, Number(definition.due_date_offset_days))},${definition.id},${definition.mandatory},${definition.work_template_stage_id ? stageInstances.get(String(definition.work_template_stage_id)) ?? null : null},${definition.review_required},${ctx.actorId},${ctx.actorId})`;
     await recordMutation(tx, ctx, "TASK_GENERATED", "PRACTICE_TASK", taskId, String(schedule.client_id), { workItemId: workId, templateTaskId: String(definition.id), sequence: Number(definition.sequence) }, "task.generated");
   }
   await tx`update recurrence_generation set work_item_id=${workId} where tenant_id=${ctx.tenantId} and id=${markerId}`;
-  await recordMutation(tx, ctx, "WORK_TEMPLATE_INSTANTIATED", "WORK_ITEM", workId, String(schedule.client_id), { templateId: String(template[0]!.id), templateVersion: Number(template[0]!.version), taskCount: definitions.length }, "work.template_instantiated");
+  await recordMutation(tx, ctx, "WORK_TEMPLATE_INSTANTIATED", "WORK_ITEM", workId, String(schedule.client_id), { templateId: String(template[0]!.id), templateVersion: Number(template[0]!.version), taskCount: definitions.length, stageCount: stageDefinitions.length }, "work.template_instantiated");
   await recordMutation(tx, ctx, "WORK_GENERATED", "WORK_ITEM", workId, String(schedule.client_id), { scheduleId: String(schedule.id), occurrenceDate: occurrence.occurrenceDate, deadline: deadline?.date }, "work.generated");
   if (deadline) await recordMutation(tx, ctx, "WORK_DEADLINE_CALCULATED", "WORK_ITEM", workId, String(schedule.client_id), { dueDate: deadline.date, ruleId: schedule.deadline_rule_id ? String(schedule.deadline_rule_id) : null }, "work.deadline_calculated");
   return workId;
@@ -644,6 +693,29 @@ export async function handlePracticeManagementRoute(request: Request, env: Env, 
   if (match && request.method === "PATCH") return taskAction(request, env, actorId, match[1]!, "patch");
   match = path.match(/^\/v1\/practice\/tasks\/([^/]+)\/(assignment|status|complete)$/);
   if (match && request.method === "POST") return taskAction(request, env, actorId, match[1]!, match[2]! as "assignment" | "status" | "complete");
+  match = path.match(/^\/v1\/practice\/tasks\/([^/]+)\/dependencies$/);
+  if (match && ["GET","POST"].includes(request.method)) return taskDependencies(request,env,actorId,match[1]!);
+  match = path.match(/^\/v1\/practice\/tasks\/([^/]+)\/dependencies\/([^/]+)\/resolve$/);
+  if (match && request.method === "POST") return resolveDependency(request,env,actorId,match[1]!,match[2]!);
+  match = path.match(/^\/v1\/practice\/work\/([^/]+)\/workflow$/);
+  if (match && request.method === "GET") return workflowStages(request,env,actorId,match[1]!);
+  match = path.match(/^\/v1\/practice\/workflow-stages\/([^/]+)\/advance$/);
+  if (match && request.method === "POST") return advanceWorkflowStage(request,env,actorId,match[1]!);
+  if (path === "/v1/practice/reviews" && ["GET","POST"].includes(request.method)) return reviews(request,env,actorId);
+  match = path.match(/^\/v1\/practice\/reviews\/([^/]+)\/decision$/);
+  if (match && request.method === "POST") return reviewDecision(request,env,actorId,match[1]!);
+  match = path.match(/^\/v1\/practice\/reviews\/([^/]+)\/points$/);
+  if (match && ["GET","POST"].includes(request.method)) return reviewPoints(request,env,actorId,match[1]!);
+  match = path.match(/^\/v1\/practice\/review-points\/([^/]+)\/status$/);
+  if (match && request.method === "POST") return reviewPointStatus(request,env,actorId,match[1]!);
+  if (path === "/v1/practice/automation-rules" && ["GET","POST"].includes(request.method)) return automationRules(request,env,actorId);
+  match = path.match(/^\/v1\/practice\/automation-rules\/([^/]+)$/);
+  if (match && request.method === "PATCH") return automationRuleItem(request,env,actorId,match[1]!);
+  match = path.match(/^\/v1\/practice\/automation-rules\/([^/]+)\/execute$/);
+  if (match && request.method === "POST") return executeAutomation(request,env,actorId,match[1]!);
+  if (path === "/v1/practice/recurrence-operations" && request.method === "GET") return recurrenceHistory(request,env,actorId);
+  if (path === "/v1/practice/recurrence-operations/dry-run" && request.method === "POST") return recurrenceOperation(request,env,actorId,"dry_run");
+  if (path === "/v1/practice/recurrence-operations/replay" && request.method === "POST") return recurrenceOperation(request,env,actorId,"replay");
   if (path === "/v1/practice/work-templates" && ["GET", "POST"].includes(request.method)) return templateCollection(request, env, actorId);
   if (path === "/v1/practice/deadline-rules" && ["GET", "POST"].includes(request.method)) return deadlineRules(request, env, actorId);
   if (path === "/v1/practice/recurring-schedules" && ["GET", "POST"].includes(request.method)) return recurringSchedules(request, env, actorId);
@@ -664,6 +736,194 @@ export async function handlePracticeManagementRoute(request: Request, env: Env, 
   return null;
 }
 
+async function workflowStages(request: Request, env: Env, actorId: string, workId: string) {
+  uuid(workId, "Work item");
+  return within(request, env, actorId, "work.view", "practice.workflow", async (tx, ctx) =>
+    response({ items: await tx`select ws.*,coalesce((select json_agg(t order by t.sequence) from practice_task t where t.tenant_id=ws.tenant_id and t.work_stage_id=ws.id),'[]') tasks from work_stage ws where ws.tenant_id=${ctx.tenantId} and ws.work_item_id=${workId} order by ws.sequence,ws.id` }));
+}
+
+async function advanceWorkflowStage(request: Request, env: Env, actorId: string, stageId: string) {
+  uuid(stageId, "Workflow stage"); const input = await body(request);
+  return within(request, env, actorId, "workflow.advance", "practice.workflow", async (tx, ctx) => {
+    const rows = await tx`select ws.*,w.client_id,w.specialist_record_reference from work_stage ws join work_item w on w.tenant_id=ws.tenant_id and w.id=ws.work_item_id where ws.tenant_id=${ctx.tenantId} and ws.id=${stageId} for update of ws`;
+    if (!rows.length) throw new ApiError(404, "NOT_FOUND", "Workflow stage not found");
+    const stage = rows[0]!, next = enumValue(input, "status", STAGE_STATUSES);
+    const mandatory = await tx`select count(*)::int remaining from practice_task where tenant_id=${ctx.tenantId} and work_stage_id=${stageId} and mandatory and status not in ('completed','skipped')`;
+    const approvals = await tx`select count(*)::int approved from practice_review where tenant_id=${ctx.tenantId} and work_stage_id=${stageId} and status in ('approved','completed')`;
+    const prior = await tx`select count(*)::int remaining from work_stage where tenant_id=${ctx.tenantId} and work_item_id=${stage.work_item_id} and sequence<${stage.sequence} and status not in ('completed','skipped')`;
+    const criteria = (stage.completion_criteria ?? {}) as Record<string, unknown>;
+    const failures = evaluateStageGates(criteria, {
+      mandatoryTasksIncomplete: Number(mandatory[0]!.remaining), approvalRequired: stage.stage_type === "approval", approvalRecorded: Number(approvals[0]!.approved)>0,
+      predecessorIncomplete: Number(prior[0]!.remaining)>0, specialistCompletionRequired: criteria.specialistCompletion === true,
+      specialistCompletionRecorded: Boolean(stage.specialist_record_reference), manualReleaseRequired: criteria.manualRelease === true, manualReleaseGranted: input.manualRelease === true,
+    });
+    orchestrate(()=>assertStageTransition(String(stage.status), next, Boolean(stage.skippable), failures));
+    const blockReason = next === "blocked" ? required(input, "reason", 500) : null;
+    const updated = await tx`update work_stage set status=${next},block_reason=${blockReason},started_at=case when ${next}='active' then coalesce(started_at,now()) else started_at end,completed_at=case when ${next} in ('completed','skipped') then now() else null end,updated_by=${ctx.actorId},updated_at=now() where tenant_id=${ctx.tenantId} and id=${stageId} returning *`;
+    const event = next === "completed" ? "workflow.stage_completed" : next === "blocked" ? "workflow.blocked" : stage.status === "blocked" ? "workflow.unblocked" : next === "active" ? "workflow.stage_started" : undefined;
+    await recordMutation(tx, ctx, `WORKFLOW_STAGE_${next.toUpperCase()}`, "WORK_STAGE", stageId, String(stage.client_id), { workItemId: String(stage.work_item_id), fromStatus: String(stage.status), toStatus: next, gateFailures: failures }, event);
+    return response({ item: updated[0], gates: failures });
+  });
+}
+
+async function taskDependencies(request: Request, env: Env, actorId: string, taskId: string) {
+  uuid(taskId, "Task"); const input = request.method === "POST" ? await body(request) : null;
+  return within(request, env, actorId, request.method === "GET" ? "tasks.view" : "workflow.manage", "practice.workflow", async (tx, ctx) => {
+    if (request.method === "GET") return response({ items: await tx`select d.*,p.title predecessor_title,p.status predecessor_status from practice_task_dependency d join practice_task p on p.tenant_id=d.tenant_id and p.id=d.predecessor_task_id where d.tenant_id=${ctx.tenantId} and d.successor_task_id=${taskId} order by d.created_at` });
+    const predecessor = uuid(required(input!, "predecessorTaskId", 36), "Predecessor task"), type = enumValue(input!, "dependencyType", DEPENDENCY_TYPES, "finish_to_start");
+    const tasks = await tx`select id,work_item_id from practice_task where tenant_id=${ctx.tenantId} and id in (${predecessor},${taskId})`;
+    if (tasks.length !== 2 || new Set(tasks.map((item) => String(item.work_item_id))).size !== 1) throw new ApiError(409, "INVALID_TASK_DEPENDENCY", "Task dependencies must remain within one work item");
+    const edges = await tx`select predecessor_task_id,successor_task_id,resolved_at from practice_task_dependency where tenant_id=${ctx.tenantId} and predecessor_task_id in (select id from practice_task where tenant_id=${ctx.tenantId} and work_item_id=${tasks[0]!.work_item_id})`;
+    if (wouldCreateDependencyCycle(edges.map((edge) => ({ predecessor:String(edge.predecessor_task_id), successor:String(edge.successor_task_id), resolved:Boolean(edge.resolved_at) })), predecessor, taskId)) throw new ApiError(409, "DEPENDENCY_CYCLE", "Task dependency would create a cycle");
+    await tx`insert into practice_task_dependency(tenant_id,predecessor_task_id,successor_task_id,dependency_type,blocking_reason,created_by) values(${ctx.tenantId},${predecessor},${taskId},${type},${optional(input!,"blockingReason",500) ?? null},${ctx.actorId})`;
+    await recordMutation(tx, ctx, "TASK_DEPENDENCY_CREATED", "PRACTICE_TASK", taskId, null, { predecessorTaskId: predecessor, dependencyType: type }, "workflow.blocked");
+    return response({ predecessorTaskId: predecessor, successorTaskId: taskId, dependencyType: type }, 201);
+  });
+}
+
+async function resolveDependency(request: Request, env: Env, actorId: string, taskId: string, predecessorId: string) {
+  uuid(taskId,"Task"); uuid(predecessorId,"Predecessor task"); const input = await body(request);
+  return within(request, env, actorId, "workflow.manage", "practice.workflow", async (tx, ctx) => {
+    const reason = required(input,"reason",500);
+    const rows = await tx`update practice_task_dependency set resolved_at=now(),resolved_by=${ctx.actorId},blocking_reason=coalesce(blocking_reason,'') || ${` | Resolved: ${reason}`} where tenant_id=${ctx.tenantId} and predecessor_task_id=${predecessorId} and successor_task_id=${taskId} and resolved_at is null returning *`;
+    if (!rows.length) throw new ApiError(404,"NOT_FOUND","Active task dependency not found");
+    await recordMutation(tx,ctx,"TASK_DEPENDENCY_RESOLVED","PRACTICE_TASK",taskId,null,{predecessorTaskId:predecessorId,reason},"workflow.unblocked");
+    return response({item:rows[0]});
+  });
+}
+
+async function reviews(request: Request, env: Env, actorId: string) {
+  const input = request.method === "POST" ? await body(request) : null;
+  return within(request, env, actorId, request.method === "GET" ? "review.perform" : "review.request", "practice.workflow", async (tx, ctx) => {
+    if (request.method === "GET") {
+      const status = new URL(request.url).searchParams.get("status"); if (status && !REVIEW_STATUSES.has(status)) throw new ApiError(400,"INVALID_REQUEST","status is invalid");
+      return response({items:await tx`select r,w.title work_title,w.due_date,o.display_name client_name,s.name service_name,ws.name stage_name,pm.display_name preparer_name,rm.display_name reviewer_name,extract(epoch from(now()-r.requested_at))/3600 waiting_hours from practice_review r join work_item w on w.tenant_id=r.tenant_id and w.id=r.work_item_id join organisation o on o.tenant_id=w.tenant_id and o.id=w.client_id join client_service cs on cs.tenant_id=w.tenant_id and cs.id=w.client_service_id join practice_service s on s.tenant_id=cs.tenant_id and s.id=cs.service_id left join work_stage ws on ws.tenant_id=r.tenant_id and ws.id=r.work_stage_id left join tenant_member pm on pm.tenant_id=r.tenant_id and pm.id=r.preparer_member_id left join tenant_member rm on rm.tenant_id=r.tenant_id and rm.id=r.reviewer_member_id where r.tenant_id=${ctx.tenantId} and (${status}::text is null or r.status=${status}) order by r.requested_at`});
+    }
+    const workId=uuid(required(input!,"workItemId",36),"Work item"), taskId=optional(input!,"taskId",36) ?? null, stageId=optional(input!,"stageId",36) ?? null;
+    if (!taskId && !stageId) throw new ApiError(400,"INVALID_REQUEST","taskId or stageId is required");
+    const work=await tx`select client_id from work_item where tenant_id=${ctx.tenantId} and id=${workId}`; if(!work.length) throw new ApiError(404,"NOT_FOUND","Work item not found");
+    const id=crypto.randomUUID(), rows=await tx`insert into practice_review(id,tenant_id,work_item_id,practice_task_id,work_stage_id,preparer_member_id,reviewer_member_id,approver_member_id,segregation_required,requested_by) values(${id},${ctx.tenantId},${workId},${taskId},${stageId},${optional(input!,"preparerMemberId",36) ?? null},${optional(input!,"reviewerMemberId",36) ?? null},${optional(input!,"approverMemberId",36) ?? null},${input!.segregationRequired !== false},${ctx.actorId}) returning *`;
+    await recordMutation(tx,ctx,"REVIEW_REQUESTED","PRACTICE_REVIEW",id,String(work[0]!.client_id),{workItemId:workId,taskId,stageId},"review.requested");
+    return response({item:rows[0]},201);
+  });
+}
+
+async function reviewDecision(request: Request, env: Env, actorId: string, reviewId: string) {
+  uuid(reviewId,"Review"); const input=await body(request), status=enumValue(input,"status",REVIEW_STATUSES);
+  const permission=status==="approved"?"review.approve":"review.perform";
+  return within(request,env,actorId,permission,"practice.workflow",async(tx,ctx)=>{
+    const rows=await tx`select r.*,w.client_id from practice_review r join work_item w on w.tenant_id=r.tenant_id and w.id=r.work_item_id where r.tenant_id=${ctx.tenantId} and r.id=${reviewId} for update of r`; if(!rows.length) throw new ApiError(404,"NOT_FOUND","Review not found");
+    const review=rows[0]!, actor=await tx`select id from tenant_member where tenant_id=${ctx.tenantId} and actor_id=${ctx.actorId} and membership_status='ACTIVE'`;
+    orchestrate(()=>assertReviewTransition(String(review.status),status));
+    if(!actor.length)throw new ApiError(403,"ACTIVE_MEMBERSHIP_REQUIRED","An active tenant membership is required");
+    if(status==="approved"&&review.approver_member_id&&String(review.approver_member_id)!==String(actor[0]!.id))throw new ApiError(403,"DESIGNATED_APPROVER_REQUIRED","Only the designated approver may approve this review");
+    if(["in_progress","changes_requested"].includes(status)&&review.reviewer_member_id&&String(review.reviewer_member_id)!==String(actor[0]!.id))throw new ApiError(403,"DESIGNATED_REVIEWER_REQUIRED","Only the designated reviewer may perform this review");
+    if(status==="approved" && review.segregation_required && actor[0]?.id && String(review.preparer_member_id)===String(actor[0].id)) throw new ApiError(403,"SELF_APPROVAL_PROHIBITED","The preparer cannot approve this review");
+    if(status==="approved"){const open=await tx`select 1 from practice_review_point where tenant_id=${ctx.tenantId} and review_id=${reviewId} and status<>'cleared' limit 1`; if(open.length) throw new ApiError(409,"OPEN_REVIEW_POINTS","Review points must be cleared before approval");}
+    const reason=status==="changes_requested"||status==="rejected"?required(input,"reason",2000):optional(input,"reason",2000)??null;
+    const updated=await tx`update practice_review set status=${status},started_at=case when ${status}='in_progress' then coalesce(started_at,now()) else started_at end,decided_at=case when ${status} in ('approved','rejected','changes_requested') then now() else decided_at end,decision_by=case when ${status} in ('approved','rejected','changes_requested') then ${ctx.actorId} else decision_by end,decision_reason=${reason},updated_at=now() where tenant_id=${ctx.tenantId} and id=${reviewId} returning *`;
+    const event=status==="approved"?"review.approved":status==="changes_requested"?"review.changes_requested":status==="reopened"?"review.reopened":undefined;
+    await recordMutation(tx,ctx,`REVIEW_${status.toUpperCase()}`,"PRACTICE_REVIEW",reviewId,String(review.client_id),{fromStatus:String(review.status),toStatus:status,reason},event);
+    return response({item:updated[0]});
+  });
+}
+
+async function reviewPoints(request: Request,env:Env,actorId:string,reviewId:string){
+  uuid(reviewId,"Review"); const input=request.method==="POST"?await body(request):null;
+  return within(request,env,actorId,request.method==="GET"?"review.perform":"review.perform","practice.workflow",async(tx,ctx)=>{
+    if(request.method==="GET") return response({items:await tx`select * from practice_review_point where tenant_id=${ctx.tenantId} and review_id=${reviewId} order by created_at`});
+    const review=await tx`select work_item_id,practice_task_id,work_stage_id from practice_review where tenant_id=${ctx.tenantId} and id=${reviewId}`; if(!review.length) throw new ApiError(404,"NOT_FOUND","Review not found");
+    const id=crypto.randomUUID(),rows=await tx`insert into practice_review_point(id,tenant_id,review_id,work_item_id,practice_task_id,work_stage_id,description,created_by,assigned_member_id,updated_by) values(${id},${ctx.tenantId},${reviewId},${review[0]!.work_item_id},${review[0]!.practice_task_id},${review[0]!.work_stage_id},${required(input!,"description",4000)},${ctx.actorId},${optional(input!,"assignedMemberId",36)??null},${ctx.actorId}) returning *`;
+    await recordMutation(tx,ctx,"REVIEW_POINT_CREATED","PRACTICE_REVIEW_POINT",id,null,{reviewId},"review.point_created"); return response({item:rows[0]},201);
+  });
+}
+
+async function reviewPointStatus(request:Request,env:Env,actorId:string,pointId:string){
+  uuid(pointId,"Review point"); const input=await body(request),status=enumValue(input,"status",REVIEW_POINT_STATUSES);
+  return within(request,env,actorId,"review.perform","practice.workflow",async(tx,ctx)=>{const current=await tx`select status from practice_review_point where tenant_id=${ctx.tenantId} and id=${pointId} for update`;if(!current.length)throw new ApiError(404,"NOT_FOUND","Review point not found");orchestrate(()=>assertReviewPointTransition(String(current[0]!.status),status));const resolution=status==="addressed"||status==="cleared"?required(input,"resolution",4000):optional(input,"resolution",4000)??null;const rows=await tx`update practice_review_point set status=${status},resolution=${resolution},addressed_at=case when ${status}='addressed' then now() else addressed_at end,cleared_at=case when ${status}='cleared' then now() else null end,updated_by=${ctx.actorId},updated_at=now() where tenant_id=${ctx.tenantId} and id=${pointId} returning *`;await recordMutation(tx,ctx,`REVIEW_POINT_${status.toUpperCase()}`,"PRACTICE_REVIEW_POINT",pointId,null,{status});return response({item:rows[0]});});
+}
+
+async function automationRules(request:Request,env:Env,actorId:string){
+  const input=request.method==="POST"?await body(request):null;
+  return within(request,env,actorId,request.method==="GET"?"automation.view":"automation.manage","practice.automation",async(tx,ctx)=>{
+    if(request.method==="GET") return response({items:await tx`select r.*,coalesce((select json_agg(e order by e.started_at desc) from (select * from automation_execution ae where ae.tenant_id=r.tenant_id and ae.automation_rule_id=r.id order by ae.started_at desc limit 10)e),'[]') recent_executions from automation_rule r where r.tenant_id=${ctx.tenantId} order by r.priority,r.name`});
+    const definition=orchestrate(()=>validateAutomationDefinition(input!.triggerType,input!.conditions??[],input!.actions)),priority=Number(input!.priority??100);
+    if(!Number.isInteger(priority)||priority<0||priority>1000)throw new ApiError(400,"INVALID_REQUEST","priority must be 0-1000");
+    const id=crypto.randomUUID(),rows=await tx`insert into automation_rule(id,tenant_id,name,enabled,trigger_type,conditions,actions,priority,effective_from,effective_to,created_by,updated_by) values(${id},${ctx.tenantId},${required(input!,"name",180)},${input!.enabled===true},${String(input!.triggerType)},${tx.json(definition.conditions as unknown as postgres.JSONValue)},${tx.json(definition.actions as unknown as postgres.JSONValue)},${priority},${optional(input!,"effectiveFrom",35)??null},${optional(input!,"effectiveTo",35)??null},${ctx.actorId},${ctx.actorId}) returning *`;
+    await recordMutation(tx,ctx,"AUTOMATION_RULE_CREATED","AUTOMATION_RULE",id,null,{triggerType:String(input!.triggerType),enabled:input!.enabled===true});return response({item:rows[0]},201);
+  });
+}
+
+async function automationRuleItem(request:Request,env:Env,actorId:string,ruleId:string){
+  uuid(ruleId,"Automation rule");const input=await body(request);
+  return within(request,env,actorId,"automation.manage","practice.automation",async(tx,ctx)=>{
+    const current=await tx`select * from automation_rule where tenant_id=${ctx.tenantId} and id=${ruleId} for update`;if(!current.length)throw new ApiError(404,"NOT_FOUND","Automation rule not found");
+    const trigger=input.triggerType??current[0]!.trigger_type,conditions=input.conditions??current[0]!.conditions,actions=input.actions??current[0]!.actions,definition=orchestrate(()=>validateAutomationDefinition(trigger,conditions,actions));
+    const priority=Number(input.priority??current[0]!.priority);if(!Number.isInteger(priority)||priority<0||priority>1000)throw new ApiError(400,"INVALID_REQUEST","priority must be 0-1000");
+    const rows=await tx`update automation_rule set name=${input.name===undefined?current[0]!.name:required(input,"name",180)},enabled=${input.enabled===undefined?current[0]!.enabled:input.enabled===true},trigger_type=${String(trigger)},conditions=${tx.json(definition.conditions as unknown as postgres.JSONValue)},actions=${tx.json(definition.actions as unknown as postgres.JSONValue)},priority=${priority},updated_by=${ctx.actorId},updated_at=now() where tenant_id=${ctx.tenantId} and id=${ruleId} returning *`;
+    await recordMutation(tx,ctx,"AUTOMATION_RULE_UPDATED","AUTOMATION_RULE",ruleId,null,{enabled:Boolean(rows[0]!.enabled),triggerType:String(rows[0]!.trigger_type)});return response({item:rows[0]});
+  });
+}
+
+async function executeAutomationAction(tx:PlatformTX,ctx:PlatformContext,work:postgres.Row,action:AutomationAction){
+  const type=String(action.type);
+  if(type==="assign_user"){const memberId=uuid(String(action.memberId??""),"Member");await tx`update work_item set assigned_member_id=${memberId},updated_by=${ctx.actorId},updated_at=now() where tenant_id=${ctx.tenantId} and id=${work.id}`;}
+  else if(type==="assign_team"){const teamId=uuid(String(action.teamId??""),"Team");await tx`update work_item set assigned_team_id=${teamId},updated_by=${ctx.actorId},updated_at=now() where tenant_id=${ctx.tenantId} and id=${work.id}`;}
+  else if(type==="update_status"){const status=String(action.status??"");if(!WORK_STATUSES.has(status)||status==="completed")throw new ApiError(400,"INVALID_AUTOMATION_ACTION","Automation cannot set this work status");await tx`update work_item set status=${status},updated_by=${ctx.actorId},updated_at=now() where tenant_id=${ctx.tenantId} and id=${work.id}`;}
+  else if(type==="create_task"){const sequence=Number(action.sequence);if(!Number.isInteger(sequence)||sequence<1)throw new ApiError(400,"INVALID_AUTOMATION_ACTION","create_task requires a positive sequence");await tx`insert into practice_task(id,tenant_id,work_item_id,title,status,sequence,mandatory,created_by,updated_by) values(${crypto.randomUUID()},${ctx.tenantId},${work.id},${String(action.title??"Automation task").slice(0,240)},'not_started',${sequence},${action.mandatory!==false},${ctx.actorId},${ctx.actorId})`;}
+  else if(type==="create_review_point"){const reviewId=uuid(String(action.reviewId??""),"Review");await tx`insert into practice_review_point(id,tenant_id,review_id,work_item_id,description,created_by,updated_by) values(${crypto.randomUUID()},${ctx.tenantId},${reviewId},${work.id},${String(action.description??"Automation review point").slice(0,4000)},${ctx.actorId},${ctx.actorId})`;}
+  else if(type==="request_review"){const taskId=action.taskId?uuid(String(action.taskId),"Task"):null,stageId=action.stageId?uuid(String(action.stageId),"Stage"):null;if(!taskId&&!stageId)throw new ApiError(400,"INVALID_AUTOMATION_ACTION","request_review requires taskId or stageId");await tx`insert into practice_review(id,tenant_id,work_item_id,practice_task_id,work_stage_id,reviewer_member_id,requested_by) values(${crypto.randomUUID()},${ctx.tenantId},${work.id},${taskId},${stageId},${action.reviewerMemberId?uuid(String(action.reviewerMemberId),"Reviewer"):null},${ctx.actorId})`;}
+  else if(type==="emit_notification_request"){await tx`insert into outbox_event(id,tenant_id,aggregate_type,aggregate_id,event_type,payload,correlation_id,idempotency_key) values(${crypto.randomUUID()},${ctx.tenantId},'WORK_ITEM',${work.id},'notification.requested',${tx.json({message:String(action.message??"").slice(0,1000)})},${ctx.correlationId},${`${ctx.correlationId}:notification.requested:${work.id}`}) on conflict(idempotency_key) do nothing`;}
+  else if(type==="mark_blocked"){await tx`update work_item set status='waiting_internal',updated_by=${ctx.actorId},updated_at=now() where tenant_id=${ctx.tenantId} and id=${work.id}`;}
+  else if(type==="unblock"){await tx`update work_item set status='in_progress',updated_by=${ctx.actorId},updated_at=now() where tenant_id=${ctx.tenantId} and id=${work.id} and status in ('waiting_internal','waiting_on_client')`;}
+}
+
+async function executeAutomation(request:Request,env:Env,actorId:string,ruleId:string){
+  uuid(ruleId,"Automation rule");const input=await body(request),aggregateId=uuid(required(input,"aggregateId",36),"Work item");
+  return within(request,env,actorId,"automation.execute","practice.automation",async(tx,ctx)=>{
+    const rules=await tx`select * from automation_rule where tenant_id=${ctx.tenantId} and id=${ruleId} and enabled and (effective_from is null or effective_from<=now()) and (effective_to is null or effective_to>=now()) for update`;if(!rules.length)throw new ApiError(409,"AUTOMATION_NOT_ACTIVE","Automation rule is not active");
+    const rule=rules[0]!,chain=orchestrate(()=>assertAutomationChain(ruleId,input.causationChain??[])),eventId=optional(input,"eventId",36)??ctx.correlationId,idempotencyKey=`${ctx.tenantId}:${ruleId}:${eventId}:${aggregateId}`;
+    const prior=await tx`select * from automation_execution where tenant_id=${ctx.tenantId} and idempotency_key=${idempotencyKey}`;if(prior.length)return response({item:prior[0],duplicate:true});
+    const workRows=await tx`select w.*,cs.service_id,o.lifecycle_status client_lifecycle_status from work_item w join client_service cs on cs.tenant_id=w.tenant_id and cs.id=w.client_service_id join organisation o on o.tenant_id=w.tenant_id and o.id=w.client_id where w.tenant_id=${ctx.tenantId} and w.id=${aggregateId} for update of w`;if(!workRows.length)throw new ApiError(404,"NOT_FOUND","Work item not found");const work=workRows[0]!;
+    const conditions=rule.conditions as unknown as AutomationCondition[],entitlementCondition=conditions.find(condition=>condition.field==="entitlement"&&typeof condition.value==="string"),stage=await tx`select stage_type from work_stage where tenant_id=${ctx.tenantId} and work_item_id=${aggregateId} and status in ('active','blocked','waiting','review') order by sequence limit 1`;
+    let entitlement:string|null=null;if(entitlementCondition){const allowed=await tx`select tenant_feature_is_enabled(${ctx.tenantId},${String(entitlementCondition.value)}) enabled`;if(allowed[0]!.enabled)entitlement=String(entitlementCondition.value);}
+    const executionId=crypto.randomUUID(),facts={serviceId:String(work.service_id),workStatus:String(work.status),stageType:stage[0]?.stage_type?String(stage[0].stage_type):null,teamId:work.assigned_team_id?String(work.assigned_team_id):null,assignedMemberId:work.assigned_member_id?String(work.assigned_member_id):null,specialistModuleKey:work.specialist_module_key?String(work.specialist_module_key):null,entitlement,dueWithinDays:work.due_date?Math.ceil((Date.parse(`${work.due_date}T00:00:00Z`)-Date.now())/86400000):null,clientLifecycleStatus:String(work.client_lifecycle_status)};
+    const matches=automationConditionsMatch(rule.conditions as unknown as AutomationCondition[],facts),actions=rule.actions as unknown as AutomationAction[];
+    await tx`insert into automation_execution(id,tenant_id,automation_rule_id,trigger_type,aggregate_type,aggregate_id,triggering_event_id,idempotency_key,causation_chain,status,actions_attempted) values(${executionId},${ctx.tenantId},${ruleId},${rule.trigger_type},'WORK_ITEM',${aggregateId},${UUID.test(String(eventId))?eventId:null},${idempotencyKey},${tx.json(chain)},${matches?'started':'skipped_condition'},${matches?actions.length:0})`;
+    if(!matches){await tx`update automation_execution set completed_at=now() where tenant_id=${ctx.tenantId} and id=${executionId}`;return response({item:{id:executionId,status:"skipped_condition"}});}
+    let completed=0;try{await tx.savepoint(async(actionTx)=>{for(const action of actions){await executeAutomationAction(actionTx,ctx,work,action);completed++;}});await tx`update automation_execution set status='succeeded',actions_completed=${completed},completed_at=now() where tenant_id=${ctx.tenantId} and id=${executionId}`;await tx`update automation_rule set last_executed_at=now() where tenant_id=${ctx.tenantId} and id=${ruleId}`;await recordMutation(tx,ctx,"AUTOMATION_EXECUTED","AUTOMATION_EXECUTION",executionId,String(work.client_id),{ruleId,aggregateId,actionsCompleted:completed,causationChain:chain},"automation.executed");return response({item:{id:executionId,status:"succeeded",actionsCompleted:completed}});}catch(error){completed=0;const code=error instanceof ApiError?error.code:"AUTOMATION_ACTION_FAILED";await tx`update automation_execution set status='failed',actions_completed=${completed},error_code=${code},error_summary=${String(error instanceof Error?error.message:error).slice(0,1000)},completed_at=now() where tenant_id=${ctx.tenantId} and id=${executionId}`;await tx`update automation_rule set last_failure_at=now(),last_failure_code=${code} where tenant_id=${ctx.tenantId} and id=${ruleId}`;await recordMutation(tx,ctx,"AUTOMATION_FAILED","AUTOMATION_EXECUTION",executionId,String(work.client_id),{ruleId,aggregateId,errorCode:code,actionsCompleted:completed},"automation.failed");return response({error:{code,message:"Automation execution failed"},executionId},422);}
+  });
+}
+
+async function recurrenceHistory(request:Request,env:Env,actorId:string){return within(request,env,actorId,"recurrence.operations","practice.workflow",async(tx,ctx)=>response({items:await tx`select e.*,coalesce((select json_agg(i order by i.created_at) from recurrence_execution_item i where i.tenant_id=e.tenant_id and i.recurrence_execution_id=e.id),'[]') items from recurrence_execution e where e.tenant_id=${ctx.tenantId} order by e.started_at desc limit 100`}));}
+
+async function recurrenceOperation(request:Request,env:Env,actorId:string,mode:"dry_run"|"replay"){
+  const input=await body(request),range=orchestrate(()=>boundedReplayRange(input.from,input.to)),permission=mode==="replay"?"recurrence.replay":"recurrence.operations";
+  return within(request,env,actorId,permission,"practice.workflow",async(tx,ctx)=>{
+    const executionId=crypto.randomUUID();await tx`insert into recurrence_execution(id,tenant_id,trigger_type,status,range_from,range_to,actor_id,correlation_id) values(${executionId},${ctx.tenantId},${mode},'running',${range.from},${range.to},${ctx.actorId},${ctx.correlationId})`;
+    if(mode==="replay")await recordMutation(tx,ctx,"RECURRENCE_REPLAY_STARTED","RECURRENCE_EXECUTION",executionId,null,{rangeFrom:range.from,rangeTo:range.to},"recurrence.replay_started");
+    const schedules=await tx`select r.*,s.required_entitlement_feature_key from recurring_work_schedule r join client_service cs on cs.tenant_id=r.tenant_id and cs.id=r.client_service_id join practice_service s on s.tenant_id=cs.tenant_id and s.id=cs.service_id where r.tenant_id=${ctx.tenantId} and r.status in ('active','blocked_entitlement') order by r.id`;
+    let generated=0,blocked=0,skipped=0,failures=0;const prospective:Array<Record<string,unknown>>=[];
+    for(const schedule of schedules){
+      let occurrences:ReturnType<typeof evaluateRecurrence>;
+      try{occurrences=evaluateRecurrence(schedule.recurrence_rule as unknown as RecurrenceRule,String(schedule.effective_from),range.to,schedule.effective_to?String(schedule.effective_to):null,120).filter(item=>item.occurrenceDate>=range.from&&item.occurrenceDate<=range.to);}catch(error){failures++;const summary=String(error instanceof Error?error.message:error).slice(0,1000);await tx`insert into recurrence_execution_item(id,tenant_id,recurrence_execution_id,recurring_schedule_id,outcome,diagnostic_code,diagnostic_summary) values(${crypto.randomUUID()},${ctx.tenantId},${executionId},${schedule.id},'failed','INVALID_RECURRENCE_RULE',${summary})`;prospective.push({scheduleId:String(schedule.id),outcome:"failed",diagnosticSummary:summary});continue;}
+      for(const occurrence of occurrences){
+        const duplicate=await tx`select work_item_id from recurrence_generation where tenant_id=${ctx.tenantId} and recurring_schedule_id=${schedule.id} and occurrence_date=${occurrence.occurrenceDate}`;
+        let outcome="prospective",workId:null|string=null,dueDate:null|string=null;
+        if(schedule.deadline_rule_id){const rules=await tx`select rule_type,configuration from deadline_rule where tenant_id=${ctx.tenantId} and id=${schedule.deadline_rule_id}`;if(rules.length)dueDate=calculateDeadline({type:String(rules[0]!.rule_type),...(rules[0]!.configuration as object)} as DeadlineRule,{periodEnd:occurrence.periodEnd}).date;}
+        if(duplicate.length){outcome="skipped_idempotent";skipped++;}
+        else if(schedule.specialist_module_key==="ledgerly"){const entitlements=await tx`select tenant_feature_is_enabled(${ctx.tenantId},'ledgerly.enabled') module_enabled,tenant_feature_is_enabled(${ctx.tenantId},${String(schedule.required_entitlement_feature_key??"ledgerly.accounts")}) feature_enabled`;if(!entitlements[0]!.module_enabled||!entitlements[0]!.feature_enabled){outcome="blocked_entitlement";blocked++;}}
+        if(mode==="replay"&&outcome==="prospective"){try{workId=await tx.savepoint(async(replayTx)=>instantiateOccurrence(replayTx,ctx,schedule,occurrence));if(workId){outcome="generated";generated++;}else{outcome="skipped_idempotent";skipped++;}}catch(error){outcome="failed";failures++;}}
+        await tx`insert into recurrence_execution_item(id,tenant_id,recurrence_execution_id,recurring_schedule_id,occurrence_date,prospective_due_date,work_item_id,outcome) values(${crypto.randomUUID()},${ctx.tenantId},${executionId},${schedule.id},${occurrence.occurrenceDate},${dueDate},${workId},${outcome})`;
+        prospective.push({scheduleId:String(schedule.id),occurrenceDate:occurrence.occurrenceDate,prospectiveDueDate:dueDate,outcome,workItemId:workId});
+      }
+    }
+    const status=failures?generated?"partially_failed":"failed":"succeeded";await tx`update recurrence_execution set status=${status},schedules_evaluated=${schedules.length},work_generated=${generated},blocked_entitlement=${blocked},skipped_idempotent=${skipped},failures=${failures},completed_at=now() where tenant_id=${ctx.tenantId} and id=${executionId}`;
+    const event=mode==="dry_run"?"recurrence.dry_run_completed":"recurrence.replay_completed";await recordMutation(tx,ctx,mode==="dry_run"?"RECURRENCE_DRY_RUN_COMPLETED":"RECURRENCE_REPLAY_COMPLETED","RECURRENCE_EXECUTION",executionId,null,{rangeFrom:range.from,rangeTo:range.to,schedulesEvaluated:schedules.length,generated,blocked,skipped,failures},event);
+    return response({item:{id:executionId,status,mode,range,schedulesEvaluated:schedules.length,generated,blockedEntitlement:blocked,skippedIdempotent:skipped,failures,items:prospective}},mode==="replay"?201:200);
+  });
+}
+
 export async function runScheduledRecurringGeneration(env: Env): Promise<{ tenants: number; schedules: number }> {
   let contexts: unknown;
   try { contexts = JSON.parse(env.RECURRENCE_EXECUTION_CONTEXTS); } catch { throw new Error("RECURRENCE_EXECUTION_CONTEXTS must be valid JSON"); }
@@ -673,15 +933,20 @@ export async function runScheduledRecurringGeneration(env: Env): Promise<{ tenan
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("Each recurrence execution context must be an object");
     const item = raw as Record<string, unknown>, tenantId = String(item.tenantId ?? ""), actorId = String(item.actorId ?? "");
     if (!UUID.test(tenantId) || !actorId.trim()) throw new Error("Each recurrence execution context requires tenantId and actorId");
-    const headers = { "x-tenant-id": tenantId, "x-correlation-id": crypto.randomUUID() };
+    const correlationId=crypto.randomUUID(), executionId=crypto.randomUUID();
+    const headers = { "x-tenant-id": tenantId, "x-correlation-id": correlationId };
+    await within(new Request("https://scheduled.invalid/v1/practice/recurrence-operations",{headers}),env,actorId,"recurrence.operations","practice.workflow",async(tx,ctx)=>{await tx`insert into recurrence_execution(id,tenant_id,trigger_type,status,actor_id,correlation_id) values(${executionId},${ctx.tenantId},'scheduled','running',${ctx.actorId},${ctx.correlationId})`;});
     const listed = await recurringSchedules(new Request("https://scheduled.invalid/v1/practice/recurring-schedules", { headers }), env, actorId);
-    if (!listed.ok) throw new Error(`Could not list schedules for tenant ${tenantId}`);
+    if (!listed.ok){await within(new Request("https://scheduled.invalid/v1/practice/recurrence-operations",{headers}),env,actorId,"recurrence.operations","practice.workflow",async(tx,ctx)=>{await tx`update recurrence_execution set status='failed',failures=1,completed_at=now(),diagnostic_summary='Could not list tenant schedules' where tenant_id=${ctx.tenantId} and id=${executionId}`;await recordMutation(tx,ctx,"RECURRENCE_EXECUTION_FAILED","RECURRENCE_EXECUTION",executionId,null,{failureCount:1,errorCode:"SCHEDULE_LIST_FAILED"},"recurrence.execution_failed");});throw new Error(`Could not list schedules for tenant ${tenantId}`);}
     const payload = await listed.json() as { items?: Array<{ id: string; status: string }> };
+    let generatedCount=0,blockedCount=0,failureCount=0;
     for (const schedule of payload.items ?? []) if (schedule.status === "active") {
       const generated = await generateSchedule(new Request(`https://scheduled.invalid/v1/practice/recurring-schedules/${schedule.id}/generate`, { method: "POST", headers: { ...headers, "content-type": "application/json" }, body: "{}" }), env, actorId, schedule.id);
-      if (!generated.ok && generated.status !== 409) throw new Error(`Schedule generation failed for ${schedule.id}`);
+      if(generated.ok){const result=await generated.clone().json() as {generated?:number};generatedCount+=Number(result.generated??0);}else if(generated.status===409)blockedCount++;else failureCount++;
       schedules++;
     }
+    await within(new Request("https://scheduled.invalid/v1/practice/recurrence-operations",{headers}),env,actorId,"recurrence.operations","practice.workflow",async(tx,ctx)=>{const status=failureCount?generatedCount?"partially_failed":"failed":"succeeded";await tx`update recurrence_execution set status=${status},schedules_evaluated=${(payload.items??[]).length},work_generated=${generatedCount},blocked_entitlement=${blockedCount},failures=${failureCount},completed_at=now(),diagnostic_summary=${failureCount?`${failureCount} schedule generation failures`:null} where tenant_id=${ctx.tenantId} and id=${executionId}`;if(failureCount)await recordMutation(tx,ctx,"RECURRENCE_EXECUTION_FAILED","RECURRENCE_EXECUTION",executionId,null,{failureCount,generatedCount},"recurrence.execution_failed");});
+    if(failureCount)throw new Error(`Scheduled recurrence execution ${executionId} failed for ${failureCount} schedules`);
   }
   return { tenants: contexts.length, schedules };
 }

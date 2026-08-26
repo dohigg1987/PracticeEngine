@@ -6,6 +6,7 @@ const production = process.argv.includes("--production");
 const skipE2e = process.argv.includes("--skip-e2e");
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const startedAt = Date.now();
+const timings=[];
 
 if (Number(process.versions.node.split(".")[0]) < 22) {
   console.error("Pilot verification requires Node.js 22 or later.");
@@ -40,6 +41,7 @@ const checks = [
 
 for (const [label, cwd, args] of checks) {
   console.log(`\n=== ${label} ===`);
+  const suiteStarted=Date.now();
   const result = spawnSync(process.execPath, args, {
     cwd,
     stdio: "inherit",
@@ -58,10 +60,16 @@ for (const [label, cwd, args] of checks) {
     console.error(`Pilot verification stopped at: ${label}`);
     process.exit(result.status ?? 1);
   }
+  const seconds=Number(((Date.now()-suiteStarted)/1000).toFixed(1));
+  timings.push({label,seconds});
+  console.log(`--- ${label}: ${seconds.toFixed(1)}s ---`);
 }
 
 const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
 console.log(`\nPilot verification passed in ${elapsed}s.`);
+console.log("Slowest pilot suites:");
+for(const item of [...timings].sort((a,b)=>b.seconds-a.seconds).slice(0,5))console.log(`${item.seconds.toFixed(1)}s  ${item.label}`);
+console.log(`VERIFY_TIMING_JSON=${JSON.stringify({tier:"pilot",seconds:Number(elapsed),suites:timings,playwrightWorkers:Number(process.env.PLAYWRIGHT_WORKERS||4),browsers:"chromium + Edge when installed"})}`);
 console.log(
   production
     ? "The materialised configuration passed local gates. Run the documented remote smoke before go-live."

@@ -11,6 +11,8 @@
     "test:ui-quality": "node --test scripts/ui-quality-guard.test.mjs scripts/forced-colors.test.mjs && node scripts/ui-quality-guard.mjs",
     "test:headers": "node --test scripts/security-headers.test.mjs",
     "test:e2e": "playwright test --project=chromium",
+    "test:e2e:pm": "playwright test e2e/practice-management.spec.ts --project=chromium",
+    "test:e2e:ledgerly": "playwright test e2e/pilot.spec.ts e2e/governed-working-papers.spec.ts --project=chromium",
     "test:e2e:headed": "playwright test --headed",
     "verify:ui": "npm run typecheck && npm test && npm run test:ui-quality && npm run test:headers && vite build && npm run test:e2e"
   },

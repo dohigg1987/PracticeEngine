@@ -65,7 +65,7 @@ async function attachSurface(page: Page, testInfo: TestInfo, name: string) {
 
 for (const viewport of viewports) {
   test(`commercial and client surfaces reflow at ${viewport.name}`, async ({ page }, testInfo) => {
-    test.setTimeout(120_000);
+    test.setTimeout(240_000);
     await page.setViewportSize(viewport);
     for (const surface of surfaces) {
       await start(page);

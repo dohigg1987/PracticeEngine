@@ -9,7 +9,9 @@ async function openWorkingPapers(page: Page) {
   if (!(await item.isVisible()))
     await page.getByRole("button", { name: "Accounts builder", exact: true }).click();
   await item.click();
-  await expect(page.getByRole("heading", { name: "Working papers" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Working papers" })).toBeVisible({
+    timeout: 15_000,
+  });
 }
 
 test.beforeEach(async ({ page }) => {
@@ -20,6 +22,7 @@ test.beforeEach(async ({ page }) => {
 test("governed library is primary and one-off papers retain governance metadata", async ({
   page,
 }, testInfo) => {
+  test.setTimeout(120_000);
   await page.setViewportSize({ width: 1440, height: 900 });
   await openWorkingPapers(page);
 

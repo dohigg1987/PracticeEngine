@@ -852,7 +852,14 @@ export type PracticeTask = {
   sequence: number;
   due_date?: string | null;
   completed_at?: string | null;
+  review_required?: boolean;
+  blockers?: Array<{ predecessorTaskId:string; dependencyType:string; blockingReason?:string|null; resolvedAt?:string|null }>;
 };
+export type PracticeWorkStage={id:string;work_item_id:string;name:string;sequence:number;stage_type:"preparation"|"client_input"|"internal_review"|"approval"|"specialist_execution"|"completion";status:"not_started"|"active"|"blocked"|"waiting"|"review"|"completed"|"skipped";block_reason?:string|null;source_template_version:number;};
+export type PracticeReviewPoint={id:string;description:string;status:"open"|"addressed"|"cleared"|"reopened";resolution?:string|null;};
+export type PracticeReview={id:string;work_item_id:string;work_title?:string;client_name?:string;service_name?:string;stage_name?:string;preparer_name?:string;reviewer_name?:string;due_date?:string|null;status:"requested"|"in_progress"|"changes_requested"|"approved"|"rejected"|"completed"|"reopened";requested_at:string;waiting_hours?:number;review_points?:PracticeReviewPoint[];};
+export type AutomationRule={id:string;name:string;enabled:boolean;trigger_type:string;conditions:Array<Record<string,unknown>>;actions:Array<Record<string,unknown>>;priority:number;last_executed_at?:string|null;last_failure_code?:string|null;recent_executions?:Array<{id:string;status:string;started_at:string}>;};
+export type RecurrenceExecution={id:string;trigger_type:"scheduled"|"manual"|"dry_run"|"replay";status:string;range_from?:string|null;range_to?:string|null;schedules_evaluated:number;work_generated:number;blocked_entitlement:number;skipped_idempotent:number;failures:number;started_at:string;completed_at?:string|null;};
 export type PracticeWorkTemplate = {
   id: string;
   name: string;
@@ -861,6 +868,7 @@ export type PracticeWorkTemplate = {
   version: number;
   status: "draft" | "published" | "superseded" | "archived";
   tasks?: Array<{ id?: string; title: string; description?: string | null; sequence: number; dueDateOffsetDays?: number | null; mandatory: boolean }>;
+  stages?: Array<{id?:string;name:string;sequence:number;stage_type:string;status:string}>;
 };
 export type RecurringWorkSchedule = {
   id: string; client_id: string; client_name?: string; client_service_id: string; service_name?: string;
@@ -2058,7 +2066,7 @@ export const api = {
     return request<{ items: PracticeWorkItem[] }>(`/v1/practice/work${query ? `?${query}` : ""}`, context);
   },
   practiceWorkItem: (context: ApiContext, id: string) =>
-    request<{ item: PracticeWorkItem }>(`/v1/practice/work/${encodeURIComponent(id)}`, context),
+    request<{ item: PracticeWorkItem & {tasks?:PracticeTask[];stages?:PracticeWorkStage[];reviews?:PracticeReview[]} }>(`/v1/practice/work/${encodeURIComponent(id)}`, context),
   updatePracticeWorkStatus: (context: ApiContext, id: string, status: PracticeWorkStatus) =>
     request<{ item: PracticeWorkItem }>(`/v1/practice/work/${encodeURIComponent(id)}/status`, context, { method: "POST", body: JSON.stringify({ status }) }),
   practiceTasks: (context: ApiContext, workId: string) =>
@@ -2075,6 +2083,16 @@ export const api = {
     request<{ items: RecurringWorkSchedule[] }>("/v1/practice/recurring-schedules", context),
   generateRecurringSchedule: (context: ApiContext, id: string) =>
     request<{ generated: number; workItemIds: string[] }>(`/v1/practice/recurring-schedules/${encodeURIComponent(id)}/generate`, context, { method: "POST", body: "{}" }),
+  practiceWorkflow:(context:ApiContext,workId:string)=>request<{items:PracticeWorkStage[]}>(`/v1/practice/work/${encodeURIComponent(workId)}/workflow`,context),
+  advancePracticeStage:(context:ApiContext,stageId:string,status:PracticeWorkStage["status"],reason?:string)=>request<{item:PracticeWorkStage}>(`/v1/practice/workflow-stages/${encodeURIComponent(stageId)}/advance`,context,{method:"POST",body:JSON.stringify({status,reason})}),
+  practiceReviews:(context:ApiContext,status?:string)=>request<{items:PracticeReview[]}>(`/v1/practice/reviews${status?`?status=${encodeURIComponent(status)}`:""}`,context),
+  decidePracticeReview:(context:ApiContext,id:string,status:PracticeReview["status"],reason?:string)=>request<{item:PracticeReview}>(`/v1/practice/reviews/${encodeURIComponent(id)}/decision`,context,{method:"POST",body:JSON.stringify({status,reason})}),
+  automationRules:(context:ApiContext)=>request<{items:AutomationRule[]}>("/v1/practice/automation-rules",context),
+  createAutomationRule:(context:ApiContext,body:Record<string,unknown>)=>request<{item:AutomationRule}>("/v1/practice/automation-rules",context,{method:"POST",body:JSON.stringify(body)}),
+  updateAutomationRule:(context:ApiContext,id:string,body:Record<string,unknown>)=>request<{item:AutomationRule}>(`/v1/practice/automation-rules/${encodeURIComponent(id)}`,context,{method:"PATCH",body:JSON.stringify(body)}),
+  recurrenceOperations:(context:ApiContext)=>request<{items:RecurrenceExecution[]}>("/v1/practice/recurrence-operations",context),
+  dryRunRecurrence:(context:ApiContext,from:string,to:string)=>request<{item:Record<string,unknown>}>("/v1/practice/recurrence-operations/dry-run",context,{method:"POST",body:JSON.stringify({from,to})}),
+  replayRecurrence:(context:ApiContext,from:string,to:string)=>request<{item:Record<string,unknown>}>("/v1/practice/recurrence-operations/replay",context,{method:"POST",body:JSON.stringify({from,to})}),
   overridePracticeDeadline: (context: ApiContext, id: string, dueDate: string, reason: string) =>
     request<{ item: PracticeWorkItem }>(`/v1/practice/work/${encodeURIComponent(id)}/deadline-override`, context, { method: "POST", body: JSON.stringify({ dueDate, reason }) }),
   recalculatePracticeDeadline: (context: ApiContext, id: string) =>
