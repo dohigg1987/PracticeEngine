@@ -22,3 +22,13 @@ DROP POLICY IF EXISTS outbox_event_authenticated_select ON public.outbox_event;
 CREATE POLICY outbox_event_authenticated_select ON public.outbox_event
   FOR SELECT TO accounts_app
   USING (tenant_id::text = nullif(current_setting('app.tenant_id',true),''));
+
+DROP POLICY IF EXISTS portal_document_authenticated_insert ON public.portal_document;
+CREATE POLICY portal_document_authenticated_insert ON public.portal_document
+  FOR INSERT TO accounts_app
+  WITH CHECK (tenant_id::text = nullif(current_setting('app.tenant_id',true),''));
+
+DROP POLICY IF EXISTS portal_document_version_authenticated_insert ON public.portal_document_version;
+CREATE POLICY portal_document_version_authenticated_insert ON public.portal_document_version
+  FOR INSERT TO accounts_app
+  WITH CHECK (tenant_id::text = nullif(current_setting('app.tenant_id',true),''));
