@@ -906,6 +906,17 @@ export type RecurringWorkSchedule = {
   specialist_module_key?: string | null; status: "active" | "suspended" | "blocked_entitlement" | "archived";
   generation_block_reason?: string | null;
 };
+export type ResourceProfile = {
+  id:string;display_name:string;team_name?:string|null;role_title?:string|null;
+  status:"active"|"inactive"|"unavailable"|"leave_unavailable"|"future_starter";
+  weekly_capacity_hours:number;assigned_hours:number;available_hours:number;utilisation_percentage:number;overdue_work:number;
+};
+export type CapacityPeriod = {key:string;label:string;available_hours:number;committed_hours:number;forecast_hours:number;unavailable_hours:number;remaining_hours:number};
+export type CapacityRow = {resource_id:string;display_name:string;team_name?:string|null;periods:CapacityPeriod[]};
+export type WorkAllocation = {id:string;work_title:string;client_id:string;client_name:string;client_service_id:string;service_name:string;resource_name?:string|null;team_name?:string|null;planned_start?:string|null;planned_end?:string|null;planned_hours:number;remaining_hours?:number|null;due_date?:string|null;status:string;assignment_state:string};
+export type TimeEntry = {id:string;resource_name:string;date:string;client_name:string;service_name?:string|null;work_title?:string|null;duration_hours:number;billable:boolean;status:string;description?:string|null};
+export type PortfolioEconomicsRow = {id:string;client_name:string;owner_name?:string|null;team_name?:string|null;service_name?:string|null;workload_hours:number;overdue_work:number;capacity_pressure:string;wip_amount?:number|null;revenue_amount?:number|null;cost_amount?:number|null;contribution_amount?:number|null;margin_percentage?:number|null;currency:string;commercial_value_state:"known"|"calculated"|"estimated"|"unavailable"};
+export type PracticeEconomicsOverview = {due_this_week:number;overdue_work:number;waiting_on_client:number;review_queue:number;capacity_utilisation_percentage:number;forecast_capacity_hours:number;wip_amount?:number|null;economic_exceptions:number;currency?:string};
 export type PracticeClientSummary = {
   client: { id: string; legal_name?: string; name?: string; originating_opportunity_id?: string | null; originating_proposal_reference_id?: string | null; converted_at?: string | null };
   services: ClientService[];
@@ -2154,6 +2165,14 @@ export const api = {
     request<{ item: PracticeWorkItem }>(`/v1/practice/work/${encodeURIComponent(id)}/deadline-recalculate`, context, { method: "POST", body: "{}" }),
   practiceClientSummary: async (context: ApiContext, clientId: string) =>
     practiceClientSummaryItem(await request<{ item: PracticeClientSummary }>(`/v1/practice/clients/${encodeURIComponent(clientId)}/summary`, context)),
+  resourceProfiles: (context: ApiContext) => request<{items:ResourceProfile[]}>("/v1/practice/resources",context),
+  capacity: (context: ApiContext, range:{from:string;to:string}) => request<{items:CapacityRow[]}>(`/v1/practice/capacity?${new URLSearchParams(range)}`,context),
+  workAllocations: (context: ApiContext, range:{from:string;to:string}) => request<{items:WorkAllocation[]}>(`/v1/practice/work-allocations?${new URLSearchParams(range)}`,context),
+  reassignWork: (context: ApiContext, workId:string, body:{resourceId:string}) => request<{item:WorkAllocation}>(`/v1/practice/work/${encodeURIComponent(workId)}/resource-assignment`,context,{method:"POST",body:JSON.stringify({assignedMemberId:body.resourceId,assignmentState:"confirmed"})}),
+  timeEntries: (context: ApiContext, range:{from:string;to:string}) => request<{items:TimeEntry[]}>(`/v1/practice/time-entries?${new URLSearchParams(range)}`,context),
+  createTimeEntry: (context: ApiContext, body:{resourceId:string;workItemId:string;clientId:string;clientServiceId:string;date:string;durationHours:number;description?:string;billable:boolean}) => request<{item:TimeEntry}>("/v1/practice/time-entries",context,{method:"POST",body:JSON.stringify({tenantMemberId:body.resourceId,workItemId:body.workItemId,clientId:body.clientId,clientServiceId:body.clientServiceId,entryDate:body.date,durationMinutes:Math.round(body.durationHours*60),narrative:body.description,classification:body.billable?"billable":"non_billable"})}),
+  portfolioEconomics: (context: ApiContext) => request<{items:PortfolioEconomicsRow[]}>("/v1/practice/portfolio-economics",context),
+  practiceEconomicsOverview: async (context: ApiContext) => (await request<{item:PracticeEconomicsOverview}>("/v1/practice/economics/overview",context)).item,
   crmProspects: (context: ApiContext) => request<{ items: CrmProspect[] }>("/v1/crm/prospects", context),
   createCrmProspect: (context: ApiContext, body: Record<string, unknown>) => request<{ item: CrmProspect }>("/v1/crm/prospects", context, { method: "POST", body: JSON.stringify(body) }),
   crmOpportunities: (context: ApiContext) => request<{ items: CrmOpportunity[] }>("/v1/crm/opportunities", context),

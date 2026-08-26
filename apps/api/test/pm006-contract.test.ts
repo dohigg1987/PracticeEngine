@@ -11,7 +11,7 @@ const crm = await readFile(new URL("apps/api/src/crm-onboarding.ts", root), "utf
 
 test("PM-006 adds only sequential migration 0034", async () => {
   const migrations = (await readdir(new URL("packages/database/migrations/", root))).filter((name) => /^\d{4}_/.test(name)).sort();
-  assert.equal(migrations.at(-1), "0034_client_portal_collaboration.sql");
+  assert.equal(migrations[33], "0034_client_portal_collaboration.sql");
   assert.match(migration, /VALUES\('0034','unified client portal requests documents messaging confirmations and machine authentication'\)/);
 });
 

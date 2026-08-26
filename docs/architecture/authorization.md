@@ -22,3 +22,17 @@ PM-005 adds CRM view/manage, prospect create/edit, opportunity create/edit/conve
 ## Enforcement
 
 New tables use forced RLS with active actor/tenant context. Composite foreign keys prevent relationships that pair a tenant with a record owned by another tenant. The service also qualifies every resource lookup by `tenant_id`; a cross-tenant identifier therefore resolves as not found and cannot be mutated.
+
+## PM-007 permission matrix
+
+| Capability | Read/entry | Management |
+| --- | --- | --- |
+| Resource profiles | `resources.view` | `resources.manage` |
+| Capacity and availability | `capacity.view` | `capacity.manage` |
+| Work allocation | existing work reads | `assignments.manage` |
+| Time | `time.view`, `time.enter` | `time.manage`, `time.approve` |
+| Internal cost rates | `costrates.view` | `costrates.manage` |
+| Economics/WIP | `economics.view` | `economics.manage` |
+| Portfolio reporting | `portfolio.view` | source-domain permissions still apply |
+
+Ordinary resource/work access does not imply cost-rate or profitability access. The API applies field-level economic restrictions before returning portfolio/time data. Self-entry is constrained to the actor's tenant-member record and accessible work; broader correction or approval requires its explicit permission. Inactive and cross-tenant assignees are rejected, while over-allocation is returned as a visible exception rather than treated as an authorization failure.

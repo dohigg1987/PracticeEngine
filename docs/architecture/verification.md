@@ -15,6 +15,7 @@
 - PM-004 uses timed development, integration and full-pilot gates. The authoritative command matrix, Playwright isolation rationale and test classifications are in `docs/engineering/verification-strategy.md`.
 - PM-005 architecture checks inventory CRM, QuoteBench reference, conversion, onboarding and notification tables; focused contracts cover ownership, idempotency, RLS, authorization, entitlements, audit/outbox and provider-neutral delivery. The UI guard starts at 187 current legacy occurrences and PM-005 lowers the checked-in ceiling in touched responsive navigation/pane styles.
 - PM-006 architecture checks require the portal/request/document/messaging/identity/machine-auth sources and inventory migration `0034` tenant tables, forced-RLS membership, staff permissions, portal entitlements and security-definer boundaries. Focused API contracts cover resource-scoped portal authorization, response/document/message idempotency, private R2 delivery controls, audit/outbox facts and QuoteBench signature/replay enforcement.
+- PM-007 architecture checks require resource, capacity, time, WIP, economics and portfolio sources and inventory migration `0035` tenant tables, forced RLS, composite tenant foreign keys, restricted grants, permissions and feature keys. Focused source contracts preserve membership/work ownership, effective dating, historical cost snapshots, QuoteBench provenance and unknown-not-zero semantics.
 - The authoritative pilot browser stage defaults to two process shards per detected browser. With Edge installed that is four concurrent jobs: Chromium 1/2 and 2/2, Edge 1/2 and 2/2. `PLAYWRIGHT_SHARDS_PER_BROWSER` may override the positive shard count.
 - `PLAYWRIGHT_WORKERS` is a total browser-worker budget, default four, divided across jobs. A budget smaller than the number of browser-shard jobs is rejected rather than silently exceeded. Default Windows execution gives each of four jobs one worker; Chromium-only execution gives each of two jobs two workers.
 - Every shard has its own two-port Vite pair and artifact root under `apps/web/test-results/pilot/{browser}-{shard}-of-{total}/{test-results,html-report}`. The runner waits for every shard, reports status/duration per job, retains failure evidence, records browser wall-clock plus nested jobs in `VERIFY_TIMING_JSON`, and fails when any shard exits non-zero. Retry-dependent results remain explicit.
@@ -27,6 +28,7 @@
 - Module boundaries are logical documentation plus a minimal import-direction guard; no package-level platform/practice/module topology exists yet.
 - Production readiness does not currently prove the live database migration head; `/ready` only proves connectivity.
 - Existing RLS verification and grant runbooks do not yet cover every historical table; PM-006 adds a focused disposable fixture for migration `0034` rather than representing full historical coverage as complete.
+- Source-contract checks cannot prove runtime RLS or economic arithmetic. Migration `0035` must also be applied to a fresh disposable Neon branch with two-tenant fixtures covering every new table, cost/economics restrictions and cross-tenant association denial.
 - Database rollback relies on Neon branch/PITR procedures; there are no down migrations.
 
 ## Canonical commands
@@ -47,3 +49,4 @@ CI runs the quick architecture guard in the non-browser job. Migration safety, t
 4. Explicit module manifests and import graph when Platform/Practice packages are created.
 5. Generate route-to-permission and permission-to-role decision matrices from the implemented catalogue.
 6. Migration fixtures that verify forward apply, cross-tenant denial, compatibility reads, and documented rollback on a disposable Neon branch.
+7. Property-based capacity/economic tests over overlapping periods, calendar boundaries and unknown input propagation.

@@ -244,6 +244,7 @@ function WorkspaceSearchIcon({
 const EngagementProduction = lazy(() => import("./EngagementProduction"));
 const CommercialWorkspace = lazy(() => import("./CommercialWorkspace"));
 const PracticeManagement = lazy(() => import("./PracticeManagement"));
+const ResourceEconomics = lazy(() => import("./ResourceEconomics"));
 const CrmOnboarding = lazy(() => import("./CrmOnboarding"));
 const ClientCollaboration = lazy(() => import("./ClientCollaboration"));
 type CsvRow = {
@@ -460,6 +461,12 @@ function AccountsWorkspace({
     | "crm-prospects"
     | "crm-opportunities"
     | "onboarding"
+    | "resources"
+    | "capacity"
+    | "allocation"
+    | "time"
+    | "portfolio"
+    | "management"
     | "team"
     | "integrations"
     | "inbox"
@@ -571,6 +578,12 @@ function AccountsWorkspace({
       workspacePage === "crm-prospects" ||
       workspacePage === "crm-opportunities" ||
       workspacePage === "onboarding" ||
+      workspacePage === "resources" ||
+      workspacePage === "capacity" ||
+      workspacePage === "allocation" ||
+      workspacePage === "time" ||
+      workspacePage === "portfolio" ||
+      workspacePage === "management" ||
       workspacePage === "team"
     )
       setPracticeNavOpen(true);
@@ -1445,6 +1458,13 @@ function AccountsWorkspace({
                     >
                       Work
                     </NavItem>
+                    <p className="eyebrow">Resources and economics</p>
+                    <NavItem className="workspace-nav-item" value="resources" icon={<PeopleTeamRegular />} onClick={() => { setWorkspacePage("resources"); setMobileNavOpen(false); }}>Resources</NavItem>
+                    <NavItem className="workspace-nav-item" value="capacity" icon={<DocumentRegular />} onClick={() => { setWorkspacePage("capacity"); setMobileNavOpen(false); }}>Capacity</NavItem>
+                    <NavItem className="workspace-nav-item" value="allocation" icon={<DocumentRegular />} onClick={() => { setWorkspacePage("allocation"); setMobileNavOpen(false); }}>Work allocation</NavItem>
+                    <NavItem className="workspace-nav-item" value="time" icon={<DocumentRegular />} onClick={() => { setWorkspacePage("time"); setMobileNavOpen(false); }}>Time</NavItem>
+                    <NavItem className="workspace-nav-item" value="portfolio" icon={<BuildingRegular />} onClick={() => { setWorkspacePage("portfolio"); setMobileNavOpen(false); }}>Portfolio</NavItem>
+                    <NavItem className="workspace-nav-item" value="management" icon={<DocumentRegular />} onClick={() => { setWorkspacePage("management"); setMobileNavOpen(false); }}>Practice overview</NavItem>
                     <NavItem
                       className="workspace-nav-item"
                       value="collaboration"
@@ -1743,6 +1763,20 @@ function AccountsWorkspace({
                     setPracticeView("client-summary");
                   }}
                   onBack={() => setPracticeView("work")}
+                />
+              </Suspense>
+            </RoutePanelBoundary>
+          ) : ["resources", "capacity", "allocation", "time", "portfolio", "management"].includes(workspacePage) ? (
+            <RoutePanelBoundary resetKey={workspacePage}>
+              <Suspense fallback={<Skeleton />}>
+                <ResourceEconomics
+                  context={context}
+                  view={workspacePage as "resources" | "capacity" | "allocation" | "time" | "portfolio" | "management"}
+                  onOpenWork={(workItemId) => {
+                    setPracticeWorkItemId(workItemId);
+                    setPracticeView("work-detail");
+                    setWorkspacePage("work");
+                  }}
                 />
               </Suspense>
             </RoutePanelBoundary>

@@ -19,3 +19,11 @@ Task reads require `tasks.view`; task creation, assignment and transitions requi
 ## UI
 
 The Practice work list uses Fluent structured data patterns with client, service, period, status, assignment, due date and priority filters. Work detail presents operational context, tasks and the related Ledgerly record without exposing internal storage or infrastructure values. Client summary presents active services, engagement state, current work and upcoming deadlines.
+
+## PM-007 planning and effort extension
+
+`work_item` remains the single operational work anchor. PM-007 adds planned end, planned/estimated/remaining effort, estimate provenance, review member and assignment state without creating a parallel planning item. Estimates may originate from a template, manual override or later historical derivation and remain optional. Template/task estimates instantiate with their provenance; an explicit work estimate is authoritative over child-task totals to prevent double counting.
+
+Current assignment stays on `work_item`; each reassignment also appends `work_assignment_history` with previous/new resource and team, reviewer, planned period/effort, state, reason and actor. Inactive/cross-tenant assignment is invalid. Authorized over-allocation is allowed and surfaced by capacity reporting.
+
+Generated recurring work is committed load. A not-yet-generated recurring occurrence may be shown only as separately labelled forecast load. Capacity, time capture and economics therefore reuse the existing client-service-engagement-work graph and never create a second work master.

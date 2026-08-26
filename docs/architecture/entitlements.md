@@ -21,3 +21,9 @@ PM-006 makes the existing `practice.portal` parent capability operational and re
 Staff collaboration routes require `practice.enabled`, `practice.portal`, the surface entitlement and a functional permission. Portal routes require the parent/surface entitlement plus an active principal and explicit client/resource relationship. Entitlement is therefore neither staff authorization nor client authorization. Machine-delivered QuoteBench events use a tenant-scoped security-definer decision function for `quotebench.enabled` and `quotebench.proposals`; signature verification does not bypass commercial control.
 
 PM-006 adds staff permissions `portal.manage`, `portal.invite`, `portal.revoke`, `client_requests.view`, `client_requests.manage`, `documents.share`, `portal_messages.view`, `portal_messages.send` and `confirmations.request`. These permissions are not assigned to portal principals. The seeded OWNER role receives the management set; MEMBER receives the documented read permissions only.
+
+## PM-007 resource and economics capabilities
+
+PM-007 registers `practice.resources`, `practice.capacity`, `practice.time`, `practice.wip`, `practice.economics` and `practice.reporting`. The keys are independently evaluable: a tenant may use resource planning without time capture or restricted economics. Existing staged-pilot tenants receive transitional enabled records to preserve current branch behaviour; these records are not plan names or evidence of a paid subscription.
+
+Each route requires its surface entitlement and its functional permission. Enabling `practice.economics` does not grant `economics.view`, and granting the permission does not make a commercially disabled capability available. Cost-rate access remains separately permissioned even for actors who can enter time. Package labels never appear in resource/economic control flow.

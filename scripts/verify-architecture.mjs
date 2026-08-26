@@ -44,6 +44,12 @@ const requiredDocuments = [
   "docs/architecture/secure-messaging.md",
   "docs/architecture/portal-identity-access.md",
   "docs/architecture/quotebench-machine-auth.md",
+  "docs/architecture/resource-management.md",
+  "docs/architecture/capacity-planning.md",
+  "docs/architecture/time-capture.md",
+  "docs/architecture/practice-economics.md",
+  "docs/architecture/wip.md",
+  "docs/architecture/portfolio-management.md",
   "docs/engineering/verification-strategy.md",
   "docs/design/DESIGN-CONSTITUTION.md",
   "docs/design/ANTI-PATTERNS.md",
@@ -238,6 +244,33 @@ if (portalMigrationName) {
   ])
     if (!portalMigration.includes(invariant)) failures.push(`${portalMigrationName} is missing ${invariant}`);
 } else failures.push("Migration 0034 client portal collaboration is missing");
+
+const resourceEconomicsMigrationName = migrations.find((name) => name.includes("resource_capacity_time_economics"));
+if (resourceEconomicsMigrationName) {
+  const migration = await readFile(path.join(migrationDirectory, resourceEconomicsMigrationName), "utf8");
+  const tenantOwnedTables = [
+    "resource_profile", "resource_working_pattern", "resource_availability_adjustment", "work_assignment_history",
+    "resource_cost_rate", "time_entry", "work_commercial_context", "billing_recovery"
+  ];
+  for (const table of tenantOwnedTables) {
+    const declaration = new RegExp(`CREATE TABLE ${table}\\([\\s\\S]*?tenant_id uuid NOT NULL`, "i");
+    if (!declaration.test(migration)) failures.push(`${resourceEconomicsMigrationName}: ${table} lacks a required tenant_id`);
+    if (!migration.includes(`'${table}'`) && !migration.includes(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY`))
+      failures.push(`${resourceEconomicsMigrationName}: ${table} is missing from the forced-RLS inventory`);
+  }
+  for (const permission of [
+    "resources.view", "resources.manage", "capacity.view", "capacity.manage", "assignments.manage",
+    "time.view", "time.enter", "time.manage", "time.approve", "costrates.view", "costrates.manage",
+    "economics.view", "economics.manage", "portfolio.view"
+  ]) if (!migration.includes(`'${permission}'`)) failures.push(`${resourceEconomicsMigrationName} is missing ${permission}`);
+  for (const entitlement of [
+    "practice.resources", "practice.capacity", "practice.time", "practice.wip", "practice.economics", "practice.reporting"
+  ]) if (!migration.includes(`'${entitlement}'`)) failures.push(`${resourceEconomicsMigrationName} is missing ${entitlement}`);
+  for (const invariant of [
+    "resource_working_pattern_period_excl", "resource_cost_rate_period_excl", "cost_rate_snapshot",
+    "proposal_reference_id", "ALTER TABLE %I FORCE ROW LEVEL SECURITY", "REVOKE ALL ON resource_profile"
+  ]) if (!migration.includes(invariant)) failures.push(`${resourceEconomicsMigrationName} is missing ${invariant}`);
+} else failures.push("Migration 0035 resource capacity time economics is missing");
 
 if (failures.length) {
   console.error(failures.map((failure) => `- ${failure}`).join("\n"));

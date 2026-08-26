@@ -99,6 +99,15 @@ function jsonObject(input: Record<string, unknown>, key: string): postgres.JSONV
   return value as postgres.JSONValue;
 }
 
+function optionalMinutes(input: Record<string, unknown>, key: string): number | null | undefined {
+  if (!(key in input)) return undefined;
+  if (input[key] === null || input[key] === "") return null;
+  const value = Number(input[key]);
+  if (!Number.isInteger(value) || value < 0 || value > 10_000_000)
+    throw new ApiError(400, "INVALID_REQUEST", `${key} must be a non-negative whole number of minutes`);
+  return value;
+}
+
 async function digest(value: string): Promise<string> {
   const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return [...new Uint8Array(bytes)].map((item) => item.toString(16).padStart(2, "0")).join("");
@@ -310,7 +319,8 @@ async function workCollection(request: Request, env: Env, actorId: string) {
     if (assignedMemberId || assignedTeamId) await assertPlatformPermission(tx, "work.assign");
     const specialistRecordReference = optional(input!, "specialistRecordReference", 200) ?? null;
     if (moduleKey === "ledgerly" && specialistRecordReference) throw new ApiError(400, "INVALID_LEDGERLY_LINK", "Link Ledgerly work through the validated Ledgerly link operation");
-    const rows = await tx`insert into work_item(id,tenant_id,client_id,client_service_id,engagement_id,title,period_reference,status,priority,assigned_member_id,assigned_team_id,planned_start_date,due_date,specialist_module_key,specialist_record_reference,created_by,updated_by) values(${id},${ctx.tenantId},${clientId},${clientServiceId},${optional(input!, "engagementId", 36) ?? null},${required(input!, "title", 240)},${optional(input!, "periodReference", 100) ?? null},${status},${enumValue(input!, "priority", PRIORITIES, "normal")},${assignedMemberId},${assignedTeamId},${optional(input!, "plannedStartDate", 10) ?? null},${optional(input!, "dueDate", 10) ?? null},${moduleKey},${specialistRecordReference},${ctx.actorId},${ctx.actorId}) returning *`;
+    const estimate = optionalMinutes(input!, "estimatedEffortMinutes") ?? null;
+    const rows = await tx`insert into work_item(id,tenant_id,client_id,client_service_id,engagement_id,title,period_reference,status,priority,assigned_member_id,assigned_team_id,planned_start_date,planned_end_date,due_date,planned_effort_minutes,estimated_effort_minutes,remaining_effort_minutes,estimate_provenance,assignment_state,specialist_module_key,specialist_record_reference,created_by,updated_by) values(${id},${ctx.tenantId},${clientId},${clientServiceId},${optional(input!, "engagementId", 36) ?? null},${required(input!, "title", 240)},${optional(input!, "periodReference", 100) ?? null},${status},${enumValue(input!, "priority", PRIORITIES, "normal")},${assignedMemberId},${assignedTeamId},${optional(input!, "plannedStartDate", 10) ?? null},${optional(input!, "plannedEndDate", 10) ?? null},${optional(input!, "dueDate", 10) ?? null},${optionalMinutes(input!, "plannedEffortMinutes") ?? estimate},${estimate},${optionalMinutes(input!, "remainingEffortMinutes") ?? estimate},${estimate === null ? null : "manual_override"},${assignedMemberId || assignedTeamId ? "confirmed" : "proposed"},${moduleKey},${specialistRecordReference},${ctx.actorId},${ctx.actorId}) returning *`;
     await recordMutation(tx, ctx, "WORK_CREATED", "WORK_ITEM", id, clientId, { clientId, clientServiceId, dueDate: rows[0]!.due_date as postgres.JSONValue }, "work.created");
     return response({ item: rows[0] }, 201);
   });
@@ -333,9 +343,13 @@ async function workItem(request: Request, env: Env, actorId: string, workId: str
     if ("specialistRecordReference" in input! && current[0]!.specialist_module_key === "ledgerly")
       throw new ApiError(400, "INVALID_LEDGERLY_LINK", "Change Ledgerly references through the validated Ledgerly link operation");
     const changes: Record<string, unknown> = { updated_by: ctx.actorId, updated_at: new Date().toISOString() };
-    const map: Record<string, [string, number]> = { title: ["title", 240], periodReference: ["period_reference", 100], engagementId: ["engagement_id", 36], plannedStartDate: ["planned_start_date", 10], dueDate: ["due_date", 10], specialistRecordReference: ["specialist_record_reference", 200] };
+    const map: Record<string, [string, number]> = { title: ["title", 240], periodReference: ["period_reference", 100], engagementId: ["engagement_id", 36], plannedStartDate: ["planned_start_date", 10], plannedEndDate: ["planned_end_date", 10], dueDate: ["due_date", 10], specialistRecordReference: ["specialist_record_reference", 200] };
     for (const [key, [column, max]] of Object.entries(map)) { const value = optional(input!, key, max); if (value !== undefined) changes[column] = value; }
     if ("priority" in input!) changes.priority = enumValue(input!, "priority", PRIORITIES);
+    for (const [key, column] of Object.entries({ plannedEffortMinutes: "planned_effort_minutes", estimatedEffortMinutes: "estimated_effort_minutes", remainingEffortMinutes: "remaining_effort_minutes" })) {
+      const value = optionalMinutes(input!, key); if (value !== undefined) changes[column] = value;
+    }
+    if ("estimatedEffortMinutes" in input!) changes.estimate_provenance = "manual_override";
     if (Object.keys(changes).length === 2) throw new ApiError(400, "INVALID_REQUEST", "No supported changes were supplied");
     const columns = Object.keys(changes), rows = await tx`update work_item set ${tx(changes, ...columns)} where tenant_id=${ctx.tenantId} and id=${workId} returning *`;
     if (!rows.length) throw new ApiError(404, "NOT_FOUND", "Work item not found");
@@ -386,7 +400,8 @@ async function workTasks(request: Request, env: Env, actorId: string, workId: st
     if (!work.length) throw new ApiError(404, "NOT_FOUND", "Work item not found");
     const sequence = input!.sequence;
     if (!Number.isInteger(sequence) || Number(sequence) < 1) throw new ApiError(400, "INVALID_REQUEST", "sequence must be a positive integer");
-    const rows = await tx`insert into practice_task(id,tenant_id,work_item_id,title,description,status,assignee_member_id,team_id,sequence,due_date,reviewer_member_id,created_by,updated_by) values(${id},${ctx.tenantId},${workId},${required(input!, "title", 240)},${optional(input!, "description", 2000) ?? null},'not_started',${optional(input!, "assigneeMemberId", 36) ?? null},${optional(input!, "teamId", 36) ?? null},${Number(sequence)},${optional(input!, "dueDate", 10) ?? null},${optional(input!, "reviewerMemberId", 36) ?? null},${ctx.actorId},${ctx.actorId}) returning *`;
+    const estimate = optionalMinutes(input!, "estimatedEffortMinutes") ?? null;
+    const rows = await tx`insert into practice_task(id,tenant_id,work_item_id,title,description,status,assignee_member_id,team_id,sequence,due_date,reviewer_member_id,estimated_effort_minutes,remaining_effort_minutes,created_by,updated_by) values(${id},${ctx.tenantId},${workId},${required(input!, "title", 240)},${optional(input!, "description", 2000) ?? null},'not_started',${optional(input!, "assigneeMemberId", 36) ?? null},${optional(input!, "teamId", 36) ?? null},${Number(sequence)},${optional(input!, "dueDate", 10) ?? null},${optional(input!, "reviewerMemberId", 36) ?? null},${estimate},${optionalMinutes(input!, "remainingEffortMinutes") ?? estimate},${ctx.actorId},${ctx.actorId}) returning *`;
     await recordMutation(tx, ctx, "TASK_CREATED", "PRACTICE_TASK", id, String(work[0]!.client_id), { workItemId: workId, sequence: Number(sequence) });
     return response({ item: rows[0] }, 201);
   });
@@ -402,6 +417,7 @@ async function taskAction(request: Request, env: Env, actorId: string, taskId: s
       const map: Record<string, [string, number]> = { title: ["title", 240], description: ["description", 2000], dueDate: ["due_date", 10], reviewerMemberId: ["reviewer_member_id", 36] };
       for (const [key, [column, max]] of Object.entries(map)) { const value = optional(input, key, max); if (value !== undefined) changes[column] = value; }
       if ("sequence" in input) { if (!Number.isInteger(input.sequence) || Number(input.sequence) < 1) throw new ApiError(400, "INVALID_REQUEST", "sequence must be a positive integer"); changes.sequence = Number(input.sequence); }
+      for (const [key, column] of Object.entries({ estimatedEffortMinutes: "estimated_effort_minutes", remainingEffortMinutes: "remaining_effort_minutes" })) { const value = optionalMinutes(input, key); if (value !== undefined) changes[column] = value; }
     } else if (action === "assignment") {
       changes.assignee_member_id = optional(input, "assigneeMemberId", 36) ?? null; changes.team_id = optional(input, "teamId", 36) ?? null;
     } else {
@@ -427,7 +443,8 @@ async function templateCollection(request: Request, env: Env, actorId: string) {
     if (request.method === "GET") return response({ items: await tx`select wt.*,s.name service_name,(select coalesce(json_agg(wtt order by wtt.sequence),'[]') from work_template_task wtt where wtt.tenant_id=wt.tenant_id and wtt.work_template_id=wt.id) tasks,(select coalesce(json_agg(wts order by wts.sequence),'[]') from work_template_stage wts where wts.tenant_id=wt.tenant_id and wts.work_template_id=wt.id) stages from work_template wt join practice_service s on s.tenant_id=wt.tenant_id and s.id=wt.service_id where wt.tenant_id=${ctx.tenantId} order by wt.name,wt.version desc` });
     const id = crypto.randomUUID(), serviceId = uuid(required(input!, "serviceId", 36), "Service");
     const version = input!.version ?? 1; if (!Number.isInteger(version) || Number(version) < 1) throw new ApiError(400, "INVALID_REQUEST", "version must be a positive integer");
-    const rows = await tx`insert into work_template(id,tenant_id,name,service_id,status,version,template_family_id,created_by,updated_by) values(${id},${ctx.tenantId},${required(input!, "name", 180)},${serviceId},${enumValue(input!, "status", TEMPLATE_STATUSES, "draft")},${Number(version)},${optional(input!, "templateFamilyId", 36) ?? id},${ctx.actorId},${ctx.actorId}) returning *`;
+    const templateEstimate = optionalMinutes(input!, "estimatedEffortMinutes") ?? null;
+    const rows = await tx`insert into work_template(id,tenant_id,name,service_id,status,version,template_family_id,estimated_effort_minutes,estimate_provenance,created_by,updated_by) values(${id},${ctx.tenantId},${required(input!, "name", 180)},${serviceId},${enumValue(input!, "status", TEMPLATE_STATUSES, "draft")},${Number(version)},${optional(input!, "templateFamilyId", 36) ?? id},${templateEstimate},${templateEstimate === null ? null : "template"},${ctx.actorId},${ctx.actorId}) returning *`;
     const stageDefinitions = input!.stages ?? [];
     if (!Array.isArray(stageDefinitions)) throw new ApiError(400, "INVALID_REQUEST", "stages must be an array");
     const stageIds = new Map<number, string>();
@@ -446,7 +463,7 @@ async function templateCollection(request: Request, env: Env, actorId: string) {
       if (!Number.isInteger(sequence) || Number(sequence) < 1) throw new ApiError(400, "INVALID_REQUEST", "Template task sequence is invalid");
       const stageSequence = item.stageSequence === undefined ? null : Number(item.stageSequence);
       if (stageSequence !== null && (!Number.isInteger(stageSequence) || !stageIds.has(stageSequence))) throw new ApiError(400, "INVALID_REQUEST", "Template task stageSequence is invalid");
-      await tx`insert into work_template_task(id,tenant_id,work_template_id,title,description,sequence,default_assignee_role_id,default_team_id,due_date_offset_days,mandatory,work_template_stage_id,review_required,created_by,updated_by) values(${crypto.randomUUID()},${ctx.tenantId},${id},${required(item, "title", 240)},${optional(item, "description", 2000) ?? null},${Number(sequence)},${optional(item, "defaultAssigneeRoleId", 36) ?? null},${optional(item, "defaultTeamId", 36) ?? null},${Number.isInteger(item.dueDateOffsetDays) ? Number(item.dueDateOffsetDays) : null},${item.mandatory !== false},${stageSequence === null ? null : stageIds.get(stageSequence) ?? null},${item.reviewRequired === true},${ctx.actorId},${ctx.actorId})`;
+      await tx`insert into work_template_task(id,tenant_id,work_template_id,title,description,sequence,default_assignee_role_id,default_team_id,due_date_offset_days,mandatory,work_template_stage_id,review_required,estimated_effort_minutes,created_by,updated_by) values(${crypto.randomUUID()},${ctx.tenantId},${id},${required(item, "title", 240)},${optional(item, "description", 2000) ?? null},${Number(sequence)},${optional(item, "defaultAssigneeRoleId", 36) ?? null},${optional(item, "defaultTeamId", 36) ?? null},${Number.isInteger(item.dueDateOffsetDays) ? Number(item.dueDateOffsetDays) : null},${item.mandatory !== false},${stageSequence === null ? null : stageIds.get(stageSequence) ?? null},${item.reviewRequired === true},${optionalMinutes(item, "estimatedEffortMinutes") ?? null},${ctx.actorId},${ctx.actorId})`;
     }
     await recordMutation(tx, ctx, "WORK_TEMPLATE_CREATED", "WORK_TEMPLATE", id, null, { serviceId, version: Number(version), taskCount: definitions.length, stageCount: stageDefinitions.length });
     return response({ item: rows[0] }, 201);
@@ -466,6 +483,7 @@ async function templateItem(request: Request, env: Env, actorId: string, templat
     if (existing[0]!.status !== "draft") throw new ApiError(409, "TEMPLATE_VERSION_IMMUTABLE", "Published or used template versions are historical records");
     const changes: Record<string, unknown> = { updated_by: ctx.actorId, updated_at: new Date().toISOString() };
     if ("name" in input!) changes.name = required(input!, "name", 180);
+    if ("estimatedEffortMinutes" in input!) { changes.estimated_effort_minutes = optionalMinutes(input!, "estimatedEffortMinutes"); changes.estimate_provenance = "manual_override"; }
     if ("status" in input!) {
       const status = enumValue(input!, "status", TEMPLATE_STATUSES);
       if (status !== "archived") throw new ApiError(409, "INVALID_TEMPLATE_LIFECYCLE", "Use the publish command to publish a template version");
@@ -556,7 +574,7 @@ async function instantiateOccurrence(tx: PlatformTX, ctx: PlatformContext, sched
     if (rules.length) deadline = calculateDeadline({ type: String(rules[0]!.rule_type), ...(rules[0]!.configuration as object) } as DeadlineRule, { periodEnd: occurrence.periodEnd });
   } else if (schedule.due_date_rule && Object.keys(schedule.due_date_rule as object).length) deadline = calculateDeadline(schedule.due_date_rule as unknown as DeadlineRule, { periodEnd: occurrence.periodEnd });
   const workId = crypto.randomUUID();
-  await tx`insert into work_item(id,tenant_id,client_id,client_service_id,engagement_id,title,period_reference,period_start,period_end,status,assigned_member_id,assigned_team_id,due_date,calculated_due_date,due_date_rule_id,due_date_calculation,source_template_id,source_template_version,recurring_schedule_id,generation_id,specialist_module_key,created_by,updated_by) values(${workId},${ctx.tenantId},${schedule.client_id},${schedule.client_service_id},${schedule.engagement_id},${`${template[0]!.name} – period ended ${occurrence.periodEnd}`},${`Period ended ${occurrence.periodEnd}`},${occurrence.periodStart},${occurrence.periodEnd},'not_started',${schedule.default_assignee_member_id},${schedule.default_team_id},${deadline?.date ?? null},${deadline?.date ?? null},${schedule.deadline_rule_id},${tx.json((deadline?.provenance ?? {}) as postgres.JSONValue)},${template[0]!.id},${template[0]!.version},${schedule.id},${markerId},${schedule.specialist_module_key},${ctx.actorId},${ctx.actorId})`;
+  await tx`insert into work_item(id,tenant_id,client_id,client_service_id,engagement_id,title,period_reference,period_start,period_end,status,assigned_member_id,assigned_team_id,due_date,calculated_due_date,due_date_rule_id,due_date_calculation,source_template_id,source_template_version,recurring_schedule_id,generation_id,planned_effort_minutes,estimated_effort_minutes,remaining_effort_minutes,estimate_provenance,assignment_state,specialist_module_key,created_by,updated_by) values(${workId},${ctx.tenantId},${schedule.client_id},${schedule.client_service_id},${schedule.engagement_id},${`${template[0]!.name} – period ended ${occurrence.periodEnd}`},${`Period ended ${occurrence.periodEnd}`},${occurrence.periodStart},${occurrence.periodEnd},'not_started',${schedule.default_assignee_member_id},${schedule.default_team_id},${deadline?.date ?? null},${deadline?.date ?? null},${schedule.deadline_rule_id},${tx.json((deadline?.provenance ?? {}) as postgres.JSONValue)},${template[0]!.id},${template[0]!.version},${schedule.id},${markerId},${template[0]!.estimated_effort_minutes},${template[0]!.estimated_effort_minutes},${template[0]!.estimated_effort_minutes},${template[0]!.estimated_effort_minutes === null ? null : "template"},${schedule.default_assignee_member_id || schedule.default_team_id ? "confirmed" : "proposed"},${schedule.specialist_module_key},${ctx.actorId},${ctx.actorId})`;
   const stageDefinitions = await tx`select * from work_template_stage where tenant_id=${ctx.tenantId} and work_template_id=${template[0]!.id} and status='active' order by sequence,id`;
   const stageInstances = new Map<string, string>();
   for (const definition of stageDefinitions) {
@@ -576,7 +594,7 @@ async function instantiateOccurrence(tx: PlatformTX, ctx: PlatformContext, sched
       assignee = resolved[0]?.id ?? assignee;
     }
     const taskId = crypto.randomUUID();
-    await tx`insert into practice_task(id,tenant_id,work_item_id,title,description,status,assignee_member_id,team_id,sequence,due_date,source_template_task_id,mandatory,work_stage_id,review_required,created_by,updated_by) values(${taskId},${ctx.tenantId},${workId},${definition.title},${definition.description},'not_started',${assignee},${definition.default_team_id ?? schedule.default_team_id},${definition.sequence},${definition.due_date_offset_days === null ? null : addDays(deadline?.date ?? occurrence.periodEnd, Number(definition.due_date_offset_days))},${definition.id},${definition.mandatory},${definition.work_template_stage_id ? stageInstances.get(String(definition.work_template_stage_id)) ?? null : null},${definition.review_required},${ctx.actorId},${ctx.actorId})`;
+    await tx`insert into practice_task(id,tenant_id,work_item_id,title,description,status,assignee_member_id,team_id,sequence,due_date,source_template_task_id,mandatory,work_stage_id,review_required,estimated_effort_minutes,remaining_effort_minutes,created_by,updated_by) values(${taskId},${ctx.tenantId},${workId},${definition.title},${definition.description},'not_started',${assignee},${definition.default_team_id ?? schedule.default_team_id},${definition.sequence},${definition.due_date_offset_days === null ? null : addDays(deadline?.date ?? occurrence.periodEnd, Number(definition.due_date_offset_days))},${definition.id},${definition.mandatory},${definition.work_template_stage_id ? stageInstances.get(String(definition.work_template_stage_id)) ?? null : null},${definition.review_required},${definition.estimated_effort_minutes},${definition.estimated_effort_minutes},${ctx.actorId},${ctx.actorId})`;
     await recordMutation(tx, ctx, "TASK_GENERATED", "PRACTICE_TASK", taskId, String(schedule.client_id), { workItemId: workId, templateTaskId: String(definition.id), sequence: Number(definition.sequence) }, "task.generated");
   }
   await tx`update recurrence_generation set work_item_id=${workId} where tenant_id=${ctx.tenantId} and id=${markerId}`;

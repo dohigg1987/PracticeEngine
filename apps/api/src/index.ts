@@ -24,6 +24,7 @@ import { handleCommercialRoute } from "./commercial.js";
 import { handlePermanentFileRoute } from "./permanent-file.js";
 import { handlePlatformCoreRoute } from "./platform-core.js";
 import { handlePracticeManagementRoute, runScheduledRecurringGeneration } from "./practice-management.js";
+import { handleResourceEconomicsRoute } from "./resource-economics.js";
 import { handleCrmOnboardingRoute } from "./crm-onboarding.js";
 import { handleClientCollaborationRoute } from "./client-collaboration.js";
 import { verifyQuoteBenchMachineRequest } from "./quotebench-machine-auth.js";
@@ -5623,6 +5624,9 @@ export default {
       const practiceManagementResponse = actorId
         ? await handlePracticeManagementRoute(request, env, actorId)
         : null;
+      const resourceEconomicsResponse = actorId
+        ? await handleResourceEconomicsRoute(request, env, actorId)
+        : null;
       const crmOnboardingResponse = actorId
         ? await handleCrmOnboardingRoute(request, env, actorId)
         : null;
@@ -5681,6 +5685,13 @@ export default {
             "practice-service-catalogue",
             "practice-engagements",
             "practice-work-management",
+            "practice-resource-profiles",
+            "capacity-planning",
+            "effort-estimation",
+            "time-capture",
+            "operational-wip",
+            "practice-economics",
+            "portfolio-management",
             "work-templates",
             "ledgerly-work-link",
             "crm-prospects-opportunities",
@@ -5706,6 +5717,7 @@ export default {
       else if (platformCoreResponse) response = platformCoreResponse;
       else if (practiceManagementResponse)
         response = practiceManagementResponse;
+      else if (resourceEconomicsResponse) response = resourceEconomicsResponse;
       else if (crmOnboardingResponse) response = crmOnboardingResponse;
       else if (clientCollaborationResponse) response = clientCollaborationResponse;
       else if (request.method === "GET" && url.pathname === "/v1/me/tenants")

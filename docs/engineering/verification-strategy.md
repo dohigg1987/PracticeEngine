@@ -20,3 +20,11 @@ Process-level sharding avoids forcing several browser workers to share one Playw
 Test classification is an equivalent file/command taxonomy: Practice (`practice-management.spec.ts`, `verify:pm`), Ledgerly (`pilot.spec.ts`, `governed-working-papers.spec.ts`, `verify:ledgerly`), security/tenancy (API authorization/RLS contract tests and `verify:security`), browser compatibility (forced-colors, responsive accessibility and visual release files), and release-critical (the entire pilot). Database/RLS migration contracts remain in API tests and the guarded disposable-Neon gate validates real PostgreSQL behavior.
 
 During implementation run the smallest targeted command, then the fast gate after a coherent increment, integration after database/API/Worker changes, and the full pilot once at final completion. Failed first attempts and reruns must be reported.
+
+## PM-007 focused evidence
+
+PM-007 adds a source contract for migration numbering, resource/member ownership, effective-dated patterns and rates, tenant-safe time/commercial relationships, forced RLS, least-privilege grants, permissions/entitlements and architecture value semantics. API tests cover deterministic daily/weekly/monthly capacity, part-time and adjustment behavior, committed versus recurrence forecast load, assignment validation/history, time association/permissions, historical rate snapshots, known/unknown economics and QuoteBench provenance.
+
+Database assurance remains a distinct disposable-Neon run: apply migrations `0001` through `0035` to a fresh confirmed non-production branch, use two tenants and actors, and attempt read/write/cross-reference access for `resource_profile`, `resource_working_pattern`, `resource_availability_adjustment`, `work_assignment_history`, `resource_cost_rate`, `time_entry`, `work_commercial_context` and `billing_recovery`. Cost-rate/economics fixtures must prove the restricted policies, not only tenant filtering.
+
+Browser evidence covers the resource list, capacity grid, allocation, time entry and portfolio/economic surfaces in Chromium during integration and in every configured Chromium/Edge pilot shard. Forced-colours is reported as first-pass or retry-dependent; retries are never hidden or increased to obtain a pass. UI-quality findings are recorded before/after and the checked-in ceiling must not increase.

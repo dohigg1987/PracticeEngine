@@ -23,6 +23,15 @@ const PROPOSAL_EVENTS = new Map([
   ["quotebench.proposal.expired", "expired"],
 ]);
 const ONBOARDING_STATUSES = new Set(["not_started", "in_progress", "blocked", "ready_for_delivery", "completed", "cancelled"]);
+const BILLING_MODELS = new Set(["fixed_fee", "time_and_materials", "subscription", "retainer", "other"]);
+
+export type QuoteBenchCommercialContext = {
+  acceptedValue: number | null;
+  currency: string | null;
+  billingModel: string | null;
+  billingFrequency: string | null;
+  serviceValues: Array<{ serviceId: string; value: number; currency: string }>;
+};
 
 const response = (data: unknown, status = 200) =>
   Response.json(data, { status, headers: { "cache-control": "no-store" } });
@@ -73,6 +82,32 @@ function numberValue(input: Record<string, unknown>, key: string): number | null
   const value = Number(input[key]);
   if (!Number.isFinite(value)) throw new ApiError(400, "INVALID_REQUEST", `${key} must be numeric`);
   return value;
+}
+
+export function quoteBenchCommercialContext(input: Record<string, unknown>): QuoteBenchCommercialContext {
+  const acceptedValue = numberValue(input, "acceptedValue");
+  if (acceptedValue !== null && acceptedValue < 0) throw new ApiError(400, "INVALID_REQUEST", "acceptedValue must not be negative");
+  const currency = optional(input, "currency", 3)?.toUpperCase() ?? null;
+  if (currency && !/^[A-Z]{3}$/.test(currency)) throw new ApiError(400, "INVALID_REQUEST", "currency must be a three-letter code");
+  const billingModel = optional(input, "billingModel", 40)?.toLowerCase() ?? null;
+  if (billingModel && !BILLING_MODELS.has(billingModel)) throw new ApiError(400, "INVALID_REQUEST", "billingModel is invalid");
+  const billingFrequency = optional(input, "billingFrequency", 80) ?? null;
+  const raw = input.serviceValues ?? [];
+  if (!Array.isArray(raw) || raw.length > 100) throw new ApiError(400, "INVALID_REQUEST", "serviceValues must be a bounded array");
+  const serviceValues = raw.map((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) throw new ApiError(400, "INVALID_REQUEST", "Each service value must be an object");
+    const row = item as Record<string, unknown>, serviceId = id(row.serviceId, "serviceId"), value = Number(row.value);
+    const itemCurrency = String(row.currency ?? currency ?? "").toUpperCase();
+    if (!Number.isFinite(value) || value < 0 || !/^[A-Z]{3}$/.test(itemCurrency)) throw new ApiError(400, "INVALID_REQUEST", "Each service value requires a non-negative value and currency");
+    return { serviceId, value, currency: itemCurrency };
+  });
+  if (new Set(serviceValues.map((item) => item.serviceId)).size !== serviceValues.length)
+    throw new ApiError(400, "INVALID_REQUEST", "serviceValues must not repeat a service");
+  if (acceptedValue !== null && !currency)
+    throw new ApiError(400, "INVALID_REQUEST", "acceptedValue requires currency provenance");
+  if ((acceptedValue !== null || serviceValues.length) && !billingModel)
+    throw new ApiError(400, "INVALID_REQUEST", "Commercial value requires billingModel provenance");
+  return { acceptedValue, currency, billingModel, billingFrequency, serviceValues };
 }
 
 async function digest(value: string): Promise<string> {
@@ -326,6 +361,15 @@ export async function convertAcceptedProposal(tx: PlatformTX, ctx: PlatformConte
   const engagement = await tx`insert into practice_engagement(id,tenant_id,client_id,reference,name,status,start_date,responsible_owner_id,responsible_team_id,acceptance_state,accepted_by,accepted_at,created_by,updated_by)
     values(${engagementId},${ctx.tenantId},${clientId},${`QB-${opportunityId.slice(0, 8)}-${String(proposal.proposal_version).slice(0, 20)}`},${String(opportunity.name)},'active',current_date,${opportunity.responsible_member_id},${opportunity.responsible_team_id},'accepted',${ctx.actorId},now(),${ctx.actorId},${ctx.actorId}) returning *`;
   for (const item of activated) await tx`insert into practice_engagement_service(tenant_id,engagement_id,client_service_id,client_id,created_by) values(${ctx.tenantId},${engagementId},${item.clientServiceId},${clientId},${ctx.actorId})`;
+  const commercial = quoteBenchCommercialContext(input);
+  for (const item of commercial.serviceValues) {
+    const activatedService = activated.find((candidate) => candidate.serviceId === item.serviceId);
+    if (!activatedService) throw new ApiError(409, "COMMERCIAL_SERVICE_MISMATCH", "Commercial context references a service outside the accepted proposal");
+    const contextId = crypto.randomUUID();
+    await tx`insert into work_commercial_context(id,tenant_id,client_id,client_service_id,engagement_id,proposal_reference_id,agreed_value,currency,billing_model,billing_frequency,value_status,source_type,source_version,effective_from,created_by,updated_by)
+      values(${contextId},${ctx.tenantId},${clientId},${activatedService.clientServiceId},${engagementId},${proposal.id},${item.value},${item.currency},${commercial.billingModel},${commercial.billingFrequency},'known','quotebench_accepted_proposal',${String(proposal.proposal_version)},current_date,${ctx.actorId},${ctx.actorId})`;
+    await recordMutation(tx, ctx, "COMMERCIAL_CONTEXT_CAPTURED", "WORK_COMMERCIAL_CONTEXT", contextId, clientId, { proposalReferenceId: String(proposal.id), clientServiceId: activatedService.clientServiceId, serviceId: item.serviceId, currency: item.currency, valueStatus: "known" }, "commercial.context_captured");
+  }
   await recordMutation(tx, ctx, "ENGAGEMENT_ACTIVATED_FROM_PROPOSAL", "PRACTICE_ENGAGEMENT", engagementId, clientId, { opportunityId, proposalReferenceId: String(proposal.id), clientServiceIds: activated.map((item) => item.clientServiceId) }, "engagement.activated_from_proposal");
   for (const item of activated) {
     const service = services.find((candidate) => String(candidate.id) === item.opportunityServiceId)!;
@@ -393,9 +437,10 @@ async function quoteBenchEvent(request: Request, env: Env, actorId: string) {
     const proposal = proposals[0]!;
     let conversion: postgres.Row | null = null;
     if (status === "accepted") {
-      await tx`update quotebench_proposal_reference set status='accepted',accepted_event_id=${eventId},accepted_at=now(),commercial_acceptance_reference=${optional(input, "commercialAcceptanceReference", 500) ?? null},last_event_at=now(),updated_by=${ctx.actorId},updated_at=now() where tenant_id=${ctx.tenantId} and id=${proposal.id}`;
+      const commercial = quoteBenchCommercialContext(input);
+      await tx`update quotebench_proposal_reference set status='accepted',accepted_event_id=${eventId},accepted_at=now(),commercial_acceptance_reference=${optional(input, "commercialAcceptanceReference", 500) ?? null},accepted_value=${commercial.acceptedValue},accepted_currency=${commercial.currency},billing_model=${commercial.billingModel},billing_frequency=${commercial.billingFrequency},accepted_service_values=${tx.json(commercial.serviceValues)},last_event_at=now(),updated_by=${ctx.actorId},updated_at=now() where tenant_id=${ctx.tenantId} and id=${proposal.id}`;
       conversion = await convertAcceptedProposal(tx, ctx, input, { ...proposal, accepted_event_id: eventId }, eventId);
-      await recordMutation(tx, ctx, "PROPOSAL_ACCEPTED", "QUOTEBENCH_PROPOSAL_REFERENCE", String(proposal.id), String(conversion.client_id), { proposalId, proposalVersion: version, opportunityId: String(proposal.opportunity_id), acceptanceEventId: eventId }, "proposal.accepted");
+      await recordMutation(tx, ctx, "PROPOSAL_ACCEPTED", "QUOTEBENCH_PROPOSAL_REFERENCE", String(proposal.id), String(conversion.client_id), { proposalId, proposalVersion: version, opportunityId: String(proposal.opportunity_id), acceptanceEventId: eventId, acceptedValueKnown: commercial.acceptedValue !== null, serviceValueCount: commercial.serviceValues.length }, "proposal.accepted");
     } else {
       await tx`update quotebench_proposal_reference set status=${status},last_event_at=now(),updated_by=${ctx.actorId},updated_at=now() where tenant_id=${ctx.tenantId} and id=${proposal.id}`;
       await recordMutation(tx, ctx, `PROPOSAL_${status.toUpperCase()}`, "QUOTEBENCH_PROPOSAL_REFERENCE", String(proposal.id), null, { proposalId, proposalVersion: version, opportunityId: String(proposal.opportunity_id) }, eventType);

@@ -15,6 +15,7 @@ const pm003VerificationFile = path.join(root, "packages", "database", "runbooks"
 const pm004VerificationFile = path.join(root, "packages", "database", "runbooks", "pm004_disposable_verification.sql");
 const pm005VerificationFile = path.join(root, "packages", "database", "runbooks", "pm005_disposable_verification.sql");
 const pm006VerificationFile = path.join(root, "packages", "database", "runbooks", "pm006_disposable_verification.sql");
+const pm007VerificationFile = path.join(root, "packages", "database", "runbooks", "pm007_disposable_verification.sql");
 
 export function validateDisposableTarget({ databaseUrl, target, confirmation }) {
   if (!databaseUrl) throw new Error("NEON_MIGRATION_DATABASE_URL is required");
@@ -84,6 +85,7 @@ async function main() {
     await executeScript(sql, await readFile(pm004VerificationFile, "utf8"), path.relative(root, pm004VerificationFile));
     await executeScript(sql, await readFile(pm005VerificationFile, "utf8"), path.relative(root, pm005VerificationFile));
     await executeScript(sql, await readFile(pm006VerificationFile, "utf8"), path.relative(root, pm006VerificationFile));
+    await executeScript(sql, await readFile(pm007VerificationFile, "utf8"), path.relative(root, pm007VerificationFile));
     conversionBuildDirectory = await mkdtemp(path.join(tmpdir(), "practiceengine-pm006-conversion-"));
     const conversionTestFile = path.join(conversionBuildDirectory, "pm006-conversion.database.test.mjs");
     await build({
