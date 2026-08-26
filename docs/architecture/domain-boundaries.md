@@ -43,3 +43,4 @@ Global reference data must be explicitly marked global and read-only to tenant r
 - Keep domain-specific R2 link tables; a shared files service should wrap access before metadata consolidation.
 - Keep the existing audit/outbox tables as the ledger and delivery foundation; standardize event names and payloads progressively.
 - Keep `packages/domain` accounting-focused. New Platform Core code must not be placed there solely because the folder name is generic.
+- Practice Management owns CRM, conversion and onboarding. QuoteBench owns pricing/proposal artefacts and integrates through stable references and events; it never writes Practice tables directly.

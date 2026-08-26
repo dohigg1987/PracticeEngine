@@ -480,6 +480,7 @@ test("CSV preview imports the selected file and opens source data", async ({ pag
     .filter({ hasText: "Source data" })
     .click();
   await page.locator('button[value="integrations"]').click();
+  await expect(page.locator("#engagement")).not.toHaveValue("");
   await page.locator('input[type="file"]').setInputFiles({
     name: "balanced-trial-balance.csv",
     mimeType: "text/csv",
@@ -497,6 +498,7 @@ test("CSV preview maps arbitrary headings before trial-balance import", async ({
     .filter({ hasText: "Source data" })
     .click();
   await page.locator('button[value="integrations"]').click();
+  await expect(page.locator("#engagement")).not.toHaveValue("");
   await page.locator('input[type="file"]').setInputFiles({
     name: "arbitrary-headings.csv",
     mimeType: "text/csv",

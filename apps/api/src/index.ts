@@ -24,6 +24,7 @@ import { handleCommercialRoute } from "./commercial.js";
 import { handlePermanentFileRoute } from "./permanent-file.js";
 import { handlePlatformCoreRoute } from "./platform-core.js";
 import { handlePracticeManagementRoute, runScheduledRecurringGeneration } from "./practice-management.js";
+import { handleCrmOnboardingRoute } from "./crm-onboarding.js";
 import {
   MAX_WORKING_PAPER_EVIDENCE_BYTES,
   WORKING_PAPER_ASSERTIONS,
@@ -5617,6 +5618,9 @@ export default {
       const practiceManagementResponse = actorId
         ? await handlePracticeManagementRoute(request, env, actorId)
         : null;
+      const crmOnboardingResponse = actorId
+        ? await handleCrmOnboardingRoute(request, env, actorId)
+        : null;
       let response: Response;
       if (url.pathname === "/health")
         response = json({ status: "ok", service: SERVICE_NAME });
@@ -5671,6 +5675,11 @@ export default {
             "practice-work-management",
             "work-templates",
             "ledgerly-work-link",
+            "crm-prospects-opportunities",
+            "quotebench-proposal-boundary",
+            "proposal-client-conversion",
+            "workflow-backed-onboarding",
+            "durable-notification-delivery",
           ],
           limitations: {
             externalConnectors: "not-configured",
@@ -5684,6 +5693,7 @@ export default {
       else if (platformCoreResponse) response = platformCoreResponse;
       else if (practiceManagementResponse)
         response = practiceManagementResponse;
+      else if (crmOnboardingResponse) response = crmOnboardingResponse;
       else if (request.method === "GET" && url.pathname === "/v1/me/tenants")
         response = await listMyTenants(env, actorId);
       else if (request.method === "POST" && url.pathname === "/v1/me/tenants")

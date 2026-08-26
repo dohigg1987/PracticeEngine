@@ -581,6 +581,15 @@ function ImportCentre({ context, engagements, onOpenSource }: Props) {
   const [mappingValidated, setMappingValidated] = useState(false);
   const [manualMapping, setManualMapping] = useState(false);
   const [notice, setNotice] = useState("");
+  useEffect(() => {
+    if (!engagements.some((item) => item.id === engagementId)) {
+      setEngagementId(engagements[0]?.id || "");
+      setPreview(null);
+      setColumnMapping({});
+      setMappingValidated(false);
+      setManualMapping(false);
+    }
+  }, [engagementId, engagements]);
   const load = useCallback(async () => {
     setLoading(true);
     setError("");

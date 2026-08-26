@@ -50,6 +50,17 @@ Events describe completed facts. Consumers must be idempotent by `eventId`. Sens
 | `task.completed` | Practice Management | Task completed; task/work IDs and completion actor/time. |
 | `document.uploaded` | Platform Core | Authorized document version stored; document/version IDs, classification, hash, byte size. No storage key in public payloads. |
 | `proposal.accepted` | QuoteBench or owning proposal module | Proposal accepted; proposal/client IDs and accepted version. |
+| `prospect.created` | Practice Management | Prospect created without creating a client; prospect ID and bounded source. |
+| `opportunity.created` | Practice Management | Opportunity and proposed service intent created. |
+| `opportunity.stage_changed` | Practice Management | Configured commercial stage changed; prior/current stage. |
+| `proposal.linked` | Practice Management | Stable QuoteBench proposal/version reference linked to an opportunity. |
+| `prospect.converted` | Practice Management | Accepted prospect linked to its canonical client and conversion provenance. |
+| `client.created_from_prospect` | Practice Management | Canonical client created by controlled acceptance conversion. |
+| `client_service.activated_from_proposal` | Practice Management | Accepted service intent mapped to a canonical client service. |
+| `engagement.activated_from_proposal` | Practice Management | Practice engagement activated for accepted services. |
+| `onboarding.started` | Practice Management | Workflow-backed onboarding case started. |
+| `onboarding.completed` | Practice Management | Mandatory onboarding gates cleared and completion recorded. |
+| `notification.requested` | Platform Core | Provider-neutral notification request queued for durable delivery. |
 | `ledgerly.workspace.created` | Ledgerly | Ledgerly capability initialized for tenant/client context; module workspace and shared reference IDs. |
 | `ledgerly.accounts.started` | Ledgerly | Accounts-production work started; Ledgerly engagement ID, shared job/engagement references, period/framework. |
 | `ledgerly.accounts.completed` | Ledgerly | Accounts work completed/released; engagement and accounts-version IDs. |

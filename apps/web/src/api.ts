@@ -793,6 +793,7 @@ export type ClientService = {
   responsible_member_id?: string | null;
   responsible_team_id?: string | null;
   specialist_module_key?: string | null;
+  delivery_readiness?: "commercially_accepted" | "onboarding" | "ready_for_delivery" | "active";
 };
 export type PracticeEngagement = {
   id: string;
@@ -853,6 +854,7 @@ export type PracticeTask = {
   due_date?: string | null;
   completed_at?: string | null;
   review_required?: boolean;
+  work_stage_id?: string | null;
   blockers?: Array<{ predecessorTaskId:string; dependencyType:string; blockingReason?:string|null; resolvedAt?:string|null }>;
 };
 export type PracticeWorkStage={id:string;work_item_id:string;name:string;sequence:number;stage_type:"preparation"|"client_input"|"internal_review"|"approval"|"specialist_execution"|"completion";status:"not_started"|"active"|"blocked"|"waiting"|"review"|"completed"|"skipped";block_reason?:string|null;source_template_version:number;};
@@ -878,12 +880,38 @@ export type RecurringWorkSchedule = {
   generation_block_reason?: string | null;
 };
 export type PracticeClientSummary = {
-  client: { id: string; legal_name?: string; name?: string };
+  client: { id: string; legal_name?: string; name?: string; originating_opportunity_id?: string | null; originating_proposal_reference_id?: string | null; converted_at?: string | null };
   services: ClientService[];
   engagements: PracticeEngagement[];
   workItems: PracticeWorkItem[];
   upcomingTasks: PracticeTask[];
   recurringSchedules?: RecurringWorkSchedule[];
+  onboarding?: { id: string; status: string; mandatory_gates_complete: boolean; updated_at: string } | null;
+};
+export type CrmProspect = {
+  id: string; display_name: string; legal_name?: string | null; entity_type: string;
+  status: "prospect" | "qualified" | "converted" | "lost" | "archived";
+  primary_contact_name?: string | null; primary_contact_email?: string | null;
+  responsible_member_name?: string | null; responsible_team_name?: string | null;
+  source?: string | null; last_activity_at?: string | null; open_opportunities?: number;
+};
+export type OpportunityService = { id: string; serviceId?: string; service_id?: string; name?: string; service_name?: string; accepted?: boolean };
+export type CrmOpportunity = {
+  id: string; prospect_id?: string | null; existing_client_id?: string | null; relationship_name?: string;
+  name: string; stage_key: string; stage_name?: string; status: "open" | "won" | "lost" | "cancelled";
+  expected_close_date?: string | null; probability?: number | null; estimated_value?: string | number | null; currency: string;
+  responsible_member_name?: string | null; responsible_team_name?: string | null;
+  services?: OpportunityService[]; proposal_status?: string | null; conversion_state: string;
+  proposals?: Array<Record<string, unknown>>; activities?: Array<Record<string, unknown>>;
+  conversion?: Record<string, unknown> | null;
+};
+export type OnboardingCase = {
+  id: string; client_id: string; client_name?: string; opportunity_id: string; opportunity_name?: string;
+  engagement_id: string; engagement_name?: string; work_item_id?: string | null; work_title?: string | null;
+  status: "not_started" | "in_progress" | "blocked" | "ready_for_delivery" | "completed" | "cancelled";
+  mandatory_gates_complete: boolean; open_blockers?: number; updated_at: string;
+  services?: ClientService[]; tasks?: PracticeTask[]; stages?: PracticeWorkStage[];
+  blockers?: Array<{ id: string; summary: string; status: "open" | "resolved" }>;
 };
 export function practiceClientSummaryItem(response: { item: PracticeClientSummary }): PracticeClientSummary {
   return response.item;
@@ -2099,4 +2127,14 @@ export const api = {
     request<{ item: PracticeWorkItem }>(`/v1/practice/work/${encodeURIComponent(id)}/deadline-recalculate`, context, { method: "POST", body: "{}" }),
   practiceClientSummary: async (context: ApiContext, clientId: string) =>
     practiceClientSummaryItem(await request<{ item: PracticeClientSummary }>(`/v1/practice/clients/${encodeURIComponent(clientId)}/summary`, context)),
+  crmProspects: (context: ApiContext) => request<{ items: CrmProspect[] }>("/v1/crm/prospects", context),
+  createCrmProspect: (context: ApiContext, body: Record<string, unknown>) => request<{ item: CrmProspect }>("/v1/crm/prospects", context, { method: "POST", body: JSON.stringify(body) }),
+  crmOpportunities: (context: ApiContext) => request<{ items: CrmOpportunity[] }>("/v1/crm/opportunities", context),
+  createCrmOpportunity: (context: ApiContext, body: Record<string, unknown>) => request<{ item: CrmOpportunity }>("/v1/crm/opportunities", context, { method: "POST", body: JSON.stringify(body) }),
+  crmOpportunity: (context: ApiContext, id: string) => request<{ item: CrmOpportunity }>(`/v1/crm/opportunities/${encodeURIComponent(id)}`, context),
+  updateOpportunityStage: (context: ApiContext, id: string, stageKey: string, outcomeReason?: string) => request<{ item: CrmOpportunity }>(`/v1/crm/opportunities/${encodeURIComponent(id)}/stage`, context, { method: "POST", body: JSON.stringify({ stageKey, outcomeReason }) }),
+  linkQuoteBenchProposal: (context: ApiContext, id: string, proposalId: string, proposalVersion = "1") => request<{ item: Record<string, unknown> }>(`/v1/crm/opportunities/${encodeURIComponent(id)}/proposals`, context, { method: "POST", body: JSON.stringify({ proposalId, proposalVersion }) }),
+  onboardingCases: (context: ApiContext) => request<{ items: OnboardingCase[] }>("/v1/onboarding", context),
+  onboardingCase: (context: ApiContext, id: string) => request<{ item: OnboardingCase }>(`/v1/onboarding/${encodeURIComponent(id)}`, context),
+  updateOnboardingStatus: (context: ApiContext, id: string, status: OnboardingCase["status"]) => request<{ item: OnboardingCase }>(`/v1/onboarding/${encodeURIComponent(id)}/status`, context, { method: "POST", body: JSON.stringify({ status }) }),
 };

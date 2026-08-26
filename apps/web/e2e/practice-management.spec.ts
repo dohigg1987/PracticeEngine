@@ -21,6 +21,25 @@ test("practice work supports operational filtering", async ({ page }) => {
   await expect(page.getByRole("row", { name: /Northstar.*Annual accounts.*2026 Annual Accounts/ })).toBeVisible();
 });
 
+test("CRM pipeline and onboarding stay operational at narrow width", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await start(page);
+  await openNav(page);
+  await page.locator('button[value="crm-prospects"]').click();
+  await expect(page.getByRole("heading", { name: "Prospects", exact: true })).toBeVisible();
+  await expect(page.getByRole("table", { name: "CRM prospects" })).toContainText("Cedar Advisory Group");
+  await openNav(page);
+  await page.locator('button[value="crm-opportunities"]').click();
+  await expect(page.getByRole("table", { name: "CRM opportunities" })).toBeVisible();
+  await page.getByRole("button", { name: "Finance function and annual accounts" }).click();
+  await expect(page.getByRole("table", { name: "Opportunity proposed services" })).toBeVisible();
+  await openNav(page);
+  await page.locator('button[value="onboarding"]').click();
+  await expect(page.getByRole("table", { name: "Onboarding work" })).toBeVisible();
+  const widths = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, root: document.documentElement.scrollWidth }));
+  expect(widths.root).toBeLessThanOrEqual(widths.viewport + 1);
+});
+
 test("practice settings exposes service and template configuration at narrow width", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 720 });
   await start(page);

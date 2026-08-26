@@ -6,7 +6,7 @@
 .pm-filters { display: grid; grid-template-columns: minmax(240px, 2fr) repeat(2, minmax(160px, 1fr)); gap: var(--spacingHorizontalM); align-items: end; }
 .pm-result-count { margin: 0; color: var(--colorNeutralForeground3); font-size: var(--fontSizeBase200); }
 .pm-grid-scroll { min-width: 0; overflow-x: auto; border-block: 1px solid var(--colorNeutralStroke1); }
-.pm-grid-scroll [role="grid"] { min-width: 960px; }
+.pm-grid-scroll [role="grid"], .pm-grid-scroll table { min-width: 960px; }
 .pm-grid-scroll [role="row"] { min-height: 44px; }
 .pm-work-title { display: grid; min-width: 0; text-align: left; }
 .pm-work-title span, .pm-work-title small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

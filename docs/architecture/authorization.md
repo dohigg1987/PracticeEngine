@@ -17,6 +17,8 @@ The catalogue includes client view/create/edit/archive, contact management, user
 
 Legacy routes still use existing OWNER/ADMIN and engagement-role checks. A compatibility trigger mirrors changes to `tenant_member.role_code` into the new assignment table, so those routes can migrate incrementally.
 
+PM-005 adds CRM view/manage, prospect create/edit, opportunity create/edit/convert, onboarding view/manage/complete and notification-delivery visibility. Conversion requires both `opportunities.convert` and the applicable Practice/QuoteBench entitlements. Onboarding completion is deliberately separate from ordinary onboarding management.
+
 ## Enforcement
 
 New tables use forced RLS with active actor/tenant context. Composite foreign keys prevent relationships that pair a tenant with a record owned by another tenant. The service also qualifies every resource lookup by `tenant_id`; a cross-tenant identifier therefore resolves as not found and cannot be mutated.

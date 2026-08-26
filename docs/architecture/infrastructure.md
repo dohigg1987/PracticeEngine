@@ -14,9 +14,11 @@ PracticeEngine's approved runtime is:
 
 PM-002 introduces no alternative host, database, identity provider or event broker. It uses the existing Worker bindings, environment separation, R2 integration, Neon Auth JWT verification, Hyperdrive connection and transactional outbox. No new Cloudflare binding is required.
 
+PM-005 retains the same platform. The notification consumer is a second Worker entrypoint intended to use the existing publisher-only Hyperdrive role; it adds no database, queue model, long-running server or email vendor. Production scheduling and credentials remain unconfigured.
+
 ## Database change control
 
-Migration `0031` is forward-only and additive. Every new tenant table has a tenant key, tenant-safe foreign keys, indexes, forced RLS and least-privilege `accounts_app` grants. `npm run verify:neon-migrations` executes complete SQL scripts and behavioral fixtures on an explicitly confirmed disposable Neon target. PM-003 validated `0029`-`0031` remotely and does not promote them to production.
+Migrations through `0033` are forward-only and additive. Every new tenant table has a tenant key, tenant-safe foreign keys, indexes, forced RLS and least-privilege `accounts_app` grants. `npm run verify:neon-migrations` executes complete SQL scripts and behavioral fixtures on an explicitly confirmed disposable Neon target. No PM-005 migration is promoted to production.
 
 ## Runtime and release control
 

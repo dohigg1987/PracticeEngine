@@ -10,6 +10,7 @@ const verificationFile = path.join(root, "packages", "database", "runbooks", "ne
 const practiceVerificationFile = path.join(root, "packages", "database", "runbooks", "practice_management_disposable_verification.sql");
 const pm003VerificationFile = path.join(root, "packages", "database", "runbooks", "pm003_disposable_verification.sql");
 const pm004VerificationFile = path.join(root, "packages", "database", "runbooks", "pm004_disposable_verification.sql");
+const pm005VerificationFile = path.join(root, "packages", "database", "runbooks", "pm005_disposable_verification.sql");
 
 export function validateDisposableTarget({ databaseUrl, target, confirmation }) {
   if (!databaseUrl) throw new Error("NEON_MIGRATION_DATABASE_URL is required");
@@ -76,6 +77,7 @@ async function main() {
     await executeScript(sql, await readFile(practiceVerificationFile, "utf8"), path.relative(root, practiceVerificationFile));
     await executeScript(sql, await readFile(pm003VerificationFile, "utf8"), path.relative(root, pm003VerificationFile));
     await executeScript(sql, await readFile(pm004VerificationFile, "utf8"), path.relative(root, pm004VerificationFile));
+    await executeScript(sql, await readFile(pm005VerificationFile, "utf8"), path.relative(root, pm005VerificationFile));
     console.log(`Neon migration verification passed through ${repositoryVersions.at(-1)} on disposable target ${target}.`);
   } finally {
     await sql.end({ timeout: 5 });

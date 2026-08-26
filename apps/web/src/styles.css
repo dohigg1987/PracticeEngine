@@ -2084,12 +2084,12 @@ body {
   box-shadow: 0 2px 8px #00000024;
 }
 .accounts-inspector {
-  background: #fff;
-  border-color: #e0e0e0;
+  background: var(--colorNeutralBackground1);
+  border-color: var(--colorNeutralStroke2);
 }
 .inspector-tabs button[aria-selected="true"] {
-  border-color: #0f6cbd;
-  color: #0f6cbd;
+  border-color: var(--colorBrandStroke1);
+  color: var(--colorBrandForeground1);
 }
 .nav-toggle,
 .builder-mobile-toolbar,
@@ -2117,7 +2117,7 @@ body {
     left: 0;
     width: 280px;
     height: auto;
-    box-shadow: 8px 0 24px #0003;
+    box-shadow: var(--shadow16);
   }
   .sidebar.mobile-open {
     display: block;
@@ -2150,8 +2150,8 @@ body {
     display: flex !important;
     gap: 8px;
     padding: 8px;
-    border-bottom: 1px solid #e0e0e0;
-    background: #fff;
+    border-bottom: 1px solid var(--colorNeutralStroke2);
+    background: var(--colorNeutralBackground1);
   }
   .document-tree,
   .accounts-inspector,
@@ -2166,7 +2166,7 @@ body {
     inset: 0 auto 0 0;
     width: min(340px, 90vw);
     min-height: 100%;
-    box-shadow: 6px 0 20px #0003;
+    box-shadow: var(--shadow16);
   }
   .accounts-inspector.mobile-panel-open {
     right: 0;

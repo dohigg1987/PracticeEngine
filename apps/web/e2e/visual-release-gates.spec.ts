@@ -182,9 +182,12 @@ test("narrow navigation and pane controls meet the 44px touch-target gate", asyn
   await assertMinimumTarget(navigation, 44);
   await navigation.click();
   const builderGroup = page.getByRole("button", { name: "Accounts builder", exact: true });
+  await expect(builderGroup).toBeVisible();
   await assertMinimumTarget(builderGroup, 44);
-  await builderGroup.click();
+  if ((await builderGroup.getAttribute("aria-expanded")) !== "true") await builderGroup.click();
+  await expect(builderGroup).toHaveAttribute("aria-expanded", "true");
   const accounts = page.locator('button[value="accounts"]').first();
+  await expect(accounts).toBeVisible();
   await assertMinimumTarget(accounts, 44);
   await accounts.click();
   await expect(page.getByRole("heading", { name: "Statutory accounts document" })).toBeVisible();

@@ -52,6 +52,10 @@ The classification describes the target treatment, not a deletion decision.
 | QuoteBench and Clarity IE | No code, schema, route, import or integration reference was found. | None in this repository. | Future module contracts. | **UNKNOWN, REQUIRES FURTHER ANALYSIS**. |
 | Fluent design system | Fluent React v9 provider/components/icons, semantic status helpers, forced-colour stylesheet and UI quality guards are established, alongside remaining baselined CSS debt. | `apps/web/src/main.tsx`, component files, CSS, `scripts/ui-quality-*`, Playwright audits. | `@fluentui/react-components`, Griffel runtime. | **RETAIN AND EXTEND**; improve incrementally, not through unrelated redesign. |
 
+## PM-005 delta
+
+Migration `0033` and `apps/api/src/crm-onboarding.ts` now implement tenant-scoped prospects, opportunities, proposed-service references, QuoteBench proposal references/events, idempotent acceptance conversion and workflow-backed onboarding. `apps/api/src/notification-worker.ts` supplies durable provider-neutral notification consumption. These additions preserve the baseline inventory below and do not move Ledgerly ownership.
+
 ## Important overlaps and constraints
 
 - `organisation*`, `client_contact`, portal identity and engagement access describe overlapping slices of a client relationship. Practice Management must establish canonical ownership without replacing IDs before consumers migrate.

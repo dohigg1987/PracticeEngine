@@ -244,6 +244,7 @@ function WorkspaceSearchIcon({
 const EngagementProduction = lazy(() => import("./EngagementProduction"));
 const CommercialWorkspace = lazy(() => import("./CommercialWorkspace"));
 const PracticeManagement = lazy(() => import("./PracticeManagement"));
+const CrmOnboarding = lazy(() => import("./CrmOnboarding"));
 type CsvRow = {
   accountCode: string;
   accountName: string;
@@ -453,6 +454,9 @@ function AccountsWorkspace({
     | "engagement"
     | "clients"
     | "work"
+    | "crm-prospects"
+    | "crm-opportunities"
+    | "onboarding"
     | "team"
     | "integrations"
     | "inbox"
@@ -560,6 +564,9 @@ function AccountsWorkspace({
     if (
       workspacePage === "clients" ||
       workspacePage === "work" ||
+      workspacePage === "crm-prospects" ||
+      workspacePage === "crm-opportunities" ||
+      workspacePage === "onboarding" ||
       workspacePage === "team"
     )
       setPracticeNavOpen(true);
@@ -1054,6 +1061,30 @@ function AccountsWorkspace({
       open: () => setWorkspacePage("work"),
     },
     {
+      id: "workspace-crm-prospects",
+      label: "Prospects",
+      description: "CRM",
+      keywords: "commercial contacts leads pipeline",
+      category: "Workspace" as const,
+      open: () => setWorkspacePage("crm-prospects"),
+    },
+    {
+      id: "workspace-crm-opportunities",
+      label: "Opportunities",
+      description: "CRM",
+      keywords: "proposal quotebench conversion services",
+      category: "Workspace" as const,
+      open: () => setWorkspacePage("crm-opportunities"),
+    },
+    {
+      id: "workspace-onboarding",
+      label: "Onboarding",
+      description: "Practice management",
+      keywords: "accepted clients workflow blockers readiness",
+      category: "Workspace" as const,
+      open: () => setWorkspacePage("onboarding"),
+    },
+    {
       id: "workspace-integrations",
       label: "Imports and integrations",
       description: "Workspace",
@@ -1407,6 +1438,40 @@ function AccountsWorkspace({
                     >
                       Work
                     </NavItem>
+                    <p className="eyebrow">CRM</p>
+                    <NavItem
+                      className="workspace-nav-item"
+                      value="crm-prospects"
+                      icon={<PeopleTeamRegular />}
+                      onClick={() => {
+                        setWorkspacePage("crm-prospects");
+                        setMobileNavOpen(false);
+                      }}
+                    >
+                      Prospects
+                    </NavItem>
+                    <NavItem
+                      className="workspace-nav-item"
+                      value="crm-opportunities"
+                      icon={<DocumentRegular />}
+                      onClick={() => {
+                        setWorkspacePage("crm-opportunities");
+                        setMobileNavOpen(false);
+                      }}
+                    >
+                      Opportunities
+                    </NavItem>
+                    <NavItem
+                      className="workspace-nav-item"
+                      value="onboarding"
+                      icon={<DocumentRegular />}
+                      onClick={() => {
+                        setWorkspacePage("onboarding");
+                        setMobileNavOpen(false);
+                      }}
+                    >
+                      Onboarding
+                    </NavItem>
                     {["OWNER", "ADMIN"].includes(
                       selectedMembership?.role_code || "",
                     ) && (
@@ -1649,6 +1714,15 @@ function AccountsWorkspace({
                     setPracticeView("client-summary");
                   }}
                   onBack={() => setPracticeView("work")}
+                />
+              </Suspense>
+            </RoutePanelBoundary>
+          ) : ["crm-prospects", "crm-opportunities", "onboarding"].includes(workspacePage) ? (
+            <RoutePanelBoundary resetKey={workspacePage}>
+              <Suspense fallback={<Skeleton />}>
+                <CrmOnboarding
+                  view={workspacePage === "crm-prospects" ? "prospects" : workspacePage === "crm-opportunities" ? "opportunities" : "onboarding"}
+                  context={context}
                 />
               </Suspense>
             </RoutePanelBoundary>

@@ -100,7 +100,13 @@ async function openSurface(page: Page, surface: Surface) {
   }
   await expect(target).toBeVisible();
   await target.click();
-  await expect(page.getByRole("heading", { name: surface.heading }).first()).toBeVisible();
+  const heading = page.getByRole("heading", { name: surface.heading }).first();
+  await expect(heading).toBeVisible();
+  // Dynamic route chunks and demo data can finish after the heading mounts.
+  // Axe evaluates in the page context, so wait for that navigation boundary
+  // to settle instead of allowing a late route load to destroy the scan.
+  await page.waitForLoadState("networkidle");
+  await expect(heading).toBeVisible();
 }
 
 async function scan(page: Page, testInfo: TestInfo, surface: Surface) {

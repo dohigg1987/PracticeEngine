@@ -9,3 +9,5 @@ Stages support preparation, client input, internal review, approval, specialist 
 Task dependencies support finish-to-start, start-to-start and explicit blocking. Both API graph validation and a database trigger reject cycles and cross-work relationships. Unresolved blockers are returned with work detail. Resolution is explicit and audited.
 
 All workflow mutations use the Platform Core tenant transaction, functional permissions, the `practice.workflow` entitlement, immutable audit events and transactional outbox facts.
+
+PM-005 onboarding is an application of this engine, not a parallel workflow. An onboarding case may instantiate a published template into ordinary work stages and tasks. Explicit blockers and every mandatory stage/task must clear before the case can become ready for delivery or completed.

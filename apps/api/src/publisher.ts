@@ -17,6 +17,39 @@ export interface NotificationDeliveryAdapter {
   deliver(event: ClaimedOutboxEvent): Promise<{ providerMessageId: string | null; metadata?: Record<string, unknown> }>;
 }
 
+export interface EmailDeliveryPort {
+  deliver(input: {
+    tenantId: string;
+    recipientReference: string;
+    templateCode: string;
+    payload: Record<string, unknown>;
+    idempotencyKey: string;
+  }): Promise<{ providerMessageId: string; metadata?: Record<string, unknown> }>;
+}
+
+function requiredDeliveryText(value: unknown, code: string, max = 240): string {
+  if (typeof value !== "string" || !value.trim() || value.trim().length > max)
+    throw Object.assign(new Error(code), { code });
+  return value.trim();
+}
+
+export function notificationDeliveryAdapter(email?: EmailDeliveryPort): NotificationDeliveryAdapter {
+  return {
+    async deliver(event) {
+      const channel = requiredDeliveryText(event.payload.channel, "NOTIFICATION_CHANNEL_INVALID", 20);
+      const recipientReference = requiredDeliveryText(event.payload.recipientReference, "NOTIFICATION_RECIPIENT_INVALID");
+      const templateCode = requiredDeliveryText(event.payload.templateCode, "NOTIFICATION_TEMPLATE_INVALID", 120);
+      const payload = event.payload.payload;
+      if (!payload || typeof payload !== "object" || Array.isArray(payload))
+        throw Object.assign(new Error("NOTIFICATION_PAYLOAD_INVALID"), { code: "NOTIFICATION_PAYLOAD_INVALID" });
+      if (channel === "IN_APP") return { providerMessageId: `in-app:${event.id}`, metadata: { channel } };
+      if (channel !== "EMAIL") throw Object.assign(new Error("NOTIFICATION_CHANNEL_UNSUPPORTED"), { code: "NOTIFICATION_CHANNEL_UNSUPPORTED" });
+      if (!email) throw Object.assign(new Error("EMAIL_PROVIDER_NOT_CONFIGURED"), { code: "EMAIL_PROVIDER_NOT_CONFIGURED" });
+      return email.deliver({ tenantId: event.tenantId, recipientReference, templateCode, payload: payload as Record<string, unknown>, idempotencyKey: event.id });
+    },
+  };
+}
+
 export interface PublisherBatchResult {
   claimed: number;
   delivered: number;

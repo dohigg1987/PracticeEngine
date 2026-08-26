@@ -31,6 +31,13 @@ const requiredDocuments = [
   "docs/architecture/work-template-versioning.md",
   "docs/architecture/work-generation.md",
   "docs/architecture/cloudflare-scheduling.md",
+  "docs/architecture/workflow-orchestration.md",
+  "docs/architecture/automation-engine.md",
+  "docs/architecture/crm.md",
+  "docs/architecture/prospect-client-conversion.md",
+  "docs/architecture/quotebench-integration.md",
+  "docs/architecture/onboarding.md",
+  "docs/architecture/notifications.md",
   "docs/design/DESIGN-CONSTITUTION.md",
   "docs/design/ANTI-PATTERNS.md",
   "AGENTS.md",
@@ -172,6 +179,27 @@ if (recurringMigrationName) {
     if (!recurringMigration.includes(`'${permission}'`)) failures.push(`${recurringMigrationName} is missing ${permission}`);
   for (const invariant of ["client_service_active_period_excl", "recurring_schedule_id,occurrence_date", "due_date_override_reason"])
     if (!recurringMigration.includes(invariant)) failures.push(`${recurringMigrationName} is missing ${invariant}`);
+}
+
+const crmMigrationName = migrations.find((name) => name.includes("crm_onboarding_notifications"));
+if (crmMigrationName) {
+  const crmMigration = await readFile(path.join(migrationDirectory, crmMigrationName), "utf8");
+  const tenantOwnedTables = [
+    "crm_stage_definition", "prospect", "prospect_contact_relationship", "opportunity", "opportunity_service",
+    "crm_activity", "quotebench_proposal_reference", "specialist_event_receipt", "onboarding_case",
+    "onboarding_case_service", "onboarding_blocker", "crm_conversion"
+  ];
+  for (const table of tenantOwnedTables) {
+    const declaration = new RegExp(`CREATE TABLE ${table}\\([\\s\\S]*?tenant_id uuid NOT NULL`, "i");
+    if (!declaration.test(crmMigration)) failures.push(`${crmMigrationName}: ${table} lacks a required tenant_id`);
+    if (!crmMigration.includes(`'${table}'`)) failures.push(`${crmMigrationName}: ${table} is missing from the forced-RLS inventory`);
+  }
+  for (const permission of ["crm.view", "crm.manage", "prospects.create", "prospects.edit", "opportunities.create", "opportunities.edit", "opportunities.convert", "onboarding.view", "onboarding.manage", "onboarding.complete", "notifications.view"])
+    if (!crmMigration.includes(`'${permission}'`)) failures.push(`${crmMigrationName} is missing ${permission}`);
+  for (const entitlement of ["quotebench.enabled", "quotebench.proposals", "quotebench.pricing", "quotebench.templates", "quotebench.esign"])
+    if (!crmMigration.includes(`'${entitlement}'`)) failures.push(`${crmMigrationName} is missing ${entitlement}`);
+  for (const invariant of ["client_service_opportunity_service_uq", "UNIQUE(tenant_id,acceptance_event_id)", "claim_notification_events", "FOR UPDATE SKIP LOCKED"])
+    if (!crmMigration.includes(invariant)) failures.push(`${crmMigrationName} is missing ${invariant}`);
 }
 
 if (failures.length) {

@@ -23,3 +23,5 @@ PM-003 adds published template instantiation, recurring schedules, deterministic
 The current `organisation` identifier remains the client key. The current Ledgerly `engagement` remains the accounts-production workspace and can be linked one-to-one to a Practice work item through an explicit tenant-safe relation. Existing Ledgerly tasks and review points remain intact.
 
 Rollback is to stop routing the new application service and restore the disposable/pre-migration Neon branch or PITR point. Migrations `0030` and `0031` are additive and no previous table, column, route, event or object is removed.
+
+PM-005 adds the commercial chain `Prospect -> Opportunity -> QuoteBench reference -> Acceptance -> Canonical client/services/engagement -> Onboarding -> Work`. CRM and onboarding remain Practice-owned; proposal pricing/content remain QuoteBench-owned. Migration `0033` is additive and preserves all earlier identifiers and routes.

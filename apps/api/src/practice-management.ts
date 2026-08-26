@@ -657,14 +657,15 @@ async function clientSummary(request: Request, env: Env, actorId: string, client
   uuid(clientId, "Client");
   return within(request, env, actorId, "work.view", "practice.work", async (tx, ctx) => {
     await assertPlatformPermission(tx, "services.view"); await assertPlatformPermission(tx, "engagements.view"); await assertPlatformPermission(tx, "tasks.view");
-    const clients = await tx`select id,display_name,legal_name,lifecycle_status,responsible_member_id,responsible_team_id from organisation where tenant_id=${ctx.tenantId} and id=${clientId}`;
+    const clients = await tx`select id,display_name,legal_name,lifecycle_status,responsible_member_id,responsible_team_id,originating_opportunity_id,originating_proposal_reference_id,converted_at from organisation where tenant_id=${ctx.tenantId} and id=${clientId}`;
     if (!clients.length) throw new ApiError(404, "NOT_FOUND", "Client not found");
     const services = await tx`select cs.*,s.name service_name,s.category from client_service cs join practice_service s on s.tenant_id=cs.tenant_id and s.id=cs.service_id where cs.tenant_id=${ctx.tenantId} and cs.client_id=${clientId} and cs.status='active' order by s.name`;
     const engagements = await tx`select * from practice_engagement where tenant_id=${ctx.tenantId} and client_id=${clientId} and status not in ('completed','terminated') order by start_date nulls last`;
     const workItems = await tx`select * from work_item where tenant_id=${ctx.tenantId} and client_id=${clientId} and status not in ('completed','cancelled') order by due_date nulls last`;
     const upcomingTasks = await tx`select t.* from practice_task t join work_item w on w.tenant_id=t.tenant_id and w.id=t.work_item_id where t.tenant_id=${ctx.tenantId} and w.client_id=${clientId} and t.status not in ('completed','skipped') order by t.due_date nulls last,t.sequence limit 50`;
     const recurringSchedules = await tx`select r.*,s.name service_name,wt.name template_name from recurring_work_schedule r join client_service cs on cs.tenant_id=r.tenant_id and cs.id=r.client_service_id join practice_service s on s.tenant_id=cs.tenant_id and s.id=cs.service_id join work_template wt on wt.tenant_id=r.tenant_id and wt.id=r.work_template_id where r.tenant_id=${ctx.tenantId} and r.client_id=${clientId} and r.status<>'archived' order by r.next_occurrence_date nulls last`;
-    return response({ item: { client: clients[0], services, engagements, workItems, upcomingTasks, recurringSchedules } });
+    const onboarding = await tx`select id,status,mandatory_gates_complete,updated_at from onboarding_case where tenant_id=${ctx.tenantId} and client_id=${clientId} order by created_at desc limit 1`;
+    return response({ item: { client: clients[0], services, engagements, workItems, upcomingTasks, recurringSchedules, onboarding: onboarding[0] ?? null } });
   });
 }
 
