@@ -418,7 +418,8 @@ async function staffThreadMessages(request:Request,env:Env,actorId:string,thread
     if(request.method==="GET")return response({item:threads[0],messages:await tx`select id,sender_context,sender_actor_id,body,reply_to_message_id,sent_at from portal_message where tenant_id=${ctx.tenantId} and portal_thread_id=${threadId} order by sent_at,id`});
     if(String(threads[0]!.status)!=="open")throw new ApiError(409,"THREAD_CLOSED","The message thread is closed");
     const messageId=crypto.randomUUID(),idempotency=text(input!,"idempotencyKey",160);
-    const rows=await tx`insert into portal_message(id,tenant_id,portal_thread_id,sender_context,sender_actor_id,body,reply_to_message_id,idempotency_key) values(${messageId},${ctx.tenantId},${threadId},'practice',${ctx.actorId},${text(input!,"body",20000)},${optionalId(input!,"replyToMessageId")},${idempotency}) on conflict(tenant_id,portal_thread_id,idempotency_key) do update set id=portal_message.id returning *`;
+    let rows=await tx`insert into portal_message(id,tenant_id,portal_thread_id,sender_context,sender_actor_id,body,reply_to_message_id,idempotency_key) values(${messageId},${ctx.tenantId},${threadId},'practice',${ctx.actorId},${text(input!,"body",20000)},${optionalId(input!,"replyToMessageId")},${idempotency}) on conflict(tenant_id,portal_thread_id,idempotency_key) do nothing returning *`;
+    if(!rows.length) rows=await tx`select * from portal_message where tenant_id=${ctx.tenantId} and portal_thread_id=${threadId} and idempotency_key=${idempotency}`;
     await tx`update portal_thread set updated_at=now() where tenant_id=${ctx.tenantId} and id=${threadId}`;
     const recipients=await tx`select p.auth_actor_id,c.email_normalized from portal_thread_participant participant join portal_principal p on p.tenant_id=participant.tenant_id and p.id=participant.portal_principal_id join contact c on c.tenant_id=p.tenant_id and c.id=p.contact_id where participant.tenant_id=${ctx.tenantId} and participant.portal_thread_id=${threadId} and participant.removed_at is null`;
     for(const recipient of recipients)await queueNotification(tx,ctx,String(recipient.auth_actor_id ?? recipient.email_normalized),"portal.message","PORTAL_MESSAGE",String(rows[0]!.id),{threadId,clientId:String(threads[0]!.client_id)});
@@ -480,7 +481,8 @@ async function portalMessages(request: Request, env: Env, actorId: string, threa
     if(String(threads[0]!.status)!=="open")throw new ApiError(409,"THREAD_CLOSED","The message thread is closed");
     await requirePortalClient(tx,ctx,principalId,String(threads[0]!.client_id),["contributor","approver"]);
     const messageId=crypto.randomUUID(),idempotency=text(input!,"idempotencyKey",160);
-    const rows=await tx`insert into portal_message(id,tenant_id,portal_thread_id,sender_context,sender_actor_id,body,reply_to_message_id,idempotency_key) values(${messageId},${ctx.tenantId},${threadId},'portal',${ctx.actorId},${text(input!,"body",20000)},${optionalId(input!,"replyToMessageId")},${idempotency}) on conflict(tenant_id,portal_thread_id,idempotency_key) do update set id=portal_message.id returning *`;
+    let rows=await tx`insert into portal_message(id,tenant_id,portal_thread_id,sender_context,sender_actor_id,body,reply_to_message_id,idempotency_key) values(${messageId},${ctx.tenantId},${threadId},'portal',${ctx.actorId},${text(input!,"body",20000)},${optionalId(input!,"replyToMessageId")},${idempotency}) on conflict(tenant_id,portal_thread_id,idempotency_key) do nothing returning *`;
+    if(!rows.length) rows=await tx`select * from portal_message where tenant_id=${ctx.tenantId} and portal_thread_id=${threadId} and idempotency_key=${idempotency}`;
     await tx`update portal_thread set updated_at=now() where tenant_id=${ctx.tenantId} and id=${threadId}`;
     await record(tx,ctx,"PORTAL_MESSAGE_SENT","message.sent","PORTAL_MESSAGE",String(rows[0]!.id),String(threads[0]!.client_id),{threadId},"CLIENT");
     return response({item:rows[0]},201);

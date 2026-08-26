@@ -84,7 +84,7 @@ export async function seed(config, { now = new Date(), log = console.log } = {})
     clients[code] = await ensure(api,"/v1/clients",(x)=>x.client_code===code,"/v1/clients",{displayName:`${MARKER} ${name}`,legalName:name,entityType:type,clientCode:code,jurisdiction:"UK"});
 
   async function clientService(clientKey, serviceName) {
-    const c=clients[clientKey], s=services[serviceName], path=`/v1/practice/clients/${c.id}/services`;
+    const c=clients[clientKey], s=services[serviceName], path=`/v1/clients/${c.id}/services`;
     return ensure(api,path,(x)=>String(x.service_id)===String(s.id)&&x.status==="active",path,{serviceId:s.id,startDate:d.past,frequency:s.default_frequency,responsibleMemberId:mid.manager,responsibleTeamId:delivery.id,specialistModuleKey:s.specialist_module_key});
   }
   const acmeAccounts=await clientService("DEV-ACME","Annual accounts"), acmeBook=await clientService("DEV-ACME","Bookkeeping"), riverVat=await clientService("DEV-RIVER","VAT returns"), orbitPayroll=await clientService("DEV-ORBIT","Payroll"), northAdvisory=await clientService("DEV-NORTH","Advisory");
@@ -99,7 +99,7 @@ export async function seed(config, { now = new Date(), log = console.log } = {})
   ], work={};
   for(const [title,cs,c,status,due,assignee] of workSpecs) work[title]=await ensure(api,"/v1/practice/work",(x)=>x.title===`${MARKER} ${title}`,"/v1/practice/work",{clientId:c.id,clientServiceId:cs.id,engagementId:c.id===clients["DEV-ACME"].id?engagement.id:undefined,title:`${MARKER} ${title}`,status,priority:due===d.overdue?"high":"normal",assignedMemberId:assignee,plannedStartDate:d.past,plannedEndDate:due,dueDate:due,estimatedEffortMinutes:480,remainingEffortMinutes:status==="in_progress"?240:480});
   const completed=work["Advisory workshop complete"];
-  await api.post(`/v1/practice/work/${completed.id}/complete`,{}).catch((e)=>{ if(!/already completed/.test(e.message)) throw e; });
+  if (completed.status !== "completed") await api.post(`/v1/practice/work/${completed.id}/complete`,{});
 
   const taskPath=`/v1/practice/work/${work["Overdue bookkeeping close"].id}/tasks`;
   const prepare=await ensure(api,taskPath,(x)=>x.title===`${MARKER} Prepare month-end`,taskPath,{title:`${MARKER} Prepare month-end`,sequence:1,assigneeMemberId:mid.member,reviewerMemberId:mid.reviewer,dueDate:d.overdue,estimatedEffortMinutes:180});

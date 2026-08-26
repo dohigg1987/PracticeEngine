@@ -134,6 +134,11 @@ GRANT INSERT ON TABLE
   accounts_version_comparative
 TO accounts_app;
 
+-- PostgreSQL requires read access to the inferred conflict target used by the
+-- transactional outbox's ON CONFLICT (tenant_id, idempotency_key) DO NOTHING.
+-- Keep that access column-scoped so payloads remain publisher-only.
+GRANT SELECT(id,tenant_id,idempotency_key) ON outbox_event TO accounts_app;
+
 GRANT INSERT(id,tenant_id,legal_name,legal_form,jurisdiction)
   ON organisation TO accounts_app;
 
