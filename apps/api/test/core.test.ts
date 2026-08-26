@@ -49,6 +49,7 @@ test("rejects incompatible reporting framework, sector and entity combinations",
 });
 import { authenticateRequest } from "../src/auth.ts";
 import {
+  healthReport,
   readinessReport,
   requestCorrelationId,
 } from "../src/operations.ts";
@@ -281,6 +282,22 @@ test("normalises correlation identifiers without reflecting unsafe input", () =>
     generated,
     /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
   );
+});
+
+test("reports a deployment version only when one is configured", () => {
+  assert.deepEqual(healthReport("e32e295c482f8eaa13ef50410b88212681be964d"), {
+    status: "ok",
+    service: "uk-accounts-api",
+    version: "e32e295c482f8eaa13ef50410b88212681be964d",
+  });
+  assert.deepEqual(healthReport(), {
+    status: "ok",
+    service: "uk-accounts-api",
+  });
+  assert.deepEqual(healthReport("   "), {
+    status: "ok",
+    service: "uk-accounts-api",
+  });
 });
 
 test("reports dependency readiness without exposing failure details", async () => {

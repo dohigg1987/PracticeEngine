@@ -1,6 +1,31 @@
-const NEON_AUTH_BASE = "https://ep-wispy-thunder-zatp3scz.neonauth.c-2.eu-west-2.aws.neon.tech/neondb/auth";
+const PRODUCTION_NEON_AUTH_BASE = "https://ep-wispy-thunder-zatp3scz.neonauth.c-2.eu-west-2.aws.neon.tech/neondb/auth";
 const UPSTREAM_SESSION_COOKIE = "__Secure-neon-auth.session_token";
 const APP_SESSION_COOKIE = "ledgerly_session";
+
+function isExplicitDevelopment(environment) {
+  const name = environment.ENVIRONMENT?.trim().toLowerCase();
+  return name === "dev" || name === "development" ||
+    environment.CF_PAGES_BRANCH === "environment/dev-integrated";
+}
+
+export function resolveNeonAuthBase(environment = {}) {
+  const configured = environment.NEON_AUTH_URL?.trim();
+  if (!configured) {
+    if (isExplicitDevelopment(environment)) {
+      throw new Error("NEON_AUTH_URL is required for the development Pages environment.");
+    }
+    return PRODUCTION_NEON_AUTH_BASE;
+  }
+
+  const url = new URL(configured);
+  if (
+    url.protocol !== "https:" || url.username || url.password || url.search ||
+    url.hash || configured.endsWith("/")
+  ) {
+    throw new Error("NEON_AUTH_URL must be a canonical HTTPS URL.");
+  }
+  return configured;
+}
 
 function rewrittenCookie(cookie) {
   return cookie
@@ -13,10 +38,24 @@ function rewrittenCookie(cookie) {
 
 export async function onRequest(context) {
   const requestUrl = new URL(context.request.url);
+  let authBase;
+  try {
+    authBase = resolveNeonAuthBase(context.env);
+  } catch (error) {
+    console.error("Neon Auth proxy configuration error", error);
+    return new Response("Authentication proxy is not configured.", {
+      status: 503,
+      headers: {
+        "cache-control": "no-store",
+        "content-type": "text/plain; charset=utf-8",
+        "x-content-type-options": "nosniff",
+      },
+    });
+  }
   const path = Array.isArray(context.params.path)
     ? context.params.path.join("/")
     : context.params.path || "";
-  const upstreamUrl = new URL(`${NEON_AUTH_BASE}/${path}`);
+  const upstreamUrl = new URL(`${authBase}/${path}`);
   upstreamUrl.search = requestUrl.search;
 
   const headers = new Headers(context.request.headers);

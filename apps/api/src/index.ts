@@ -43,6 +43,7 @@ import {
 } from "./working-paper-library.js";
 import {
   SERVICE_NAME,
+  healthReport,
   readinessReport,
   requestCorrelationId,
 } from "./operations.js";
@@ -5635,7 +5636,7 @@ export default {
         : null;
       let response: Response;
       if (url.pathname === "/health")
-        response = json({ status: "ok", service: SERVICE_NAME });
+        response = json(healthReport(env.APP_VERSION));
       else if (url.pathname === "/ready") response = await serviceReadiness(env);
       else if (url.pathname === "/v1/capabilities")
         response = json({

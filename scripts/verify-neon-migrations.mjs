@@ -9,6 +9,7 @@ import { spawnSync } from "node:child_process";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const migrationsDirectory = path.join(root, "packages", "database", "migrations");
+const accountsAppGrantsFile = path.join(root, "packages", "database", "runbooks", "accounts_app_grants.sql");
 const verificationFile = path.join(root, "packages", "database", "runbooks", "neon_migration_verification.sql");
 const practiceVerificationFile = path.join(root, "packages", "database", "runbooks", "practice_management_disposable_verification.sql");
 const pm003VerificationFile = path.join(root, "packages", "database", "runbooks", "pm003_disposable_verification.sql");
@@ -59,9 +60,15 @@ async function main() {
     if (String(identity[0].role_name) !== "neondb_owner") throw new Error("Connected role is not neondb_owner");
 
     const migrationTable = await sql`select to_regclass('public.schema_migration') migration_table`;
-    const appliedRows = migrationTable[0].migration_table
+    let migrationHistoryAvailable = Boolean(migrationTable[0].migration_table);
+    const appliedRows = migrationHistoryAvailable
       ? await sql`select version from schema_migration order by version`
       : [];
+    if (!migrationHistoryAvailable) {
+      const baselineTable = await sql`select to_regclass('public.tenant') baseline_table`;
+      if (baselineTable[0].baseline_table)
+        throw new Error("Target contains a partial pre-0004 bootstrap without migration history; recreate or restore the branch before retrying");
+    }
     const repositoryVersions = migrationFiles.map((name) => name.slice(0, 4));
     const applied = new Set(appliedRows.map((row) => String(row.version)));
     console.log(`Starting migration head: ${appliedRows.at(-1)?.version ?? "empty"}; repository head: ${repositoryVersions.at(-1)}`);
@@ -71,12 +78,29 @@ async function main() {
     if (firstMissing >= 0 && repositoryVersions.slice(firstMissing + 1).some((version) => applied.has(version)))
       throw new Error("Target migration history has a gap; refusing to guess ordering");
 
+    // The operational runtime-grant baseline covers the schema through 0030.
+    // Apply it at that boundary so later migrations can add their own focused
+    // grants without a subsequent broad revoke removing them.
+    if (applied.has("0030") && !applied.has("0031"))
+      await executeScript(sql, await readFile(accountsAppGrantsFile, "utf8"), path.relative(root, accountsAppGrantsFile));
+
     for (const name of migrationFiles) {
       const version = name.slice(0, 4);
       if (applied.has(version)) continue;
       await executeScript(sql, await readFile(path.join(migrationsDirectory, name), "utf8"), name);
-      const recorded = await sql`select exists(select 1 from schema_migration where version=${version}) recorded`;
-      if (!recorded[0].recorded) throw new Error(`${name} completed without recording schema_migration ${version}`);
+      // Migration 0004 creates schema_migration and backfills 0001-0003. A
+      // genuinely empty database therefore cannot prove per-file history until
+      // that bootstrap migration has completed.
+      if (version === "0004") migrationHistoryAvailable = true;
+      if (migrationHistoryAvailable) {
+        const expectedRecorded = repositoryVersions.slice(0, Number(version));
+        const recordedRows = await sql`select version from schema_migration where version = any(${expectedRecorded}) order by version`;
+        const recorded = new Set(recordedRows.map((row) => String(row.version)));
+        const missing = expectedRecorded.filter((expectedVersion) => !recorded.has(expectedVersion));
+        if (missing.length) throw new Error(`${name} completed without recording schema_migration ${missing.join(", ")}`);
+      }
+      if (version === "0030")
+        await executeScript(sql, await readFile(accountsAppGrantsFile, "utf8"), path.relative(root, accountsAppGrantsFile));
     }
 
     await executeScript(sql, await readFile(verificationFile, "utf8"), path.relative(root, verificationFile));

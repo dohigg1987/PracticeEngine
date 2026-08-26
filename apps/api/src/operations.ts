@@ -1,5 +1,20 @@
 export const SERVICE_NAME = "uk-accounts-api";
 
+export interface HealthReport {
+  status: "ok";
+  service: string;
+  version?: string;
+}
+
+export function healthReport(appVersion?: string): HealthReport {
+  const version = appVersion?.trim();
+  return {
+    status: "ok",
+    service: SERVICE_NAME,
+    ...(version ? { version } : {}),
+  };
+}
+
 export type ReadinessComponent = "database" | "artefactStorage";
 
 export interface ReadinessReport {

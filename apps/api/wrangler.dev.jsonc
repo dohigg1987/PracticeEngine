@@ -1,0 +1,32 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "practiceengine-api-dev",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-19",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "vars": {
+    "APP_VERSION": "e32e295c482f8eaa13ef50410b88212681be964d",
+    "WEB_ORIGIN": "https://practiceengine-dev.pages.dev",
+    "NEON_AUTH_URL": "https://ep-royal-dawn-axwaqz1u.neonauth.c-4.us-east-2.aws.neon.tech/neondb/auth",
+    "RECURRENCE_EXECUTION_CONTEXTS": "[]"
+  },
+  "observability": {
+    "enabled": true,
+    "logs": { "head_sampling_rate": 1 },
+    "traces": { "enabled": true, "head_sampling_rate": 0.05 }
+  },
+  "r2_buckets": [
+    {
+      "binding": "ARTEFACTS",
+      "bucket_name": "practiceengine-dev-artefacts"
+    }
+  ],
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "642a6a36a3074b5e8875990bfa1485c9"
+    }
+  ]
+}
