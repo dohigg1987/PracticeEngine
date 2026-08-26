@@ -14,6 +14,7 @@ import {
 import { formatDate } from "./displayFormat";
 import { statutoryLabel } from "./format";
 import { statusBadgeProps } from "./statusBadge";
+import ClientCollaboration from "./ClientCollaboration";
 import "./practice-management.css";
 
 export type PracticeManagementView = "work" | "work-detail" | "client-summary" | "settings";
@@ -173,6 +174,7 @@ function ClientSummary({ context, clientId = "", onOpenWork, onBack }: Props) {
     <section className="pm-section"><header><h2>Active services</h2></header><Table aria-label="Client services"><TableHeader><TableRow><TableHeaderCell>Service</TableHeaderCell><TableHeaderCell>Frequency</TableHeaderCell><TableHeaderCell>Responsible team</TableHeaderCell><TableHeaderCell>Delivery readiness</TableHeaderCell><TableHeaderCell>Status</TableHeaderCell></TableRow></TableHeader><TableBody>{summary.services.map((service) => <TableRow key={service.id}><TableCell>{service.service_name || "Service"}</TableCell><TableCell>{service.frequency ? label(service.frequency) : "Not set"}</TableCell><TableCell>{service.responsible_team_id ? "Assigned" : "Unassigned"}</TableCell><TableCell>{service.delivery_readiness ? <Status value={service.delivery_readiness} /> : "Active"}</TableCell><TableCell><Status value={service.status} /></TableCell></TableRow>)}</TableBody></Table></section>
     <section className="pm-section"><header><h2>Current work and deadlines</h2></header><Table aria-label="Client work"><TableHeader><TableRow><TableHeaderCell>Work item</TableHeaderCell><TableHeaderCell>Status</TableHeaderCell><TableHeaderCell>Due</TableHeaderCell></TableRow></TableHeader><TableBody>{summary.workItems.map((work) => <TableRow key={work.id}><TableCell>{onOpenWork ? <Button appearance="transparent" className="pm-inline-link" onClick={() => onOpenWork(work.id)}>{work.title}</Button> : work.title}</TableCell><TableCell><Status value={work.status} /></TableCell><TableCell className={isOverdue(work.due_date, work.status) ? "pm-overdue" : ""}>{date(work.due_date)}</TableCell></TableRow>)}</TableBody></Table></section>
     <section className="pm-section"><header><h2>Recurring schedules</h2></header><Table aria-label="Client recurring schedules"><TableHeader><TableRow><TableHeaderCell>Service</TableHeaderCell><TableHeaderCell>Template</TableHeaderCell><TableHeaderCell>Next work</TableHeaderCell><TableHeaderCell>Status</TableHeaderCell></TableRow></TableHeader><TableBody>{(summary.recurringSchedules || []).map((schedule) => <TableRow key={schedule.id}><TableCell>{schedule.service_name || "Service"}</TableCell><TableCell>{schedule.template_name || "Template"}</TableCell><TableCell>{date(schedule.next_occurrence_date)}</TableCell><TableCell><Status value={schedule.status} /></TableCell></TableRow>)}</TableBody></Table></section>
+    <ClientCollaboration context={context} clientId={clientId} engagementIds={summary.engagements.map((engagement) => engagement.id)} />
   </section>;
 }
 

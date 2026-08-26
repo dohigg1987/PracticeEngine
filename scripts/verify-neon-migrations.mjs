@@ -1,8 +1,11 @@
-import { readdir, readFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import postgres from "postgres";
+import { build } from "esbuild";
+import { spawnSync } from "node:child_process";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const migrationsDirectory = path.join(root, "packages", "database", "migrations");
@@ -11,6 +14,7 @@ const practiceVerificationFile = path.join(root, "packages", "database", "runboo
 const pm003VerificationFile = path.join(root, "packages", "database", "runbooks", "pm003_disposable_verification.sql");
 const pm004VerificationFile = path.join(root, "packages", "database", "runbooks", "pm004_disposable_verification.sql");
 const pm005VerificationFile = path.join(root, "packages", "database", "runbooks", "pm005_disposable_verification.sql");
+const pm006VerificationFile = path.join(root, "packages", "database", "runbooks", "pm006_disposable_verification.sql");
 
 export function validateDisposableTarget({ databaseUrl, target, confirmation }) {
   if (!databaseUrl) throw new Error("NEON_MIGRATION_DATABASE_URL is required");
@@ -47,6 +51,7 @@ async function main() {
   }
 
   const sql = postgres(databaseUrl, { max: 1, ssl: "require", prepare: false, connect_timeout: 20, idle_timeout: 5 });
+  let conversionBuildDirectory;
   try {
     const identity = await sql`select current_database() database_name,current_user role_name,current_setting('server_version') server_version`;
     console.log(`Disposable target ${target}: database=${identity[0].database_name}, role=${identity[0].role_name}, PostgreSQL=${identity[0].server_version}`);
@@ -78,9 +83,26 @@ async function main() {
     await executeScript(sql, await readFile(pm003VerificationFile, "utf8"), path.relative(root, pm003VerificationFile));
     await executeScript(sql, await readFile(pm004VerificationFile, "utf8"), path.relative(root, pm004VerificationFile));
     await executeScript(sql, await readFile(pm005VerificationFile, "utf8"), path.relative(root, pm005VerificationFile));
+    await executeScript(sql, await readFile(pm006VerificationFile, "utf8"), path.relative(root, pm006VerificationFile));
+    conversionBuildDirectory = await mkdtemp(path.join(tmpdir(), "practiceengine-pm006-conversion-"));
+    const conversionTestFile = path.join(conversionBuildDirectory, "pm006-conversion.database.test.mjs");
+    await build({
+      entryPoints: [path.join(root, "apps", "api", "integration", "pm006-conversion.database.test.ts")],
+      outfile: conversionTestFile,
+      bundle: true,
+      platform: "node",
+      format: "esm",
+      sourcemap: "inline",
+    });
+    const conversionTest = spawnSync(process.execPath, ["--test", conversionTestFile], {
+      cwd: root, stdio: "inherit", shell: false, env: { ...process.env, PM006_CONVERSION_DATABASE_URL: databaseUrl },
+    });
+    if (conversionTest.error) throw conversionTest.error;
+    if (conversionTest.status !== 0) throw new Error("PM-006 database-backed QuoteBench conversion integration failed");
     console.log(`Neon migration verification passed through ${repositoryVersions.at(-1)} on disposable target ${target}.`);
   } finally {
     await sql.end({ timeout: 5 });
+    if (conversionBuildDirectory) await rm(conversionBuildDirectory, { recursive: true, force: true });
   }
 }
 

@@ -15,6 +15,9 @@ import type {
   CrmProspect,
   CrmOpportunity,
   OnboardingCase,
+  ClientRequestItem,
+  PortalMessageItem,
+  PortalThreadItem,
   WorkingPaper,
   WorkingPaperAttachment,
   WorkingPaperCategory,
@@ -25,6 +28,12 @@ import type {
 } from "./api";
 
 const now = "2027-03-18T09:30:00.000Z";
+let demoClientRequests: ClientRequestItem[] = [
+  { id: "client-request-1", client_id: "demo-org", client_name: "Northstar Community Foundation", title: "Confirm trustee details", description: "Check the current trustee list and confirm that it is complete.", request_type: "confirmation", status: "open", priority: "high", due_at: "2027-03-25T17:00:00.000Z", engagement_name: "2026 accounts engagement", responsible_member_id: "member-demo", response_count: 0, completion_mode: "manual" },
+  { id: "client-request-2", client_id: "demo-org-2", client_name: "Harbour Trading Ltd", title: "Upload quarterly bank statements", description: "Upload statements for each trading account for the quarter.", request_type: "document", status: "responded", priority: "normal", due_at: "2027-03-20T17:00:00.000Z", work_title: "Q1 VAT Return", responsible_member_id: "member-demo", response_count: 1, last_response_at: now, completion_mode: "manual" },
+];
+let demoPortalThreads: PortalThreadItem[] = [{ id: "portal-thread-1", client_id: "demo-org", client_name: "Northstar Community Foundation", subject: "Trustee information", status: "open", last_message_at: now, updated_at: now }];
+let demoPortalMessages: PortalMessageItem[] = [{ id: "portal-message-1", sender_context: "practice", body: "Please let us know if any trustees changed during the year.", sent_at: now }];
 let demoPracticeServices: PracticeService[] = [
   { id: "service-accounts", name: "Annual accounts", description: "Statutory accounts preparation and filing support", category: "accounts", status: "active", default_frequency: "annual", specialist_module_key: "ledgerly", entitlement_feature_key: "ledgerly.accounts" },
   { id: "service-vat", name: "VAT returns", description: "Periodic VAT return preparation", category: "tax", status: "active", default_frequency: "quarterly" },
@@ -1266,6 +1275,13 @@ const reads: Array<[RegExp, unknown]> = [
 ];
 
 function practiceDemoRead(path: string): unknown | undefined {
+  if (path === "/v1/client-requests" || path === "/v1/portal/requests") return { items: structuredClone(demoClientRequests) };
+  if (path === "/v1/portal/documents") return { items: [] };
+  const requestMatch = path.match(/^\/v1\/client-requests\/([^/]+)$/);
+  if (requestMatch) return { item: { ...structuredClone(demoClientRequests.find((item) => item.id === requestMatch[1])), recipients: [], responses: [], documents: [] } };
+  if (path === "/v1/portal-threads" || path === "/v1/portal/messages") return { items: structuredClone(demoPortalThreads) };
+  const messageMatch = path.match(/^\/v1\/portal\/messages\/([^/]+)$/);
+  if (messageMatch) return { item: structuredClone(demoPortalThreads.find((item) => item.id === messageMatch[1])), messages: structuredClone(demoPortalMessages) };
   if (path === "/v1/crm/prospects") return {items:structuredClone(demoProspects)};
   if (path === "/v1/crm/opportunities") return {items:structuredClone(demoOpportunities)};
   const opportunityMatch=path.match(/^\/v1\/crm\/opportunities\/([^/]+)$/);if(opportunityMatch)return {item:structuredClone(demoOpportunities.find(item=>item.id===opportunityMatch[1]))};
@@ -1308,6 +1324,23 @@ export function demoRequest(path: string, init?: RequestInit): unknown {
     const body = JSON.parse(String(init?.body || "{}")) as Partial<PracticeService>;
     const item: PracticeService = { id: `service-${Date.now()}`, name: body.name || "New service", description: body.description, category: body.category, status: body.status || "active", default_frequency: body.default_frequency, specialist_module_key: body.specialist_module_key };
     demoPracticeServices = [...demoPracticeServices, item];
+    return { item: structuredClone(item) };
+  }
+  const completeRequestMatch = path.match(/^\/v1\/client-requests\/([^/]+)\/complete$/);
+  if (method === "POST" && completeRequestMatch) {
+    demoClientRequests = demoClientRequests.map((item) => item.id === completeRequestMatch[1] ? { ...item, status: "completed" } : item);
+    return { item: structuredClone(demoClientRequests.find((item) => item.id === completeRequestMatch[1])) };
+  }
+  const portalResponseMatch = path.match(/^\/v1\/portal\/requests\/([^/]+)\/responses$/);
+  if (method === "POST" && portalResponseMatch) {
+    demoClientRequests = demoClientRequests.map((item) => item.id === portalResponseMatch[1] ? { ...item, status: "responded", response_count: (item.response_count ?? 0) + 1, last_response_at: now } : item);
+    return { item: { id: `demo-response-${Date.now()}`, submitted_at: now } };
+  }
+  const portalMessageMatch = path.match(/^\/v1\/portal\/messages\/([^/]+)$/);
+  if (method === "POST" && portalMessageMatch) {
+    const body = JSON.parse(String(init?.body || "{}")) as { body?: string };
+    const item: PortalMessageItem = { id: `portal-message-${Date.now()}`, sender_context: "portal", body: body.body || "Message", sent_at: now };
+    demoPortalMessages = [...demoPortalMessages, item];
     return { item: structuredClone(item) };
   }
   if(method==="POST"&&path==="/v1/crm/prospects"){const body=JSON.parse(String(init?.body||"{}")) as Record<string,unknown>;const item:CrmProspect={id:`prospect-${Date.now()}`,display_name:String(body.displayName||"New prospect"),entity_type:String(body.entityType||"OTHER"),status:"prospect",source:body.source?String(body.source):null,open_opportunities:0};demoProspects=[item,...demoProspects];return {item:structuredClone(item)};}

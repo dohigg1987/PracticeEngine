@@ -12,7 +12,7 @@ const ui = await readFile(new URL("apps/web/src/CrmOnboarding.tsx", root), "utf8
 
 test("PM-005 adds only the next sequential migration", async () => {
   const migrations = (await import("node:fs/promises")).readdir(new URL("packages/database/migrations/", root));
-  assert.equal((await migrations).sort().at(-1), "0033_crm_onboarding_notifications.sql");
+  assert.ok((await migrations).includes("0033_crm_onboarding_notifications.sql"));
   assert.match(migration, /VALUES\('0033','CRM QuoteBench acceptance conversion onboarding and durable notifications'\)/);
 });
 

@@ -256,8 +256,11 @@ test("pilot workspace administration reaches clients and team without actor iden
 
 test("production boundary gives actionable auth configuration recovery", async ({
   page,
+  baseURL,
 }) => {
-  await page.goto("http://127.0.0.1:51874/");
+  const demoOrigin = new URL(baseURL ?? "http://127.0.0.1:51873");
+  const productionOrigin = `${demoOrigin.protocol}//${demoOrigin.hostname}:${Number(demoOrigin.port) + 1}/`;
+  await page.goto(productionOrigin);
   await expect(
     page.getByRole("heading", { name: "Connect Neon Auth" }),
   ).toBeVisible();

@@ -38,6 +38,13 @@ const requiredDocuments = [
   "docs/architecture/quotebench-integration.md",
   "docs/architecture/onboarding.md",
   "docs/architecture/notifications.md",
+  "docs/architecture/client-portal.md",
+  "docs/architecture/client-requests.md",
+  "docs/architecture/document-exchange.md",
+  "docs/architecture/secure-messaging.md",
+  "docs/architecture/portal-identity-access.md",
+  "docs/architecture/quotebench-machine-auth.md",
+  "docs/engineering/verification-strategy.md",
   "docs/design/DESIGN-CONSTITUTION.md",
   "docs/design/ANTI-PATTERNS.md",
   "AGENTS.md",
@@ -201,6 +208,36 @@ if (crmMigrationName) {
   for (const invariant of ["client_service_opportunity_service_uq", "UNIQUE(tenant_id,acceptance_event_id)", "claim_notification_events", "FOR UPDATE SKIP LOCKED"])
     if (!crmMigration.includes(invariant)) failures.push(`${crmMigrationName} is missing ${invariant}`);
 }
+
+const portalMigrationName = migrations.find((name) => name.includes("client_portal_collaboration"));
+if (portalMigrationName) {
+  const portalMigration = await readFile(path.join(migrationDirectory, portalMigrationName), "utf8");
+  const tenantOwnedTables = [
+    "portal_principal", "portal_client_access", "portal_invitation",
+    "client_request", "client_request_recipient", "client_request_response",
+    "portal_document", "portal_document_version", "portal_thread", "portal_thread_participant",
+    "portal_message", "portal_message_attachment", "portal_thread_read", "client_confirmation",
+    "quotebench_request_receipt"
+  ];
+  for (const table of tenantOwnedTables) {
+    const declaration = new RegExp(`CREATE TABLE ${table}\\([\\s\\S]*?tenant_id uuid NOT NULL`, "i");
+    if (!declaration.test(portalMigration)) failures.push(`${portalMigrationName}: ${table} lacks a required tenant_id`);
+    if (!portalMigration.includes(`'${table}'`)) failures.push(`${portalMigrationName}: ${table} is missing from the forced-RLS inventory`);
+  }
+  for (const permission of [
+    "portal.manage", "portal.invite", "portal.revoke", "client_requests.view", "client_requests.manage",
+    "documents.share", "portal_messages.view", "portal_messages.send", "confirmations.request"
+  ])
+    if (!portalMigration.includes(`'${permission}'`)) failures.push(`${portalMigrationName} is missing ${permission}`);
+  for (const entitlement of ["practice.portal.requests", "practice.portal.documents", "practice.portal.messaging"])
+    if (!portalMigration.includes(`'${entitlement}'`)) failures.push(`${portalMigrationName} is missing ${entitlement}`);
+  for (const invariant of [
+    "portal_actor_has_client_access", "portal_tenant_feature_enabled", "accept_portal_invitation",
+    "quotebench_machine_key_for_request", "claim_quotebench_request", "machine_tenant_feature_enabled",
+    "ALTER TABLE quotebench_machine_key ENABLE ROW LEVEL SECURITY", "UNIQUE(tenant_id,client_request_id,idempotency_key)"
+  ])
+    if (!portalMigration.includes(invariant)) failures.push(`${portalMigrationName} is missing ${invariant}`);
+} else failures.push("Migration 0034 client portal collaboration is missing");
 
 if (failures.length) {
   console.error(failures.map((failure) => `- ${failure}`).join("\n"));

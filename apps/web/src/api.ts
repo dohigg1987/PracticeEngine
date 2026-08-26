@@ -768,6 +768,33 @@ export type NormalizedImportPreview = {
   warnings: string[];
 };
 export type ApiContext = { tenantId: string };
+export type ClientRequestItem = {
+  id: string; client_id: string; client_name?: string; title: string; request_type: string;
+  status: "draft" | "open" | "viewed" | "responded" | "partially_complete" | "completed" | "cancelled" | "overdue";
+  priority: string; due_at?: string | null; engagement_name?: string | null; work_title?: string | null;
+  responsible_member_id?: string | null; response_count?: number; last_response_at?: string | null;
+  description?: string | null; completion_mode?: "manual" | "automatic" | "workflow";
+  response_requirements?: Record<string, unknown>; created_at?: string; updated_at?: string;
+};
+export type PortalDocumentItem = {
+  id: string; display_filename: string; visibility: "internal" | "shared_with_client" | "client_uploaded" | "restricted";
+  client_request_id?: string | null; engagement_id?: string | null; work_item_id?: string | null;
+  current_version: number; original_filename?: string; media_type?: string; byte_size?: number;
+  scan_status?: "pending" | "accepted" | "quarantined" | "rejected"; version_created_at?: string;
+};
+export type PortalMessageItem = {
+  id: string; sender_context: "practice" | "portal"; body: string; sent_at: string;
+  reply_to_message_id?: string | null;
+};
+export type PortalThreadItem = {
+  id: string; client_id: string; client_name?: string; subject: string; status: "open" | "closed" | "archived";
+  last_message_at?: string | null; updated_at: string;
+};
+export type ClientPortalAccess = {
+  tenantId: string; tenantName: string; organisationId: string; organisationName: string;
+  engagementId: string; periodStart: string; periodEnd: string; contactId: string;
+  accessId: string; accessRole: string;
+};
 export type PracticeService = {
   id: string;
   name: string;
@@ -2137,4 +2164,18 @@ export const api = {
   onboardingCases: (context: ApiContext) => request<{ items: OnboardingCase[] }>("/v1/onboarding", context),
   onboardingCase: (context: ApiContext, id: string) => request<{ item: OnboardingCase }>(`/v1/onboarding/${encodeURIComponent(id)}`, context),
   updateOnboardingStatus: (context: ApiContext, id: string, status: OnboardingCase["status"]) => request<{ item: OnboardingCase }>(`/v1/onboarding/${encodeURIComponent(id)}/status`, context, { method: "POST", body: JSON.stringify({ status }) }),
+  clientRequests: (context: ApiContext) => request<{ items: ClientRequestItem[] }>("/v1/client-requests", context),
+  clientRequest: (context: ApiContext, id: string) => request<{ item: ClientRequestItem & { recipients?: Record<string, unknown>[]; responses?: Record<string, unknown>[]; documents?: Record<string, unknown>[] } }>(`/v1/client-requests/${encodeURIComponent(id)}`, context),
+  completeClientRequest: (context: ApiContext, id: string) => request<{ item: ClientRequestItem }>(`/v1/client-requests/${encodeURIComponent(id)}/complete`, context, { method: "POST", body: "{}" }),
+  portalThreads: (context: ApiContext) => request<{ items: PortalThreadItem[] }>("/v1/portal-threads", context),
+  clientPortalAccess: () => request<{ items: ClientPortalAccess[] }>("/v1/me/client-portal/access"),
+  clientPortalRequests: (context: ApiContext) => request<{ items: ClientRequestItem[] }>("/v1/portal/requests", context),
+  clientPortalRequest: (context: ApiContext, id: string) => request<{ item: ClientRequestItem & { responses?: Record<string, unknown>[]; documents?: PortalDocumentItem[] } }>(`/v1/portal/requests/${encodeURIComponent(id)}`, context),
+  clientPortalDocuments: (context: ApiContext) => request<{ items: PortalDocumentItem[] }>("/v1/portal/documents", context),
+  respondToClientRequest: (context: ApiContext, id: string, body: { responseType: "text" | "confirmation" | "structured"; text?: string; value?: boolean; structured?: Record<string, unknown>; idempotencyKey: string }) => request<{ item: Record<string, unknown> }>(`/v1/portal/requests/${encodeURIComponent(id)}/responses`, context, { method: "POST", body: JSON.stringify(body) }),
+  uploadClientRequestDocument: (context: ApiContext, id: string, file: File, idempotencyKey: string) => { const body = new FormData(); body.append("file", file); body.append("idempotencyKey", idempotencyKey); return request<{ item: Record<string, unknown> }>(`/v1/portal/requests/${encodeURIComponent(id)}/documents`, context, { method: "POST", body }); },
+  clientPortalThreads: (context: ApiContext) => request<{ items: PortalThreadItem[] }>("/v1/portal/messages", context),
+  clientPortalThread: (context: ApiContext, id: string) => request<{ item: PortalThreadItem; messages: PortalMessageItem[] }>(`/v1/portal/messages/${encodeURIComponent(id)}`, context),
+  sendClientPortalMessage: (context: ApiContext, id: string, body: string, idempotencyKey: string) => request<{ item: PortalMessageItem }>(`/v1/portal/messages/${encodeURIComponent(id)}`, context, { method: "POST", body: JSON.stringify({ body, idempotencyKey }) }),
+  clientPortalDocumentBlob: (context: ApiContext, id: string) => requestBlob(`/v1/portal/documents/${encodeURIComponent(id)}/content`, context),
 };

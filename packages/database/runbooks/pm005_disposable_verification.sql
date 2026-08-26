@@ -18,6 +18,8 @@ INSERT INTO tenant(id,name,legal_name) VALUES
 INSERT INTO tenant_member(id,tenant_id,actor_id,role_code) VALUES
  ('61000000-0000-0000-0000-000000000001','60000000-0000-0000-0000-000000000001','pm005-owner-a','OWNER'),
  ('61000000-0000-0000-0000-000000000002','60000000-0000-0000-0000-000000000002','pm005-owner-b','OWNER');
+SELECT seed_tenant_platform_defaults(id) FROM tenant
+WHERE id IN ('60000000-0000-0000-0000-000000000001','60000000-0000-0000-0000-000000000002');
 INSERT INTO contact(id,tenant_id,display_name,email_normalized,status,created_by,updated_by) VALUES
  ('62000000-0000-0000-0000-000000000001','60000000-0000-0000-0000-000000000001','Contact A','contact-a@example.test','ACTIVE','pm005-owner-a','pm005-owner-a'),
  ('62000000-0000-0000-0000-000000000002','60000000-0000-0000-0000-000000000002','Contact B','contact-b@example.test','ACTIVE','pm005-owner-b','pm005-owner-b');

@@ -25,6 +25,8 @@ import { handlePermanentFileRoute } from "./permanent-file.js";
 import { handlePlatformCoreRoute } from "./platform-core.js";
 import { handlePracticeManagementRoute, runScheduledRecurringGeneration } from "./practice-management.js";
 import { handleCrmOnboardingRoute } from "./crm-onboarding.js";
+import { handleClientCollaborationRoute } from "./client-collaboration.js";
+import { verifyQuoteBenchMachineRequest } from "./quotebench-machine-auth.js";
 import {
   MAX_WORKING_PAPER_EVIDENCE_BYTES,
   WORKING_PAPER_ASSERTIONS,
@@ -5600,12 +5602,15 @@ export default {
       const organisationArchiveRoute = url.pathname.match(
         /^\/v1\/organisations\/([^/]+)\/archive$/,
       );
-      const actorId = url.pathname.startsWith("/v1/")
-        ? await authenticateRequest(
-            request,
-            neonAccessTokenVerifier(env.NEON_AUTH_URL),
-          )
-        : "";
+      const quoteBenchMachineRoute = url.pathname === "/v1/integrations/quotebench/events" && request.method === "POST";
+      let actorId = "";
+      if (quoteBenchMachineRoute) {
+        const verified = await verifyQuoteBenchMachineRequest(request, env);
+        actorId = verified.actorId;
+        request = verified.request;
+      } else if (url.pathname.startsWith("/v1/")) {
+        actorId = await authenticateRequest(request, neonAccessTokenVerifier(env.NEON_AUTH_URL));
+      }
       const commercialResponse = actorId
         ? await handleCommercialRoute(request, env, actorId)
         : null;
@@ -5620,6 +5625,9 @@ export default {
         : null;
       const crmOnboardingResponse = actorId
         ? await handleCrmOnboardingRoute(request, env, actorId)
+        : null;
+      const clientCollaborationResponse = actorId
+        ? await handleClientCollaborationRoute(request, env, actorId)
         : null;
       let response: Response;
       if (url.pathname === "/health")
@@ -5680,6 +5688,11 @@ export default {
             "proposal-client-conversion",
             "workflow-backed-onboarding",
             "durable-notification-delivery",
+            "unified-client-portal",
+            "client-requests",
+            "portal-document-exchange",
+            "secure-portal-messaging",
+            "client-confirmations",
           ],
           limitations: {
             externalConnectors: "not-configured",
@@ -5694,6 +5707,7 @@ export default {
       else if (practiceManagementResponse)
         response = practiceManagementResponse;
       else if (crmOnboardingResponse) response = crmOnboardingResponse;
+      else if (clientCollaborationResponse) response = clientCollaborationResponse;
       else if (request.method === "GET" && url.pathname === "/v1/me/tenants")
         response = await listMyTenants(env, actorId);
       else if (request.method === "POST" && url.pathname === "/v1/me/tenants")

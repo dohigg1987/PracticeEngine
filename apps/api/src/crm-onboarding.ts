@@ -105,6 +105,15 @@ async function within<T>(request: Request, env: Env, actorId: string, permission
   const ctx = platformContext(request, actorId), sql = platformDatabase(env);
   try {
     return await platformTransaction(sql, ctx, async (tx) => {
+      if (actorId.startsWith("quotebench:")) {
+        if (new URL(request.url).pathname !== "/v1/integrations/quotebench/events" || request.headers.get("x-practiceengine-machine-verified") !== "quotebench")
+          throw new ApiError(403, "MACHINE_ROUTE_FORBIDDEN", "The machine identity is restricted to its integration boundary");
+        const decisions = await tx`select machine_tenant_feature_enabled(${ctx.tenantId}::uuid,'quotebench.enabled') enabled,
+          machine_tenant_feature_enabled(${ctx.tenantId}::uuid,${feature}) feature_enabled`;
+        if (decisions[0]?.enabled !== true || decisions[0]?.feature_enabled !== true)
+          throw new ApiError(403, "ENTITLEMENT_REQUIRED", "The QuoteBench integration is not enabled");
+        return operation(tx, ctx);
+      }
       await assertPlatformPermission(tx, permission);
       await assertPlatformEntitled(tx, "practice.enabled");
       await assertPlatformEntitled(tx, feature);
@@ -274,7 +283,7 @@ async function queueNotification(tx: PlatformTX, ctx: PlatformContext, recipient
   await recordMutation(tx, ctx, "NOTIFICATION_QUEUED", "NOTIFICATION", notificationId, null, { templateCode, relatedEntityType: relatedType, relatedEntityId: relatedId });
 }
 
-async function convertAcceptedProposal(tx: PlatformTX, ctx: PlatformContext, input: Record<string, unknown>, proposal: postgres.Row, eventId: string) {
+export async function convertAcceptedProposal(tx: PlatformTX, ctx: PlatformContext, input: Record<string, unknown>, proposal: postgres.Row, eventId: string) {
   const existing = await tx`select * from crm_conversion where tenant_id=${ctx.tenantId} and acceptance_event_id=${eventId}`;
   if (existing.length) return existing[0];
   const opportunityId = String(proposal.opportunity_id);
@@ -360,7 +369,19 @@ async function quoteBenchEvent(request: Request, env: Env, actorId: string) {
   const input = await requestBody(request), eventId = id(input.eventId, "eventId"), eventType = required(input, "eventType", 160), status = PROPOSAL_EVENTS.get(eventType);
   if (!status) throw new ApiError(400, "INVALID_EVENT_TYPE", "Unsupported QuoteBench event type");
   return within(request, env, actorId, eventType.endsWith("accepted") ? "opportunities.convert" : "opportunities.edit", "practice.crm", async (tx, ctx) => {
-    await assertPlatformEntitled(tx, "quotebench.enabled"); await assertPlatformEntitled(tx, "quotebench.proposals");
+    if (actorId.startsWith("quotebench:")) {
+      const keyId = request.headers.get("x-practiceengine-machine-key-id"), machineEventId = request.headers.get("x-practiceengine-machine-event-id"), payloadHash = request.headers.get("x-practiceengine-payload-hash"), signedAt = request.headers.get("x-practiceengine-machine-signed-at"), expiresAt = request.headers.get("x-practiceengine-machine-expires-at");
+      if (!keyId || machineEventId !== eventId || !payloadHash || !signedAt || !expiresAt)
+        throw new ApiError(401, "MACHINE_CONTEXT_INVALID", "The verified machine context does not match the event");
+      const claimed = await tx`select claim_quotebench_request(${ctx.tenantId}::uuid,${keyId},${eventId},${payloadHash},${signedAt}::timestamptz,${expiresAt}::timestamptz) claimed`;
+      if (claimed[0]?.claimed !== true) throw new ApiError(409, "MACHINE_REQUEST_REPLAYED", "The signed machine request was already used or has expired");
+    }
+    if (actorId.startsWith("quotebench:")) {
+      const proposalDecision = await tx`select machine_tenant_feature_enabled(${ctx.tenantId}::uuid,'quotebench.proposals') enabled`;
+      if (proposalDecision[0]?.enabled !== true) throw new ApiError(403, "ENTITLEMENT_REQUIRED", "QuoteBench proposals are not enabled");
+    } else {
+      await assertPlatformEntitled(tx, "quotebench.enabled"); await assertPlatformEntitled(tx, "quotebench.proposals");
+    }
     const receipt = await tx`select id from specialist_event_receipt where tenant_id=${ctx.tenantId} and module_key='quotebench' and event_id=${eventId}`;
     if (receipt.length) {
       const conversion = await tx`select * from crm_conversion where tenant_id=${ctx.tenantId} and acceptance_event_id=${eventId}`;

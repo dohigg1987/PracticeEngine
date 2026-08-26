@@ -245,6 +245,7 @@ const EngagementProduction = lazy(() => import("./EngagementProduction"));
 const CommercialWorkspace = lazy(() => import("./CommercialWorkspace"));
 const PracticeManagement = lazy(() => import("./PracticeManagement"));
 const CrmOnboarding = lazy(() => import("./CrmOnboarding"));
+const ClientCollaboration = lazy(() => import("./ClientCollaboration"));
 type CsvRow = {
   accountCode: string;
   accountName: string;
@@ -454,6 +455,8 @@ function AccountsWorkspace({
     | "engagement"
     | "clients"
     | "work"
+    | "collaboration"
+    | "client-portal"
     | "crm-prospects"
     | "crm-opportunities"
     | "onboarding"
@@ -564,6 +567,7 @@ function AccountsWorkspace({
     if (
       workspacePage === "clients" ||
       workspacePage === "work" ||
+      workspacePage === "collaboration" ||
       workspacePage === "crm-prospects" ||
       workspacePage === "crm-opportunities" ||
       workspacePage === "onboarding" ||
@@ -1342,6 +1346,9 @@ function AccountsWorkspace({
               </MenuTrigger>
               <MenuPopover>
                 <MenuList>
+                  <MenuItem onClick={() => setWorkspacePage("client-portal")}>
+                    Open client portal
+                  </MenuItem>
                   <MenuItem onClick={onSignOut}>Sign out</MenuItem>
                 </MenuList>
               </MenuPopover>
@@ -1437,6 +1444,28 @@ function AccountsWorkspace({
                       }}
                     >
                       Work
+                    </NavItem>
+                    <NavItem
+                      className="workspace-nav-item"
+                      value="collaboration"
+                      icon={<PeopleTeamRegular />}
+                      onClick={() => {
+                        setWorkspacePage("collaboration");
+                        setMobileNavOpen(false);
+                      }}
+                    >
+                      Client collaboration
+                    </NavItem>
+                    <NavItem
+                      className="workspace-nav-item"
+                      value="client-portal"
+                      icon={<OpenRegular />}
+                      onClick={() => {
+                        setWorkspacePage("client-portal");
+                        setMobileNavOpen(false);
+                      }}
+                    >
+                      Client portal
                     </NavItem>
                     <p className="eyebrow">CRM</p>
                     <NavItem
@@ -1714,6 +1743,15 @@ function AccountsWorkspace({
                     setPracticeView("client-summary");
                   }}
                   onBack={() => setPracticeView("work")}
+                />
+              </Suspense>
+            </RoutePanelBoundary>
+          ) : workspacePage === "collaboration" || workspacePage === "client-portal" ? (
+            <RoutePanelBoundary resetKey={workspacePage}>
+              <Suspense fallback={<Skeleton />}>
+                <ClientCollaboration
+                  context={context}
+                  mode={workspacePage === "client-portal" ? "portal" : "staff"}
                 />
               </Suspense>
             </RoutePanelBoundary>

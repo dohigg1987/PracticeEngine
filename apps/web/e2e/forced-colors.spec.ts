@@ -7,6 +7,11 @@ const surfaces = [
   { value: "settings", heading: "Workspace settings", group: "Administration" },
 ] as const;
 
+// Cold Vite transformation plus forced-colors style evaluation can dominate
+// the first navigation. Keep that one-time readiness work out of the ordinary
+// 30-second budget used by the rest of the browser suite.
+test.describe.configure({ timeout: 60_000 });
+
 async function openSurface(page: Page, surface: (typeof surfaces)[number]) {
   const target = page.locator(`button[value="${surface.value}"]`).first();
   if (!(await target.isVisible()) && "group" in surface) {
@@ -19,7 +24,11 @@ async function openSurface(page: Page, surface: (typeof surfaces)[number]) {
 test.beforeEach(async ({ page }) => {
   await page.emulateMedia({ forcedColors: "active", reducedMotion: "reduce" });
   await page.goto("/", { waitUntil: "domcontentloaded" });
-  await expect(page.getByText(/Showcase mode.*seeded data/)).toBeVisible();
+  // The banner is the app-level readiness signal: waiting for it prevents
+  // media/focus checks from racing React hydration under parallel shards.
+  await expect(page.getByText(/Showcase mode.*seeded data/)).toBeVisible({
+    timeout: 30_000,
+  });
   await expect.poll(() => page.evaluate(() => matchMedia("(forced-colors: active)").matches)).toBe(true);
 });
 
@@ -31,11 +40,10 @@ for (const surface of surfaces) {
       'main :is(button, a[href], input:not([type="hidden"]), select, textarea):visible:not([disabled])',
     ).first();
     await expect(focusable).toBeVisible();
-    await focusable.focus();
-    // Return through keyboard navigation so Chromium applies :focus-visible,
-    // rather than testing the pointer/programmatic focus heuristic.
+    // Establish keyboard modality before focusing the stable target. Tab then
+    // Shift+Tab can land on Fluent's transient Tabster sentinels in busy runs.
     await page.keyboard.press("Tab");
-    await page.keyboard.press("Shift+Tab");
+    await focusable.focus();
     await expect(focusable).toBeFocused();
     await expect.poll(() => focusable.evaluate((element) => element.matches(":focus-visible"))).toBe(true);
 

@@ -16,9 +16,13 @@ PM-002 introduces no alternative host, database, identity provider or event brok
 
 PM-005 retains the same platform. The notification consumer is a second Worker entrypoint intended to use the existing publisher-only Hyperdrive role; it adds no database, queue model, long-running server or email vendor. Production scheduling and credentials remain unconfigured.
 
+PM-006 uses the same API Worker, Neon Auth context, Hyperdrive transaction boundary and private `ARTEFACTS` R2 binding. Portal upload keys include opaque tenant/client/document/version segments; buckets are never public. Download is a controlled Worker response after tenant/client/visibility/scan authorization and object metadata integrity checks. The malware scan state is an explicit provider seam; no unapproved scanner or email provider is introduced.
+
+QuoteBench now authenticates event requests with Ed25519 public keys stored in Neon and a short validity window. No private/production key is checked in. Replay receipts and business-event receipts are relational, forced-RLS protected records; no new broker or credential service is introduced.
+
 ## Database change control
 
-Migrations through `0033` are forward-only and additive. Every new tenant table has a tenant key, tenant-safe foreign keys, indexes, forced RLS and least-privilege `accounts_app` grants. `npm run verify:neon-migrations` executes complete SQL scripts and behavioral fixtures on an explicitly confirmed disposable Neon target. No PM-005 migration is promoted to production.
+Migrations through `0034` are forward-only and additive. Every new tenant table has a tenant key, tenant-safe foreign keys, indexes, forced RLS and least-privilege `accounts_app` grants. Global machine-key material is owner-only and request receipts are tenant-owned. `npm run verify:neon-migrations` executes complete SQL scripts and PM-006 behavioral fixtures on an explicitly confirmed disposable Neon target. No PM-006 migration is promoted to production.
 
 ## Runtime and release control
 

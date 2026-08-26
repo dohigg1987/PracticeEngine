@@ -10,4 +10,8 @@ Task dependencies support finish-to-start, start-to-start and explicit blocking.
 
 All workflow mutations use the Platform Core tenant transaction, functional permissions, the `practice.workflow` entitlement, immutable audit events and transactional outbox facts.
 
+PM-006 client collaboration is an input to this engine, not a second workflow. A request may reference a work item and task; creation can explicitly move non-terminal work to `waiting_on_client`. Client response, document upload and confirmation completion append normalized outbox facts. Automatic request completion applies only to the request aggregate when configured; it does not complete work. Any task eligibility, stage gate release or work-status change is performed by the existing workflow/application-service boundary after its normal authorization and gate checks.
+
+Portal events therefore carry identifiers and evidence, not commands that bypass workflow. A revoked portal actor cannot satisfy a gate, and specialist completion or regulated acceptance remains owned by the specialist module.
+
 PM-005 onboarding is an application of this engine, not a parallel workflow. An onboarding case may instantiate a published template into ordinary work stages and tasks. Explicit blockers and every mandatory stage/task must clear before the case can become ready for delivery or completed.

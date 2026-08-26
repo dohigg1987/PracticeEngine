@@ -598,4 +598,44 @@ describe("authenticated API boundary", () => {
       "/v1/engagements/engagement%2F1/accounts-versions/current%2Fversion/presentation",
     );
   });
+
+  it("keeps practice and portal collaboration on their distinct authenticated routes", async () => {
+    const context = { tenantId: "tenant-1" };
+    await api.clientRequests(context);
+    await api.completeClientRequest(context, "request/1");
+    await api.clientPortalRequests(context);
+    await api.respondToClientRequest(context, "request/1", {
+      responseType: "text",
+      text: "The information is attached.",
+      idempotencyKey: "response-key",
+    });
+    await api.clientPortalThreads(context);
+    await api.sendClientPortalMessage(context, "thread/1", "Please confirm receipt.", "message-key");
+
+    expect(call(0).url).toBe("/v1/client-requests");
+    expect(call(1)).toMatchObject({ url: "/v1/client-requests/request%2F1/complete", body: {} });
+    expect(call(2).url).toBe("/v1/portal/requests");
+    expect(call(3)).toMatchObject({
+      url: "/v1/portal/requests/request%2F1/responses",
+      body: { responseType: "text", text: "The information is attached.", idempotencyKey: "response-key" },
+    });
+    expect(call(4).url).toBe("/v1/portal/messages");
+    expect(call(5)).toMatchObject({
+      url: "/v1/portal/messages/thread%2F1",
+      body: { body: "Please confirm receipt.", idempotencyKey: "message-key" },
+    });
+    expect(fetchMock.mock.calls.every((_, index) => call(index).headers["x-tenant-id"] === "tenant-1")).toBe(true);
+  });
+
+  it("uploads portal evidence as multipart without overriding its content type", async () => {
+    const file = new File(["evidence"], "evidence.pdf", { type: "application/pdf" });
+    await api.uploadClientRequestDocument({ tenantId: "tenant-1" }, "request/1", file, "upload-key");
+    const request = call(0);
+    expect(request.url).toBe("/v1/portal/requests/request%2F1/documents");
+    expect(request.init.method).toBe("POST");
+    expect(request.headers["content-type"]).toBeUndefined();
+    expect(request.body).toBeInstanceOf(FormData);
+    expect((request.body as FormData).get("idempotencyKey")).toBe("upload-key");
+    expect(((request.body as FormData).get("file") as File).name).toBe("evidence.pdf");
+  });
 });
