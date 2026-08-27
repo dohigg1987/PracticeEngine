@@ -4,42 +4,33 @@ type Surface = {
   name: string;
   value: string;
   heading: string;
-  group?: string;
+  path: string;
 };
 
 const surfaces: Surface[] = [
-  { name: "Clients", value: "clients", heading: "Clients" },
-  { name: "Team", value: "team", heading: "Team" },
-  { name: "Overview", value: "overview", heading: "Preparation overview" },
-  { name: "Imports and integrations", value: "integrations", heading: "Imports and integrations", group: "Source data" },
-  { name: "Source data", value: "data", heading: "Trial balance", group: "Source data" },
-  { name: "Mapping", value: "mapping", heading: "Account mapping", group: "Source data" },
-  { name: "Journals", value: "journals", heading: "Journals", group: "Adjustments" },
-  { name: "Reconciliations", value: "reconciliations", heading: "Reconciliations", group: "Adjustments" },
-  { name: "Working papers", value: "working-papers", heading: "Working papers", group: "Accounts builder" },
-  { name: "Disclosures", value: "disclosures", heading: "Disclosure checklist", group: "Accounts builder" },
-  { name: "Draft accounts", value: "accounts", heading: "Statutory accounts document", group: "Accounts builder" },
-  { name: "Tasks", value: "tasks", heading: "Task board", group: "Review & approval" },
-  { name: "Review points", value: "review", heading: "Review points", group: "Review & approval" },
-  { name: "Accounts versions", value: "versions", heading: "Accounts versions", group: "Review & approval" },
-  { name: "History", value: "history", heading: "History", group: "Review & approval" },
-  { name: "Filing evidence", value: "filing", heading: "Regulator filing record", group: "Submission" },
-  { name: "Client portal", value: "portal", heading: "Client portal", group: "Submission" },
-  { name: "Inbox", value: "inbox", heading: "Inbox", group: "Administration" },
-  { name: "Workspace settings", value: "settings", heading: "Workspace settings", group: "Administration" },
+  { name: "Clients", value: "clients", heading: "Clients", path: "/practice/clients" },
+  { name: "Team", value: "team", heading: "Team", path: "/settings/teams" },
+  { name: "Overview", value: "overview", heading: "Preparation overview", path: "/ledgerly/overview" },
+  { name: "Imports and integrations", value: "integrations", heading: "Imports and integrations", path: "/ledgerly/integrations" },
+  { name: "Source data", value: "data", heading: "Trial balance", path: "/ledgerly/trial-balance" },
+  { name: "Mapping", value: "mapping", heading: "Account mapping", path: "/ledgerly/mapping" },
+  { name: "Journals", value: "journals", heading: "Journals", path: "/ledgerly/journals" },
+  { name: "Reconciliations", value: "reconciliations", heading: "Reconciliations", path: "/ledgerly/reconciliations" },
+  { name: "Working papers", value: "working-papers", heading: "Working papers", path: "/ledgerly/working-papers" },
+  { name: "Disclosures", value: "disclosures", heading: "Disclosure checklist", path: "/ledgerly/disclosures" },
+  { name: "Draft accounts", value: "accounts", heading: "Statutory accounts document", path: "/ledgerly/accounts" },
+  { name: "Tasks", value: "tasks", heading: "Task board", path: "/ledgerly/tasks" },
+  { name: "Review points", value: "review", heading: "Review points", path: "/ledgerly/review" },
+  { name: "Accounts versions", value: "versions", heading: "Accounts versions", path: "/ledgerly/artefacts" },
+  { name: "History", value: "history", heading: "History", path: "/ledgerly/history" },
+  { name: "Filing evidence", value: "filing", heading: "Regulator filing record", path: "/ledgerly/filing" },
+  { name: "Client portal", value: "portal", heading: "Client portal", path: "/ledgerly/portal" },
+  { name: "Inbox", value: "inbox", heading: "Inbox", path: "/settings/notifications" },
+  { name: "Workspace settings", value: "settings", heading: "Workspace settings", path: "/settings/organisation" },
 ];
 
 async function openSurface(page: Page, surface: Surface) {
-  const target = page.locator(`button[value="${surface.value}"]`).first();
-  const navigationToggle = page.getByRole("button", { name: "Open practice navigation" });
-  if (!(await target.isVisible()) && await navigationToggle.isVisible()) {
-    await navigationToggle.click();
-  }
-  if (!(await target.isVisible()) && surface.group) {
-    await page.getByRole("button", { name: surface.group, exact: true }).click();
-  }
-  await expect(target).toBeVisible();
-  await target.click();
+  await page.goto(surface.path);
   await expect(page.getByRole("heading", { name: surface.heading }).first()).toBeVisible();
 }
 

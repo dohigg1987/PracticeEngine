@@ -23,6 +23,7 @@ Platform Core owns identity, tenancy, authorization, audit, files, notifications
 
 ## Mandatory engineering rules
 
+- **Any new user-facing capability must declare which PracticeEngine application owns it. Application navigation must be added only to that application's manifest.** No specialist application may contribute primary navigation directly to the global suite shell.
 - Enforce tenant isolation, authorization and entitlements server-side. UI gating is not security.
 - Separate functional permission from commercial entitlement; never branch on package names.
 - Every auditable mutation appends an immutable audit event; use the transactional outbox for external effects requiring reliable publication.

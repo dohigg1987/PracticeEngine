@@ -1,5 +1,7 @@
 # Target modular platform
 
+PracticeEngine is the suite identity. Its global shell selects exactly one active application through the application manifest registry; specialist applications never inject primary navigation into global chrome. Canonical UI namespaces are `/practice`, `/ledgerly`, `/quotebench` and the reserved `/clarity-ie`, with shared settings below `/settings`.
+
 ## Architectural stance
 
 Build a modular monolith first. Preserve Ledgerly's working vertical slice and introduce explicit ownership, application services, contracts, and domain events around it. Physical deployment may remain a React application, Cloudflare Worker, Neon/Postgres and R2 while logical module boundaries mature.

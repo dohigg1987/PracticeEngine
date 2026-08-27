@@ -4,15 +4,15 @@ import { expect, test, type Page, type TestInfo } from "@playwright/test";
 type Surface = {
   value: "clients" | "team" | "integrations" | "inbox" | "settings";
   heading: string;
-  group?: "Source data" | "Administration";
+  path: string;
 };
 
 const surfaces: Surface[] = [
-  { value: "clients", heading: "Clients" },
-  { value: "team", heading: "Team" },
-  { value: "integrations", heading: "Imports and integrations", group: "Source data" },
-  { value: "inbox", heading: "Inbox", group: "Administration" },
-  { value: "settings", heading: "Workspace settings", group: "Administration" },
+  { value: "clients", heading: "Clients", path: "/practice/clients" },
+  { value: "team", heading: "Team", path: "/settings/teams" },
+  { value: "integrations", heading: "Imports and integrations", path: "/ledgerly/integrations" },
+  { value: "inbox", heading: "Inbox", path: "/settings/notifications" },
+  { value: "settings", heading: "Workspace settings", path: "/settings/organisation" },
 ];
 
 const viewports = [
@@ -22,25 +22,15 @@ const viewports = [
   { name: "reflow-320", width: 320, height: 720 },
 ];
 
-async function start(page: Page) {
-  await page.goto("/");
-  await expect(page.getByText(/Showcase mode.*seeded data/)).toHaveCount(1);
-  await expect(page.locator("main.content")).toBeVisible();
-}
-
 async function openNavigation(page: Page) {
-  const toggle = page.getByRole("button", { name: "Open practice navigation" });
+  const toggle = page.getByRole("button", { name: "Open application navigation" });
   if (await toggle.isVisible()) await toggle.click();
 }
 
 async function openSurface(page: Page, surface: Surface) {
-  await openNavigation(page);
-  const target = page.locator(`button[value="${surface.value}"]`).first();
-  if (!(await target.isVisible()) && surface.group) {
-    await page.getByRole("button", { name: surface.group, exact: true }).click();
-  }
-  await expect(target).toBeVisible();
-  await target.click();
+  await page.goto(surface.path);
+  await expect(page.getByText(/Showcase mode.*seeded data/)).toHaveCount(1);
+  await expect(page.locator("main.content")).toBeVisible();
   await expect(page.getByRole("heading", { name: surface.heading }).first()).toBeVisible();
 }
 
@@ -68,7 +58,6 @@ for (const viewport of viewports) {
     test.setTimeout(240_000);
     await page.setViewportSize(viewport);
     for (const surface of surfaces) {
-      await start(page);
       await openSurface(page, surface);
       await assertPageReflows(page);
       if (surface.value === "team" || surface.value === "integrations") {
@@ -76,7 +65,6 @@ for (const viewport of viewports) {
       }
     }
 
-    await start(page);
     await openSurface(page, surfaces[0]);
     await page.locator(".client-name-button").first().click();
     await expect(page.locator(".permanent-file")).toBeVisible();
@@ -99,12 +87,10 @@ test("owned surfaces tolerate WCAG text spacing at 320px", async ({ page }) => {
   });
 
   for (const surface of surfaces) {
-    await start(page);
     await openSurface(page, surface);
     await assertPageReflows(page);
   }
 
-  await start(page);
   await openSurface(page, surfaces[0]);
   await page.locator(".client-name-button").first().click();
   await expect(page.locator(".permanent-file")).toBeVisible();
@@ -115,7 +101,6 @@ for (const surface of surfaces.filter(({ value }) => value !== "clients")) {
   test(`forced colors preserve focus and axe semantics on ${surface.value}`, async ({ page }) => {
     await page.setViewportSize(viewports[2]);
     await page.emulateMedia({ forcedColors: "active", reducedMotion: "reduce" });
-    await start(page);
     await openSurface(page, surface);
     const focusable = page.locator(
       'main :is(button, a[href], input:not([type="hidden"]), select, textarea):visible:not([disabled])',
@@ -138,7 +123,6 @@ for (const surface of surfaces.filter(({ value }) => value !== "clients")) {
 test("client permanent file preserves forced-color focus and axe semantics", async ({ page }) => {
   await page.setViewportSize(viewports[2]);
   await page.emulateMedia({ forcedColors: "active", reducedMotion: "reduce" });
-  await start(page);
   await openSurface(page, surfaces[0]);
   await page.locator(".client-name-button").first().click();
   await expect(page.locator(".permanent-file")).toBeVisible();

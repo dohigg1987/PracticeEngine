@@ -1,19 +1,7 @@
-import { expect, test, type Page } from "@playwright/test";
-
-async function start(page: Page) {
-  await page.goto("/");
-  await expect(page.getByText(/Showcase mode.*seeded data/)).toHaveCount(1);
-}
-
-async function openNav(page: Page) {
-  const toggle = page.getByRole("button", { name: "Open practice navigation" });
-  if (await toggle.isVisible()) await toggle.click();
-}
+import { expect, test } from "@playwright/test";
 
 test("practice collaboration uses an operational request grid", async ({ page }) => {
-  await start(page);
-  await openNav(page);
-  await page.locator('button[value="collaboration"]').click();
+  await page.goto("/practice/collaboration");
   await expect(page.getByRole("heading", { name: "Client requests" })).toBeVisible();
   const grid = page.getByRole("grid", { name: "Client requests" });
   await expect(grid).toContainText("Confirm trustee details");
@@ -23,9 +11,7 @@ test("practice collaboration uses an operational request grid", async ({ page })
 });
 
 test("client portal prioritises actions and reflows at 320 pixels", async ({ page }) => {
-  await start(page);
-  await openNav(page);
-  await page.locator('button[value="client-portal"]').click();
+  await page.goto("/practice/client-portal");
   await page.setViewportSize({ width: 320, height: 720 });
   await expect(page.getByRole("heading", { name: "Client portal" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Actions required" })).toBeVisible();

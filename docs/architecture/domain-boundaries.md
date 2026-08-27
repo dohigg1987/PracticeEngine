@@ -1,5 +1,9 @@
 # Domain boundaries
 
+## User-interface ownership
+
+Every user-facing capability declares a PracticeEngine application owner. The global suite shell owns suite identity and shared platform affordances only; application navigation, routes, settings and contextual actions are declared in that application's manifest. This UI rule mirrors, but does not replace, the server-side domain and authorization boundaries below.
+
 ## Mandatory rules
 
 1. A higher architectural layer may consume lower-layer capabilities.

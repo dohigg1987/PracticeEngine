@@ -155,6 +155,20 @@ import {
   requiredSectorProfile,
   reportingRegimeError,
 } from "./reporting-regime";
+import {
+  applicationManifests,
+  applicationAccessAllowed,
+  availableApplications,
+  canonicalPath,
+  globalSettings,
+  manifestForPath,
+  navigationItemForPath,
+  type ApplicationManifest,
+  type ApplicationNavigationItem,
+  type PracticeView,
+  type WorkspacePage,
+  suiteIdentity,
+} from "./application-manifests";
 
 type View =
   | "overview"
@@ -240,6 +254,10 @@ function WorkspaceSearchIcon({
   if (category === "Engagement sections")
     return <OpenRegular aria-hidden="true" />;
   return <PeopleTeamRegular aria-hidden="true" />;
+}
+function applicationNavigationValue(item: ApplicationNavigationItem): string {
+  if (item.practiceView) return item.practiceView === "work" ? "work" : item.id;
+  return item.ledgerlyView ?? (item.primary === false ? item.id : item.page);
 }
 const EngagementProduction = lazy(() => import("./EngagementProduction"));
 const CommercialWorkspace = lazy(() => import("./CommercialWorkspace"));
@@ -361,6 +379,21 @@ export function inviteTokenFromHash(hash: string): string {
   return new URLSearchParams(hash.slice(1)).get("token")?.trim() || "";
 }
 
+function engagementFromRoute(
+  items: readonly Engagement[],
+  search: string,
+): Engagement | undefined {
+  const parameters = new URLSearchParams(search);
+  const engagementId = parameters.get("engagement")?.trim();
+  if (!engagementId) return undefined;
+  const clientId = parameters.get("client")?.trim();
+  return items.find(
+    (item) =>
+      item.id === engagementId &&
+      (!clientId || item.organisation_id === clientId),
+  );
+}
+
 export function App() {
   const [checkingSession, setCheckingSession] = useState(authConfigured);
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -452,27 +485,14 @@ function AccountsWorkspace({
   const [onboarding, setOnboarding] = useState<TenantOnboarding | null>(null);
   const [membershipLoading, setMembershipLoading] = useState(true);
   const [membershipError, setMembershipError] = useState("");
-  const [workspacePage, setWorkspacePage] = useState<
-    | "engagement"
-    | "clients"
-    | "work"
-    | "collaboration"
-    | "client-portal"
-    | "crm-prospects"
-    | "crm-opportunities"
-    | "onboarding"
-    | "resources"
-    | "capacity"
-    | "allocation"
-    | "time"
-    | "portfolio"
-    | "management"
-    | "team"
-    | "integrations"
-    | "inbox"
-    | "settings"
-    | "practice-settings"
-  >("engagement");
+  const [workspacePage, setWorkspacePage] = useState<WorkspacePage>("engagement");
+  const [pathname, setPathname] = useState(() => canonicalPath(window.location.pathname));
+  const [locationSearch, setLocationSearch] = useState(() => window.location.search);
+  const [entitlementDecisions, setEntitlementDecisions] = useState<Record<string, boolean>>(
+    demoMode ? { "practice.enabled": true, "ledgerly.enabled": true, "quotebench.enabled": false } : {},
+  );
+  const [entitlementsLoaded, setEntitlementsLoaded] = useState(demoMode);
+  const [practiceSection, setPracticeSection] = useState<PracticeView>("work");
   const [practiceView, setPracticeView] = useState<
     "work" | "work-detail" | "client-summary"
   >("work");
@@ -603,6 +623,83 @@ function AccountsWorkspace({
   const configured = Boolean(
     context.tenantId && (hasDiscoveredMembership || usingLocalFallback),
   );
+  const activeApplication = manifestForPath(pathname);
+  const entitledApplications = availableApplications(entitlementDecisions);
+  const activeApplicationDenied = Boolean(
+    !applicationAccessAllowed(activeApplication, entitlementDecisions, entitlementsLoaded),
+  );
+  const navigate = useCallback((nextPath: string, replace = false) => {
+    const canonical = canonicalPath(nextPath);
+    const target = new URL(canonical, window.location.origin);
+    window.history[replace ? "replaceState" : "pushState"](null, "", `${target.pathname}${target.search}`);
+    setPathname(target.pathname);
+    setLocationSearch(target.search);
+    setMobileNavOpen(false);
+  }, []);
+  const activateNavigationItem = useCallback((item: ApplicationNavigationItem) => {
+    setWorkspacePage(item.page);
+    if (item.ledgerlyView) setView(item.ledgerlyView);
+    if (item.practiceView) setPracticeSection(item.practiceView);
+    navigate(item.path);
+  }, [navigate]);
+
+  useEffect(() => {
+    const syncLocation = () => {
+      const canonical = canonicalPath(window.location.pathname);
+      const search = window.location.search;
+      if (canonical !== window.location.pathname)
+        window.history.replaceState(null, "", `${canonical}${search}`);
+      setPathname(canonical);
+      setLocationSearch(search);
+    };
+    syncLocation();
+    window.addEventListener("popstate", syncLocation);
+    return () => window.removeEventListener("popstate", syncLocation);
+  }, []);
+
+  useEffect(() => {
+    const item = navigationItemForPath(pathname);
+    if (item) {
+      setWorkspacePage(item.page);
+      if (item.ledgerlyView) setView(item.ledgerlyView);
+      if (item.practiceView) setPracticeSection(item.practiceView);
+    } else if (pathname === "/settings/teams" || pathname === "/settings/users") {
+      setWorkspacePage("team");
+    } else if (pathname === "/settings/notifications") {
+      setWorkspacePage("inbox");
+    } else if (pathname === "/settings" || pathname.startsWith("/settings/")) {
+      setWorkspacePage("settings");
+    } else if (pathname.startsWith("/practice/settings")) {
+      setWorkspacePage("practice-settings");
+    }
+  }, [pathname]);
+
+  useEffect(() => {
+    document.title = `${activeApplication?.name ?? "Home"} · ${suiteIdentity.name}`;
+  }, [activeApplication]);
+
+  useEffect(() => {
+    if (!configured || demoMode) return;
+    let cancelled = false;
+    setEntitlementsLoaded(false);
+    void Promise.all(
+      applicationManifests
+        .filter((manifest) => manifest.status !== "future")
+        .map(async (manifest) => {
+          try {
+            const result = await api.entitlementDecision(context, manifest.entitlement);
+            return [manifest.entitlement, result.item.enabled] as const;
+          } catch {
+            return [manifest.entitlement, false] as const;
+          }
+        }),
+    ).then((entries) => {
+      if (cancelled) return;
+      setEntitlementDecisions(Object.fromEntries(entries));
+      setEntitlementsLoaded(true);
+    });
+    return () => { cancelled = true; };
+  }, [configured, context, context.tenantId]);
   const engagement = engagements.find((item) => item.id === selectedId);
   const selectedMembership = memberships.find(
     (item) => item.tenant_id === context.tenantId,
@@ -653,11 +750,16 @@ function AccountsWorkspace({
       });
     try {
       const data = await api.engagements(context);
+      const routeEngagement = engagementFromRoute(
+        data.items,
+        window.location.search,
+      );
       setEngagements(data.items);
       setSelectedId((current) =>
-        data.items.some((item) => item.id === current)
+        routeEngagement?.id ??
+        (data.items.some((item) => item.id === current)
           ? current
-          : data.items[0]?.id || "",
+          : data.items[0]?.id || ""),
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load engagements.");
@@ -810,6 +912,31 @@ function AccountsWorkspace({
   useEffect(() => {
     loadEngagements();
   }, [loadEngagements]);
+  useEffect(() => {
+    if (manifestForPath(pathname)?.id !== "ledgerly" || !engagements.length)
+      return;
+    const parameters = new URLSearchParams(locationSearch);
+    const requestedEngagementId = parameters.get("engagement")?.trim();
+    if (!requestedEngagementId) return;
+
+    const routeEngagement = engagementFromRoute(engagements, locationSearch);
+    if (routeEngagement) {
+      setSelectedId((current) =>
+        current === routeEngagement.id ? current : routeEngagement.id,
+      );
+      return;
+    }
+
+    parameters.delete("engagement");
+    parameters.delete("client");
+    const query = parameters.toString();
+    const nextSearch = query ? `?${query}` : "";
+    window.history.replaceState(null, "", `${pathname}${nextSearch}`);
+    setLocationSearch(nextSearch);
+    setSelectedId((current) =>
+      current === engagements[0]!.id ? current : engagements[0]!.id,
+    );
+  }, [engagements, locationSearch, pathname]);
   useEffect(() => {
     loadOrganisations();
   }, [loadOrganisations]);
@@ -1067,7 +1194,7 @@ function AccountsWorkspace({
       description: "Workspace",
       keywords: "organisations legal entities",
       category: "Workspace" as const,
-      open: () => setWorkspacePage("clients"),
+      open: () => navigate("/practice/clients"),
     },
     {
       id: "workspace-work",
@@ -1075,7 +1202,7 @@ function AccountsWorkspace({
       description: "Practice management",
       keywords: "jobs tasks deadlines services assignments",
       category: "Workspace" as const,
-      open: () => setWorkspacePage("work"),
+      open: () => navigate("/practice/work"),
     },
     {
       id: "workspace-crm-prospects",
@@ -1083,7 +1210,7 @@ function AccountsWorkspace({
       description: "CRM",
       keywords: "commercial contacts leads pipeline",
       category: "Workspace" as const,
-      open: () => setWorkspacePage("crm-prospects"),
+      open: () => navigate("/practice/crm/prospects"),
     },
     {
       id: "workspace-crm-opportunities",
@@ -1091,7 +1218,7 @@ function AccountsWorkspace({
       description: "CRM",
       keywords: "proposal quotebench conversion services",
       category: "Workspace" as const,
-      open: () => setWorkspacePage("crm-opportunities"),
+      open: () => navigate("/practice/crm/opportunities"),
     },
     {
       id: "workspace-onboarding",
@@ -1099,7 +1226,7 @@ function AccountsWorkspace({
       description: "Practice management",
       keywords: "accepted clients workflow blockers readiness",
       category: "Workspace" as const,
-      open: () => setWorkspacePage("onboarding"),
+      open: () => navigate("/practice/onboarding"),
     },
     {
       id: "workspace-integrations",
@@ -1107,7 +1234,7 @@ function AccountsWorkspace({
       description: "Workspace",
       keywords: "csv xlsx templates connectors sync",
       category: "Workspace" as const,
-      open: () => setWorkspacePage("integrations"),
+      open: () => navigate("/ledgerly/trial-balance"),
     },
     {
       id: "workspace-inbox",
@@ -1115,7 +1242,7 @@ function AccountsWorkspace({
       description: "Workspace",
       keywords: "notifications alerts delivery",
       category: "Workspace" as const,
-      open: () => setWorkspacePage("inbox"),
+      open: () => navigate("/settings/notifications"),
     },
     ...(["OWNER", "ADMIN"].includes(selectedMembership?.role_code || "")
       ? [
@@ -1125,7 +1252,7 @@ function AccountsWorkspace({
             description: "Workspace",
             keywords: "members invitations roles",
             category: "Workspace" as const,
-            open: () => setWorkspacePage("team" as const),
+            open: () => navigate("/settings/teams"),
           },
         ]
       : []),
@@ -1137,7 +1264,7 @@ function AccountsWorkspace({
             description: "Administration",
             keywords: "services work templates practice configuration",
             category: "Workspace" as const,
-            open: () => setWorkspacePage("practice-settings" as const),
+            open: () => navigate("/practice/settings/services"),
           },
           {
             id: "workspace-settings",
@@ -1145,7 +1272,7 @@ function AccountsWorkspace({
             description: "Administration",
             keywords: "tenant lifecycle export close suspend",
             category: "Workspace" as const,
-            open: () => setWorkspacePage("settings" as const),
+            open: () => navigate("/settings/organisation"),
           },
         ]
       : []),
@@ -1155,7 +1282,7 @@ function AccountsWorkspace({
       description: `Client · ${organisation.legal_form}`,
       keywords: `${organisation.jurisdiction} organisation client`,
       category: "Clients" as const,
-      open: () => setWorkspacePage("clients" as const),
+      open: () => navigate(`/practice/clients?client=${encodeURIComponent(organisation.id)}`),
     })),
     ...engagements.map((item) => ({
       id: `engagement-${item.id}`,
@@ -1167,6 +1294,7 @@ function AccountsWorkspace({
         setSelectedId(item.id);
         setWorkspacePage("engagement");
         setView("overview");
+        navigate(`/ledgerly/overview?engagement=${encodeURIComponent(item.id)}&client=${encodeURIComponent(item.organisation_id)}`);
       },
     })),
     ...views.map((item) => ({
@@ -1178,6 +1306,7 @@ function AccountsWorkspace({
       open: () => {
         setWorkspacePage("engagement" as const);
         setView(item.id);
+        navigate(`/ledgerly/${item.id}`);
       },
     })),
   ];
@@ -1208,18 +1337,51 @@ function AccountsWorkspace({
   return (
     <div className="app-shell">
       <header className="topbar">
-        <Tooltip content="Open practice navigation" relationship="description">
+        <Tooltip content="Open application navigation" relationship="description">
           <FluentButton
             className="nav-toggle"
             appearance="subtle"
             icon={<NavigationRegular />}
-            aria-label="Open practice navigation"
+            aria-label="Open application navigation"
             onClick={() => setMobileNavOpen((open) => !open)}
           />
         </Tooltip>
+        <Menu>
+          <MenuTrigger disableButtonEnhancement>
+            <FluentButton
+              className="app-launcher-button"
+              appearance="subtle"
+              icon={<BuildingRegular />}
+              aria-label="Open PracticeEngine application launcher"
+            >
+              Apps
+            </FluentButton>
+          </MenuTrigger>
+          <MenuPopover className="app-launcher-popover">
+            <MenuList aria-label="Licensed PracticeEngine applications">
+              {entitledApplications.map((manifest) => (
+                <MenuItem
+                  key={manifest.id}
+                  icon={manifest.id === "practice" ? <PeopleTeamRegular /> : manifest.id === "ledgerly" ? <BuildingRegular /> : <DocumentRegular />}
+                  onClick={() => {
+                    if (manifest.externalUrl) window.location.assign(manifest.externalUrl);
+                    else navigate(manifest.homeRoute);
+                  }}
+                >
+                  <span className="app-launcher-entry">
+                    <strong>{manifest.name}</strong>
+                    <small>{manifest.id === activeApplication?.id ? "Current application" : "Open application"}</small>
+                  </span>
+                </MenuItem>
+              ))}
+              {!entitlementsLoaded && <MenuItem disabled>Checking available apps…</MenuItem>}
+              {entitlementsLoaded && !entitledApplications.length && <MenuItem disabled>No licensed apps available</MenuItem>}
+            </MenuList>
+          </MenuPopover>
+        </Menu>
         <FluentLink className="brand" href="/">
-          <span>LD</span>
-          <b>Ledgerly</b>
+          <span>{suiteIdentity.mark}</span>
+          <b>{suiteIdentity.name}</b>
         </FluentLink>
         <div className="global-search">
           <SearchBox
@@ -1323,7 +1485,7 @@ function AccountsWorkspace({
             </div>
           )}
         </div>
-        <Toolbar className="top-actions" aria-label="Workspace actions">
+        <Toolbar className="top-actions" aria-label="PracticeEngine actions">
           {error && (
             <Badge appearance="tint" color="danger">
               Service issue
@@ -1359,7 +1521,7 @@ function AccountsWorkspace({
               </MenuTrigger>
               <MenuPopover>
                 <MenuList>
-                  <MenuItem onClick={() => setWorkspacePage("client-portal")}>
+                  <MenuItem onClick={() => { setWorkspacePage("client-portal"); navigate("/practice/client-portal"); }}>
                     Open client portal
                   </MenuItem>
                   <MenuItem onClick={onSignOut}>Sign out</MenuItem>
@@ -1375,347 +1537,105 @@ function AccountsWorkspace({
             className="fluent-nav"
             type="inline"
             open
-            selectedValue={
-              workspacePage === "engagement" ? view : workspacePage
-            }
+            selectedValue={navigationItemForPath(pathname) ? applicationNavigationValue(navigationItemForPath(pathname)!) : pathname.startsWith("/settings") ? "global-settings" : activeApplication && pathname.startsWith(`${activeApplication.routePrefix}/settings`) ? `${activeApplication.id}-settings` : ""}
           >
             <NavDrawerBody className="workspace-nav-body">
-              <p className="eyebrow">
-                {selectedMembership?.name || "Accounts workspace"}
-              </p>
-              <div className="current-engagement-context">
-                <label htmlFor="engagement">Current engagement</label>
-                <Select
-                  id="engagement"
-                  aria-label="Engagement"
-                  size="small"
-                  value={selectedId}
-                  onChange={(e) => {
-                    setSelectedId(e.target.value);
-                    setWorkspacePage("engagement");
-                  }}
-                  disabled={loading || !engagements.length}
-                >
-                  <option value="">
-                    {loading ? "Loading…" : "Select engagement"}
-                  </option>
-                  {engagements.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.legal_name} —{" "}
-                      {formatPeriodYear(item.period_end)}
-                    </option>
-                  ))}
-                </Select>
+              <div className="application-identity">
+                <p className="eyebrow">Current application</p>
+                <strong>{activeApplication?.name ?? "PracticeEngine settings"}</strong>
+                <small>{selectedMembership?.name || "Practice workspace"}</small>
               </div>
-              <Accordion
-                multiple
-                collapsible
-                className="workspace-nav-accordion"
-                openItems={[
-                  ...(practiceNavOpen ? ["practice"] : []),
-                  ...(accountsProductionNavOpen ? ["production"] : []),
-                  ...(administrationNavOpen ? ["administration"] : []),
-                ]}
-                onToggle={(_, data) => {
-                  const openItems = new Set(data.openItems);
-                  setPracticeNavOpen(openItems.has("practice"));
-                  setAccountsProductionNavOpen(openItems.has("production"));
-                  setAdministrationNavOpen(openItems.has("administration"));
-                }}
-              >
-              <AccordionItem
-                value="practice"
-                className="workspace-nav-bookend"
-              >
-                <AccordionHeader
-                  className="workspace-nav-header"
-                  button={{ className: "workspace-nav-toggle" }}
-                  expandIconPosition="end"
-                >
-                  Practice
-                </AccordionHeader>
-                <AccordionPanel className="workspace-nav-panel">
-                  <div className="workspace-nav-items">
-                    <NavItem
-                      className="workspace-nav-item"
-                      value="clients"
-                      icon={<BuildingRegular />}
-                      onClick={() => {
-                        setWorkspacePage("clients");
-                        setMobileNavOpen(false);
-                      }}
-                    >
-                      Clients
-                    </NavItem>
-                    <NavItem
-                      className="workspace-nav-item"
-                      value="work"
-                      icon={<DocumentRegular />}
-                      onClick={() => {
-                        setWorkspacePage("work");
-                        setMobileNavOpen(false);
-                      }}
-                    >
-                      Work
-                    </NavItem>
-                    <p className="eyebrow">Resources and economics</p>
-                    <NavItem className="workspace-nav-item" value="resources" icon={<PeopleTeamRegular />} onClick={() => { setWorkspacePage("resources"); setMobileNavOpen(false); }}>Resources</NavItem>
-                    <NavItem className="workspace-nav-item" value="capacity" icon={<DocumentRegular />} onClick={() => { setWorkspacePage("capacity"); setMobileNavOpen(false); }}>Capacity</NavItem>
-                    <NavItem className="workspace-nav-item" value="allocation" icon={<DocumentRegular />} onClick={() => { setWorkspacePage("allocation"); setMobileNavOpen(false); }}>Work allocation</NavItem>
-                    <NavItem className="workspace-nav-item" value="time" icon={<DocumentRegular />} onClick={() => { setWorkspacePage("time"); setMobileNavOpen(false); }}>Time</NavItem>
-                    <NavItem className="workspace-nav-item" value="portfolio" icon={<BuildingRegular />} onClick={() => { setWorkspacePage("portfolio"); setMobileNavOpen(false); }}>Portfolio</NavItem>
-                    <NavItem className="workspace-nav-item" value="management" icon={<DocumentRegular />} onClick={() => { setWorkspacePage("management"); setMobileNavOpen(false); }}>Practice overview</NavItem>
-                    <NavItem
-                      className="workspace-nav-item"
-                      value="collaboration"
-                      icon={<PeopleTeamRegular />}
-                      onClick={() => {
-                        setWorkspacePage("collaboration");
-                        setMobileNavOpen(false);
-                      }}
-                    >
-                      Client collaboration
-                    </NavItem>
-                    <NavItem
-                      className="workspace-nav-item"
-                      value="client-portal"
-                      icon={<OpenRegular />}
-                      onClick={() => {
-                        setWorkspacePage("client-portal");
-                        setMobileNavOpen(false);
-                      }}
-                    >
-                      Client portal
-                    </NavItem>
-                    <p className="eyebrow">CRM</p>
-                    <NavItem
-                      className="workspace-nav-item"
-                      value="crm-prospects"
-                      icon={<PeopleTeamRegular />}
-                      onClick={() => {
-                        setWorkspacePage("crm-prospects");
-                        setMobileNavOpen(false);
-                      }}
-                    >
-                      Prospects
-                    </NavItem>
-                    <NavItem
-                      className="workspace-nav-item"
-                      value="crm-opportunities"
-                      icon={<DocumentRegular />}
-                      onClick={() => {
-                        setWorkspacePage("crm-opportunities");
-                        setMobileNavOpen(false);
-                      }}
-                    >
-                      Opportunities
-                    </NavItem>
-                    <NavItem
-                      className="workspace-nav-item"
-                      value="onboarding"
-                      icon={<DocumentRegular />}
-                      onClick={() => {
-                        setWorkspacePage("onboarding");
-                        setMobileNavOpen(false);
-                      }}
-                    >
-                      Onboarding
-                    </NavItem>
-                    {["OWNER", "ADMIN"].includes(
-                      selectedMembership?.role_code || "",
-                    ) && (
-                      <NavItem
-                        className="workspace-nav-item"
-                        value="team"
-                        icon={<PeopleTeamRegular />}
-                        onClick={() => {
-                          setWorkspacePage("team");
-                          setMobileNavOpen(false);
-                        }}
-                      >
-                        Team
-                      </NavItem>
-                    )}
-                  </div>
-                </AccordionPanel>
-              </AccordionItem>
-              <AccordionItem
-                value="production"
-                className="production-navigation"
-              >
-                <AccordionHeader
-                  className="workspace-nav-header"
-                  button={{ className: "workspace-nav-toggle" }}
-                  expandIconPosition="end"
-                >
-                  Accounts production
-                </AccordionHeader>
-                <AccordionPanel className="workspace-nav-panel">
-                  <div
-                    className="accounts-production-nav-items"
+              {activeApplication?.id === "ledgerly" && (
+                <div className="current-engagement-context">
+                  <label htmlFor="engagement">Current engagement</label>
+                  <Select
+                    id="engagement"
+                    aria-label="Engagement"
+                    size="small"
+                    value={selectedId}
+                    onChange={(event) => {
+                      setSelectedId(event.target.value);
+                      setWorkspacePage("engagement");
+                    }}
+                    disabled={loading || !engagements.length}
                   >
-                    <nav aria-label="Engagement sections">
-                      <NavItem
-                        className="workspace-nav-item"
-                        value="overview"
-                        icon={<DocumentRegular />}
-                        onClick={() => {
-                          setView("overview");
-                          setWorkspacePage("engagement");
-                          setMobileNavOpen(false);
-                        }}
-                      >
-                        Overview
-                      </NavItem>
-                      <Accordion
-                        collapsible
-                        openItems={openProductionNavStage ? [openProductionNavStage] : []}
-                        onToggle={(_, data) =>
-                          setOpenProductionNavStage(
-                            (data.openItems[0] as ProductionNavStage | undefined) ?? null,
-                          )
-                        }
-                      >
-                      {productionNavStages.map((stage) => {
-                        const stageViews = views.filter((item) =>
-                          stage.viewIds.includes(item.id),
-                        );
-                        return (
-                          <AccordionItem
-                            value={stage.id}
-                            className="production-nav-stage"
-                            key={stage.id}
-                          >
-                            <AccordionHeader
-                              className="production-nav-stage-header"
-                              button={{ className: "production-nav-stage-toggle" }}
-                              expandIconPosition="end"
-                            >
-                              {stage.label}
-                            </AccordionHeader>
-                            <AccordionPanel className="production-nav-stage-panel">
-                              <div className="production-nav-stage-items">
-                                {stage.id === "source" ? (
-                                  <NavItem
-                                    className="workspace-nav-item"
-                                    value="integrations"
-                                    icon={<DocumentRegular />}
-                                    onClick={() => {
-                                      setWorkspacePage("integrations");
-                                      setMobileNavOpen(false);
-                                    }}
-                                  >
-                                    Imports and integrations
-                                  </NavItem>
-                                ) : null}
-                                {stageViews.map((item) => (
-                                  <NavItem
-                                    className="workspace-nav-item"
-                                    key={item.id}
-                                    value={item.id}
-                                    icon={<DocumentRegular />}
-                                    onClick={() => {
-                                      setView(item.id);
-                                      setWorkspacePage("engagement");
-                                      setMobileNavOpen(false);
-                                    }}
-                                  >
-                                    {item.label}
-                                  </NavItem>
-                                ))}
-                              </div>
-                            </AccordionPanel>
-                          </AccordionItem>
-                        );
-                      })}
-                      </Accordion>
-                    </nav>
-                    <div className="progress">
-                      <span>Source mapping</span>
-                      <b>
-                        {lines.length
-                          ? Math.round((mapped / lines.length) * 100)
-                          : 0}
-                        %
-                      </b>
-                      <ProgressBar
-                        aria-label="Source mapping progress"
-                        value={lines.length ? mapped / lines.length : 0}
-                      />
-                      <small>
-                        {unmapped
-                          ? `${unmapped} mapping decisions remaining`
-                          : lines.length
-                            ? "Mapping complete"
-                            : "Waiting for source data"}
-                      </small>
-                    </div>
-                  </div>
-                </AccordionPanel>
-              </AccordionItem>
-              <AccordionItem
-                value="administration"
-                className="workspace-nav-bookend administration-navigation"
-              >
-                <AccordionHeader
-                  className="workspace-nav-header"
-                  button={{ className: "workspace-nav-toggle" }}
-                  expandIconPosition="end"
-                >
-                  Administration
-                </AccordionHeader>
-                <AccordionPanel className="workspace-nav-panel">
-                  <div className="workspace-nav-items">
+                    <option value="">{loading ? "Loading…" : "Select engagement"}</option>
+                    {engagements.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.legal_name} — {formatPeriodYear(item.period_end)}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              )}
+              {activeApplication ? (
+                <nav className="application-navigation" aria-label={`${activeApplication.name} navigation`}>
+                  {activeApplication.navigation.filter((item) => item.primary !== false).map((item) => (
                     <NavItem
+                      key={item.id}
                       className="workspace-nav-item"
-                      value="inbox"
+                      value={applicationNavigationValue(item)}
+                      icon={
+                        item.icon === "clients" || item.icon === "home" ? <BuildingRegular /> :
+                        item.icon === "people" ? <PeopleTeamRegular /> :
+                        item.icon === "open" ? <OpenRegular /> :
+                        <DocumentRegular />
+                      }
+                      onClick={() => activateNavigationItem(item)}
+                    >
+                      {item.label}
+                    </NavItem>
+                  ))}
+                  {["OWNER", "ADMIN"].includes(selectedMembership?.role_code || "") && activeApplication.settings.length > 0 && (
+                    <NavItem
+                      className="workspace-nav-item application-settings-link"
+                      value={`${activeApplication.id}-settings`}
                       icon={<DocumentRegular />}
                       onClick={() => {
-                        setWorkspacePage("inbox");
-                        setMobileNavOpen(false);
+                        if (activeApplication.id === "practice") {
+                          setWorkspacePage("practice-settings");
+                          navigate(activeApplication.settings[0]?.path ?? "/practice/settings");
+                        } else {
+                          navigate(activeApplication.settings[0]?.path ?? activeApplication.homeRoute);
+                        }
                       }}
                     >
-                      Inbox
+                      {activeApplication.name} settings
                     </NavItem>
-                    {["OWNER", "ADMIN"].includes(
-                      selectedMembership?.role_code || "",
-                    ) && (
+                  )}
+                </nav>
+              ) : pathname.startsWith("/settings") ? (
+                <nav className="application-navigation" aria-label="PracticeEngine global settings">
+                  {globalSettings.map((label) => {
+                    const path = `/settings/${label.toLowerCase().replace(/[^a-z]+/g, "-").replace(/(^-|-$)/g, "")}`;
+                    return (
                       <NavItem
+                        key={label}
                         className="workspace-nav-item"
-                        value="practice-settings"
-                        icon={<DocumentRegular />}
+                        value={pathname === path ? "global-settings" : label}
+                        icon={label === "Users" || label === "Teams" ? <PeopleTeamRegular /> : <DocumentRegular />}
                         onClick={() => {
-                          setWorkspacePage("practice-settings");
-                          setMobileNavOpen(false);
+                          setWorkspacePage(label === "Teams" || label === "Users" ? "team" : label === "Notifications" ? "inbox" : "settings");
+                          navigate(path);
                         }}
                       >
-                        Practice Management
+                        {label}
                       </NavItem>
-                    )}
-                    {["OWNER", "ADMIN"].includes(
-                      selectedMembership?.role_code || "",
-                    ) && (
-                      <NavItem
-                        className="workspace-nav-item"
-                        value="settings"
-                        icon={<DocumentRegular />}
-                        onClick={() => {
-                          setWorkspacePage("settings");
-                          setMobileNavOpen(false);
-                        }}
-                      >
-                        Workspace settings
-                      </NavItem>
-                    )}
-                  </div>
-                </AccordionPanel>
-              </AccordionItem>
-              </Accordion>
+                    );
+                  })}
+                </nav>
+              ) : null}
             </NavDrawerBody>
           </NavDrawer>
         </aside>
         <main className="content">
-          {inviteToken ? (
+          {activeApplicationDenied ? (
+            <ApplicationAccessDenied application={activeApplication!} onOpenLauncher={() => navigate("/settings/apps-entitlements")} />
+          ) : activeApplication?.id === "quotebench" ? (
+            <SpecialistApplicationBoundary application={activeApplication} />
+          ) : activeApplication?.id === "ledgerly" && pathname.startsWith("/ledgerly/settings") ? (
+            <ApplicationSettingsBoundary application={activeApplication} />
+          ) : inviteToken ? (
             <InviteAcceptance
               token={inviteToken}
               onCancel={() => setInviteToken("")}
@@ -1747,13 +1667,18 @@ function AccountsWorkspace({
             workspacePage === "practice-settings" ? (
             <RoutePanelBoundary resetKey={workspacePage}>
               <Suspense fallback={<Skeleton />}>
-                <PracticeManagement
+                  <PracticeManagement
                   view={
                     workspacePage === "work" ? practiceView : "settings"
                   }
                   context={context}
                   workItemId={practiceWorkItemId}
-                  clientId={practiceClientId}
+                    clientId={practiceClientId}
+                    initialTab={practiceSection}
+                    onOpenLedgerly={entitlementDecisions["ledgerly.enabled"] ? (engagementId, clientId) => {
+                      setSelectedId(engagementId);
+                      navigate(`/ledgerly/overview?client=${encodeURIComponent(clientId)}&engagement=${encodeURIComponent(engagementId)}`);
+                    } : undefined}
                   onOpenWork={(workItemId) => {
                     setPracticeWorkItemId(workItemId);
                     setPracticeView("work-detail");
@@ -1776,6 +1701,7 @@ function AccountsWorkspace({
                     setPracticeWorkItemId(workItemId);
                     setPracticeView("work-detail");
                     setWorkspacePage("work");
+                    navigate("/practice/work");
                   }}
                 />
               </Suspense>
@@ -1795,6 +1721,12 @@ function AccountsWorkspace({
                 <CrmOnboarding
                   view={workspacePage === "crm-prospects" ? "prospects" : workspacePage === "crm-opportunities" ? "opportunities" : "onboarding"}
                   context={context}
+                  onOpenQuoteBench={entitlementDecisions["quotebench.enabled"] ? (opportunityId) => {
+                    const quoteBench = applicationManifests.find((manifest) => manifest.id === "quotebench")!;
+                    const target = `${quoteBench.externalUrl ?? quoteBench.homeRoute}?opportunity=${encodeURIComponent(opportunityId)}`;
+                    if (quoteBench.externalUrl) window.location.assign(target);
+                    else navigate(target);
+                  } : undefined}
                 />
               </Suspense>
             </RoutePanelBoundary>
@@ -1817,10 +1749,12 @@ function AccountsWorkspace({
                 setSelectedId(engagementId);
                 setView("overview");
                 setWorkspacePage("engagement");
+                navigate(`/ledgerly/overview?engagement=${encodeURIComponent(engagementId)}`);
               }}
               onOpenWorkspace={() => {
                 setView("overview");
                 setWorkspacePage("engagement");
+                navigate("/ledgerly/overview");
               }}
             />
           ) : workspacePage === "team" ? (
@@ -1830,6 +1764,7 @@ function AccountsWorkspace({
               onOpenWorkspace={() => {
                 setView("overview");
                 setWorkspacePage("engagement");
+                navigate("/ledgerly/overview");
               }}
             />
           ) : ["integrations", "inbox", "settings"].includes(workspacePage) ? (
@@ -1844,6 +1779,7 @@ function AccountsWorkspace({
                     setSelectedId(engagementId);
                     setView("data");
                     setWorkspacePage("engagement");
+                    navigate(`/ledgerly/trial-balance?engagement=${encodeURIComponent(engagementId)}`);
                   }}
                 />
               </Suspense>
@@ -3299,7 +3235,7 @@ export function NoMembership({
             Your account <b>{user.email}</b> is signed in successfully, but it
             has no organisation memberships.{" "}
             {onboarding?.message ||
-              "Ask your Ledgerly administrator to invite this email address, then check again."}
+              "Ask your PracticeEngine administrator to invite this email address, then check again."}
           </p>
           <div>
             <FluentButton appearance="primary" type="button" onClick={onRetry}>
@@ -4624,6 +4560,54 @@ function ReviewPointsView({
   );
 }
 
+function ApplicationAccessDenied({
+  application,
+  onOpenLauncher,
+}: {
+  application: ApplicationManifest;
+  onOpenLauncher: () => void;
+}) {
+  return (
+    <section className="error-state application-boundary" role="alert">
+      <span aria-hidden="true"><ErrorCircleRegular /></span>
+      <p className="eyebrow">Application unavailable</p>
+      <h1>{application.name} is not available</h1>
+      <p>This practice does not have an effective {application.name} entitlement. Direct application links cannot bypass server-side access controls.</p>
+      <FluentButton appearance="primary" onClick={onOpenLauncher}>Review apps and entitlements</FluentButton>
+    </section>
+  );
+}
+
+function SpecialistApplicationBoundary({ application }: { application: ApplicationManifest }) {
+  return (
+    <section className="setup application-boundary">
+      <p className="eyebrow">Specialist application</p>
+      <h1>{application.name}</h1>
+      <p>Proposal composition, pricing, versions and commercial acceptance remain owned by QuoteBench. PracticeEngine carries common practice, client and opportunity context through the integration boundary.</p>
+      {application.externalUrl ? (
+        <FluentButton appearance="primary" as="a" href={application.externalUrl}>Open {application.name}</FluentButton>
+      ) : (
+        <MessageBar intent="info"><MessageBarBody>The QuoteBench deployment URL has not been configured for this environment.</MessageBarBody></MessageBar>
+      )}
+    </section>
+  );
+}
+
+function ApplicationSettingsBoundary({ application }: { application: ApplicationManifest }) {
+  return (
+    <section className="setup application-boundary">
+      <p className="eyebrow">{application.name}</p>
+      <h1>Application settings</h1>
+      <p>Only accounting-specific configuration belongs here. Organisation, users, security, subscription and app access remain in PracticeEngine global settings.</p>
+      <Table aria-label={`${application.name} settings sections`}>
+        <TableBody>
+          {application.settings.map((setting) => <TableRow key={setting.id}><TableCell>{setting.label}</TableCell></TableRow>)}
+        </TableBody>
+      </Table>
+    </section>
+  );
+}
+
 function initials(user: AuthUser) {
   const source = user.name?.trim() || user.email;
   return source
@@ -4640,15 +4624,15 @@ function AuthFrame({ children }: React.PropsWithChildren) {
     <main className="auth-page">
       <section className="auth-brand">
         <FluentLink className="brand" href="/">
-          <span>LD</span>
-          <b>Ledgerly</b>
+          <span>{suiteIdentity.mark}</span>
+          <b>{suiteIdentity.name}</b>
         </FluentLink>
         <div>
-          <p className="eyebrow">Accounts production</p>
-          <h1>UK statutory accounts</h1>
+          <p className="eyebrow">Professional practice platform</p>
+          <h1>One practice. Modular applications.</h1>
           <p>
-            Trial balance, adjustments, disclosures, accounts and filing
-            evidence.
+            Practice Management, Ledgerly and specialist applications in one
+            secure suite.
           </p>
         </div>
         <small>Managed authentication · Immutable engagement history</small>
@@ -4832,7 +4816,7 @@ function AuthScreen({
           {mode === "sign-in"
             ? "Sign in to continue to your accounts workspace."
             : mode === "sign-up"
-              ? "Use your work email to create a secure Ledgerly account."
+              ? "Use your work email to create a secure PracticeEngine account."
               : mode === "reset-request"
                 ? "Enter your account email and we will send a secure reset link."
                 : "Enter and confirm your new password."}
@@ -4927,7 +4911,7 @@ function AuthScreen({
         )}
         <div className="auth-switch">
           <span>
-            {mode === "sign-in" ? "New to Ledgerly?" : "Return to sign in"}
+            {mode === "sign-in" ? "New to PracticeEngine?" : "Return to sign in"}
           </span>
           <FluentButton
             appearance="transparent"

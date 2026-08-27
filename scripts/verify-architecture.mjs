@@ -1,6 +1,7 @@
 import { readFile, readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import ts from "typescript";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const failures = [];
@@ -50,6 +51,11 @@ const requiredDocuments = [
   "docs/architecture/practice-economics.md",
   "docs/architecture/wip.md",
   "docs/architecture/portfolio-management.md",
+  "docs/architecture/application-shell.md",
+  "docs/architecture/application-manifests.md",
+  "docs/architecture/application-navigation-map.md",
+  "docs/architecture/cross-app-context.md",
+  "docs/architecture/settings-ownership.md",
   "docs/engineering/verification-strategy.md",
   "docs/design/DESIGN-CONSTITUTION.md",
   "docs/design/ANTI-PATTERNS.md",
@@ -74,7 +80,8 @@ const requiredRules = [
   ["docs/architecture/domain-boundaries.md", "Licensing is controlled through entitlements"],
   ["docs/design/DESIGN-CONSTITUTION.md", "Fluent UI React v9 is the application design system"],
   ["docs/architecture/ledgerly-integration.md", "Preserve working behaviour"],
-  ["AGENTS.md", "pre-platform-refactor-baseline"]
+  ["AGENTS.md", "pre-platform-refactor-baseline"],
+  ["AGENTS.md", "Any new user-facing capability must declare which PracticeEngine application owns it"]
 ];
 
 for (const [document, rule] of requiredRules) {
@@ -135,6 +142,46 @@ for (const sourceRoot of sourceRoots) {
       failures.push(`${relative(file)} contains package-name licensing logic; evaluate a feature entitlement instead`);
   }
 }
+
+// Parse the shell structurally so application navigation cannot drift back into
+// global JSX declarations. Labels and route ownership belong in the manifest.
+const shellSource = await readFile(path.join(root, "apps/web/src/App.tsx"), "utf8");
+const shellAst = ts.createSourceFile("App.tsx", shellSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+let importsApplicationManifest = false;
+let rendersActiveManifestNavigation = false;
+const forbiddenGlobalNavLabels = new Set([
+  "Clients", "Prospects", "Opportunities", "Resources", "Capacity", "Trial balance",
+  "Mapping", "Journals", "Reconciliations", "Working papers", "Accounts", "Filing"
+]);
+function inspectShell(node) {
+  if (ts.isImportDeclaration(node) && node.moduleSpecifier.text === "./application-manifests")
+    importsApplicationManifest = true;
+  if (ts.isPropertyAccessExpression(node) && node.name.text === "navigation")
+    rendersActiveManifestNavigation = true;
+  if (ts.isJsxElement(node) && node.openingElement.tagName.getText(shellAst) === "NavItem") {
+    const label = node.children.filter(ts.isJsxText).map((child) => child.text.trim()).filter(Boolean).join(" ");
+    if (forbiddenGlobalNavLabels.has(label))
+      failures.push(`apps/web/src/App.tsx declares specialist navigation '${label}' directly; add it to the owning application manifest`);
+  }
+  ts.forEachChild(node, inspectShell);
+}
+inspectShell(shellAst);
+if (!importsApplicationManifest) failures.push("Global shell must import the application manifest boundary");
+if (!rendersActiveManifestNavigation) failures.push("Global shell must render navigation from the active application manifest");
+
+const applicationManifestSource = await readFile(path.join(root, "apps/web/src/application-manifests.ts"), "utf8");
+const applicationManifestAst = ts.createSourceFile("application-manifests.ts", applicationManifestSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+const registeredApplicationIds = new Set();
+function inspectManifest(node) {
+  if (ts.isPropertyAssignment(node) && node.name.getText(applicationManifestAst) === "id" && ts.isStringLiteral(node.initializer)) {
+    const id = node.initializer.text;
+    if (["practice", "ledgerly", "quotebench", "clarity-ie"].includes(id)) registeredApplicationIds.add(id);
+  }
+  ts.forEachChild(node, inspectManifest);
+}
+inspectManifest(applicationManifestAst);
+for (const id of ["practice", "ledgerly", "quotebench", "clarity-ie"])
+  if (!registeredApplicationIds.has(id)) failures.push(`Application manifest registration is missing ${id}`);
 
 const migrationDirectory = path.join(root, "packages/database/migrations");
 const migrations = (await readdir(migrationDirectory)).filter((name) => /^\d{4}_.+\.sql$/.test(name)).sort();

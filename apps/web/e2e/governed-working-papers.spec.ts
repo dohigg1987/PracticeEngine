@@ -1,14 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 async function openWorkingPapers(page: Page) {
-  const navigationToggle = page.getByRole("button", {
-    name: "Open practice navigation",
-  });
-  if (await navigationToggle.isVisible()) await navigationToggle.click();
-  const item = page.locator('button[value="working-papers"]').first();
-  if (!(await item.isVisible()))
-    await page.getByRole("button", { name: "Accounts builder", exact: true }).click();
-  await item.click();
+  await page.goto("/ledgerly/working-papers");
   await expect(page.getByRole("heading", { name: "Working papers" })).toBeVisible({
     timeout: 15_000,
   });

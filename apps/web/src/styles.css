@@ -1257,6 +1257,65 @@ tfoot td {
   }
 }
 
+/* PracticeEngine suite shell */
+.topbar {
+  justify-content: flex-start;
+  gap: var(--spacingHorizontalS);
+}
+.global-search {
+  flex: 1 1 auto;
+  margin-inline: var(--spacingHorizontalM);
+}
+.top-actions {
+  margin-inline-start: auto;
+}
+.app-launcher-button {
+  flex: 0 0 auto;
+}
+.app-launcher-entry {
+  display: grid;
+  gap: var(--spacingVerticalXXS);
+  min-width: 180px;
+}
+.app-launcher-entry small,
+.application-identity small {
+  color: var(--colorNeutralForeground3);
+}
+.application-identity {
+  display: grid;
+  gap: var(--spacingVerticalXXS);
+  padding: var(--spacingVerticalS) var(--spacingHorizontalM) var(--spacingVerticalM);
+  border-bottom: var(--strokeWidthThin) solid var(--colorNeutralStroke2);
+}
+.application-identity .eyebrow {
+  padding: 0;
+  margin: 0;
+}
+.application-navigation {
+  padding-inline: var(--spacingHorizontalXS);
+}
+.application-settings-link {
+  margin-top: var(--spacingVerticalM);
+  border-top: var(--strokeWidthThin) solid var(--colorNeutralStroke2);
+  padding-top: var(--spacingVerticalS);
+}
+.application-boundary {
+  max-width: 720px;
+}
+
+@media (max-width: 620px) {
+  .app-launcher-button {
+    min-width: 44px;
+  }
+  .app-launcher-button > span:last-child,
+  .brand b {
+    display: none;
+  }
+  .global-search {
+    margin-inline: var(--spacingHorizontalXS);
+  }
+}
+
 /* Accounts Builder */
 .accounts-builder-shell {
   border: 1px solid #cdd4da;
