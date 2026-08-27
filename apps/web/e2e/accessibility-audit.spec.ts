@@ -58,17 +58,9 @@ const knownViolationNodes: Record<string, KnownViolationNode[]> = {
   team: [],
   overview: [
     { id: "color-contrast", target: [".page-head > div:nth-child(1) > small"] },
-    { id: "color-contrast", target: ["div:nth-child(1) > span"] },
-    { id: "color-contrast", target: ["div:nth-child(2) > span"] },
-    { id: "color-contrast", target: [".metrics > div:nth-child(3) > span"] },
-    { id: "color-contrast", target: ["div:nth-child(4) > span"] },
   ],
   data: [
     { id: "color-contrast", target: [".page-head > div:nth-child(1) > small"] },
-    { id: "color-contrast", target: ["div:nth-child(1) > span"] },
-    { id: "color-contrast", target: ["div:nth-child(2) > span"] },
-    { id: "color-contrast", target: [".metrics > div:nth-child(3) > span"] },
-    { id: "color-contrast", target: ["div:nth-child(4) > span"] },
   ],
   mapping: [{ id: "color-contrast", target: [".page-head > div:nth-child(1) > small"] }],
   journals: [
