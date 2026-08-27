@@ -3,23 +3,19 @@ import { ApiError } from "./core.js";
 import {
   assertPlatformEntitled,
   assertPlatformPermission,
+  assertPlatformRouteAccess,
   platformContext,
   platformDatabase,
   platformTransaction,
   type PlatformContext,
   type PlatformTX,
 } from "./platform-core.js";
-import { evaluateRecurrence, type RecurrenceRule } from "./practice-scheduling.js";
 import {
   calculateCostSnapshot,
-  calculateDailyCapacity,
   calculateEconomicPosition,
-  rollupCapacity,
-  selectWorkEstimate,
-  type AvailabilityAdjustment,
-  type CapacityCommitment,
-  type WorkingPattern,
 } from "./resource-economics-core.js";
+import { buildCapacityItems, loadCapacityRows } from "./resource-economics-capacity.js";
+import { buildEconomicsOverviewItem, loadEconomicsOverviewRow, loadResourceListRows } from "./resource-economics-read.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -28,7 +24,21 @@ const ASSIGNMENT_STATES = new Set(["proposed", "confirmed", "completed", "cancel
 const ADJUSTMENT_TYPES = new Set(["annual_leave", "training", "internal_commitment", "unavailable", "additional_capacity", "other"]);
 const TIME_STATUSES = new Set(["draft", "submitted", "approved", "rejected"]);
 
-const response = (data: unknown, status = 200) => Response.json(data, { status, headers: { "cache-control": "no-store" } });
+const response = (data: unknown, status = 200) => {
+  const startedAt = performance.now();
+  const body = JSON.stringify(data);
+  const serializationMs = Math.round((performance.now() - startedAt) * 100) / 100;
+  const encodedBody = new TextEncoder().encode(body);
+  return new Response(encodedBody, {
+    status,
+    headers: {
+      "cache-control": "no-store",
+      "content-type": "application/json",
+      "x-pe-response-bytes": String(encodedBody.byteLength),
+      "x-pe-serialization-ms": String(serializationMs),
+    },
+  });
+};
 
 function validDate(value: string): boolean {
   if (!ISO_DATE.test(value)) return false;
@@ -114,9 +124,7 @@ async function within<T>(request: Request, env: Env, actorId: string, permission
   const ctx = platformContext(request, actorId), sql = platformDatabase(env);
   try {
     return await platformTransaction(sql, ctx, async (tx) => {
-      await assertPlatformPermission(tx, permission);
-      await assertPlatformEntitled(tx, "practice.enabled");
-      await assertPlatformEntitled(tx, entitlement);
+      await assertPlatformRouteAccess(tx, permission, "practice.enabled", entitlement);
       return operation(tx, ctx);
     });
   } finally { await sql.end(); }
@@ -125,19 +133,7 @@ async function within<T>(request: Request, env: Env, actorId: string, permission
 async function resources(request: Request, env: Env, actorId: string) {
   const input = request.method === "POST" ? await body(request) : null;
   return within(request, env, actorId, request.method === "GET" ? "resources.view" : "resources.manage", "practice.resources", async (tx, ctx) => {
-    if (request.method === "GET") return response({ items: await tx`
-      select rp.tenant_member_id id,tm.display_name,string_agg(distinct t.name,', ' order by t.name) team_name,
-        rp.job_title role_title,rp.resource_status status,round(rp.standard_capacity_minutes_week/60.0,2)::float8 weekly_capacity_hours,
-        round(coalesce(load.assigned_minutes,0)/60.0,2)::float8 assigned_hours,
-        round((rp.standard_capacity_minutes_week-coalesce(load.assigned_minutes,0))/60.0,2)::float8 available_hours,
-        case when rp.standard_capacity_minutes_week=0 then 0 else round(coalesce(load.assigned_minutes,0)*100.0/rp.standard_capacity_minutes_week,2)::float8 end utilisation_percentage,
-        coalesce(load.overdue_work,0)::int overdue_work
-      from resource_profile rp join tenant_member tm on tm.tenant_id=rp.tenant_id and tm.id=rp.tenant_member_id
-      left join team_member tmm on tmm.tenant_id=rp.tenant_id and tmm.tenant_member_id=rp.tenant_member_id
-      left join team t on t.tenant_id=tmm.tenant_id and t.id=tmm.team_id
-      left join lateral(select sum(coalesce(w.planned_effort_minutes,w.remaining_effort_minutes,w.estimated_effort_minutes,0)) assigned_minutes,
-        count(*) filter(where w.due_date<current_date)::int overdue_work from work_item w where w.tenant_id=rp.tenant_id and w.assigned_member_id=rp.tenant_member_id and w.status not in ('completed','cancelled')) load on true
-      where rp.tenant_id=${ctx.tenantId} group by rp.tenant_id,rp.tenant_member_id,tm.id,load.assigned_minutes,load.overdue_work order by tm.display_name,rp.tenant_member_id` });
+    if (request.method === "GET") return response({ items: await loadResourceListRows(tx,ctx.tenantId) });
     const memberId = id(input!, "tenantMemberId")!, status = enumValue(input!, "status", RESOURCE_STATUSES, "active");
     const member = await tx`select id from tenant_member where tenant_id=${ctx.tenantId} and id=${memberId}`;
     if (!member.length) throw new ApiError(404, "NOT_FOUND", "Tenant member not found");
@@ -204,24 +200,8 @@ async function capacity(request:Request,env:Env,actorId:string){
   if(!["day","week","month"].includes(grain))throw new ApiError(400,"INVALID_REQUEST","grain must be day, week or month");
   if(filter&&!UUID.test(filter))throw new ApiError(400,"INVALID_REQUEST","resourceId is invalid");
   return within(request,env,actorId,"capacity.view","practice.capacity",async(tx,ctx)=>{
-    const profiles=await tx`select rp.tenant_member_id,tm.display_name,string_agg(distinct t.name,', ' order by t.name) team_name from resource_profile rp join tenant_member tm on tm.tenant_id=rp.tenant_id and tm.id=rp.tenant_member_id left join team_member tmm on tmm.tenant_id=rp.tenant_id and tmm.tenant_member_id=rp.tenant_member_id left join team t on t.tenant_id=tmm.tenant_id and t.id=tmm.team_id where rp.tenant_id=${ctx.tenantId} and (${filter}::uuid is null or rp.tenant_member_id=${filter}) group by rp.tenant_id,rp.tenant_member_id,tm.id order by tm.display_name`;
-    const items=[];
-    for(const profile of profiles){
-      const memberId=String(profile.tenant_member_id);
-      const patterns=await tx`select effective_from,effective_to,monday_minutes,tuesday_minutes,wednesday_minutes,thursday_minutes,friday_minutes,saturday_minutes,sunday_minutes from resource_working_pattern where tenant_id=${ctx.tenantId} and tenant_member_id=${memberId} and effective_from<=${to} and (effective_to is null or effective_to>=${from}) order by effective_from`;
-      const adjustments=await tx`select starts_on,ends_on,capacity_delta_minutes from resource_availability_adjustment where tenant_id=${ctx.tenantId} and tenant_member_id=${memberId} and starts_on<=${to} and ends_on>=${from}`;
-      const works=await tx`select w.id,w.planned_start_date,w.planned_end_date,w.due_date,w.planned_effort_minutes,w.estimated_effort_minutes,array_agg(pt.estimated_effort_minutes) filter(where pt.id is not null) task_estimates from work_item w left join practice_task pt on pt.tenant_id=w.tenant_id and pt.work_item_id=w.id where w.tenant_id=${ctx.tenantId} and w.assigned_member_id=${memberId} and w.status not in ('completed','cancelled') and coalesce(w.planned_start_date,w.due_date)<=${to} and coalesce(w.planned_end_date,w.due_date,w.planned_start_date)>=${from} group by w.id`;
-      const commitments:CapacityCommitment[]=works.map(row=>{const selected=selectWorkEstimate(row.planned_effort_minutes===null?Number(row.estimated_effort_minutes):Number(row.planned_effort_minutes),(row.task_estimates as unknown[]|null??[]).map(value=>value===null?null:Number(value)));return{id:String(row.id),startsOn:databaseDate(row.planned_start_date??row.due_date),endsOn:databaseDate(row.planned_end_date??row.due_date??row.planned_start_date),minutes:selected.minutes,source:"generated"};});
-      const schedules=await tx`select r.id,r.recurrence_rule,r.effective_from,r.effective_to,r.next_occurrence_date,wt.estimated_effort_minutes from recurring_work_schedule r join work_template wt on wt.tenant_id=r.tenant_id and wt.id=r.work_template_id where r.tenant_id=${ctx.tenantId} and r.default_assignee_member_id=${memberId} and r.status='active' and r.effective_from<=${to} and (r.effective_to is null or r.effective_to>=${from})`;
-      for(const schedule of schedules){for(const occurrence of evaluateRecurrence(schedule.recurrence_rule as unknown as RecurrenceRule,databaseDate(schedule.effective_from),to,schedule.effective_to?databaseDate(schedule.effective_to):null)){if(occurrence.occurrenceDate<from)continue;const generated=await tx`select 1 from recurrence_generation where tenant_id=${ctx.tenantId} and recurring_schedule_id=${String(schedule.id)} and occurrence_date=${occurrence.occurrenceDate} and status='generated'`;if(!generated.length)commitments.push({id:`forecast:${schedule.id}:${occurrence.occurrenceDate}`,startsOn:occurrence.occurrenceDate,endsOn:occurrence.occurrenceDate,minutes:Number(schedule.estimated_effort_minutes??0),source:"forecast"});}}
-      const normalizedPatterns:WorkingPattern[]=patterns.map(row=>({effectiveFrom:databaseDate(row.effective_from),effectiveTo:row.effective_to?databaseDate(row.effective_to):null,mondayMinutes:Number(row.monday_minutes),tuesdayMinutes:Number(row.tuesday_minutes),wednesdayMinutes:Number(row.wednesday_minutes),thursdayMinutes:Number(row.thursday_minutes),fridayMinutes:Number(row.friday_minutes),saturdayMinutes:Number(row.saturday_minutes),sundayMinutes:Number(row.sunday_minutes)}));
-      const normalizedAdjustments:AvailabilityAdjustment[]=adjustments.map(row=>({startsOn:databaseDate(row.starts_on),endsOn:databaseDate(row.ends_on),capacityDeltaMinutes:Number(row.capacity_delta_minutes)}));
-      const periods=rollupCapacity(calculateDailyCapacity(from,to,normalizedPatterns,normalizedAdjustments,commitments),grain as "day"|"week"|"month").map(value=>{
-        const start="date" in value?value.date:value.periodStart,end="date" in value?value.date:value.periodEnd;
-        return {key:start,label:start===end?start:`${start} – ${end}`,available_hours:Number((value.availableMinutes/60).toFixed(2)),committed_hours:Number((value.committedMinutes/60).toFixed(2)),forecast_hours:Number((value.forecastMinutes/60).toFixed(2)),unavailable_hours:Number((Math.max(0,-value.adjustmentMinutes)/60).toFixed(2)),remaining_hours:Number((value.remainingMinutes/60).toFixed(2)),forecast_remaining_hours:Number((value.forecastRemainingMinutes/60).toFixed(2)),overallocated:value.overallocated,forecast_overallocated:value.forecastOverallocated};
-      });
-      items.push({resource_id:memberId,display_name:String(profile.display_name),team_name:profile.team_name?String(profile.team_name):null,periods});
-    }
+    const data=await loadCapacityRows(tx,ctx.tenantId,from,to,filter);
+    const items=buildCapacityItems(data,from,to,grain as "day"|"week"|"month");
     return response({items,from,to,grain});
   });
 }
@@ -334,6 +314,10 @@ async function recoveries(request:Request,env:Env,actorId:string){
 async function economicsRows(request:Request,env:Env,actorId:string,portfolio:boolean){
   return within(request,env,actorId,portfolio?"portfolio.view":"economics.view",portfolio?"practice.reporting":"practice.economics",async(tx,ctx)=>{
     if(portfolio)await assertPlatformPermission(tx,"economics.view");
+    if(!portfolio){
+      const rows=await loadEconomicsOverviewRow(tx,ctx.tenantId),overview=rows[0];
+      return response({item:buildEconomicsOverviewItem(overview)});
+    }
     const rows=await tx`
       with work_stats as(select tenant_id,client_service_id,count(*)::int work_count,
           count(*) filter(where due_date<current_date and status not in ('completed','cancelled'))::int overdue_work,
@@ -361,11 +345,7 @@ async function economicsRows(request:Request,env:Env,actorId:string,portfolio:bo
       left join recovery_stats rs on rs.tenant_id=cs.tenant_id and rs.client_service_id=cs.id
       where o.tenant_id=${ctx.tenantId} order by o.display_name,ps.name`;
     const positions=rows.map(row=>({row,position:calculateEconomicPosition({actualMinutes:Number(row.actual_minutes),internalCost:row.internal_cost===null?null:Number(row.internal_cost),billableValue:row.billable_value===null?null:Number(row.billable_value),acceptedRevenue:row.accepted_revenue===null?null:Number(row.accepted_revenue),billedAmount:row.billed_amount===null?null:Number(row.billed_amount),recoveredAmount:row.recovered_amount===null?null:Number(row.recovered_amount)})}));
-    if(portfolio)return response({items:positions.map(({row,position})=>({id:String(row.client_service_id),client_id:String(row.client_id),client_name:String(row.client_name),owner_name:row.owner_name?String(row.owner_name):null,team_name:row.team_name?String(row.team_name):null,service_name:String(row.service_name),workload_hours:Number((Number(row.workload_minutes)/60).toFixed(2)),overdue_work:Number(row.overdue_work),capacity_pressure:Number(row.overdue_work)>0?"attention":"normal",wip_amount:position.wipBalance,revenue_amount:position.acceptedRevenue,cost_amount:position.internalCost,contribution_amount:position.contribution,margin_percentage:position.marginPercent,currency:String(row.currency),commercial_value_state:position.status.revenue==="unavailable"?"unavailable":row.has_estimate?"estimated":"known"}))});
-    const work=await tx`select count(*) filter(where due_date between current_date and current_date+6)::int due_this_week,count(*) filter(where due_date<current_date and status not in ('completed','cancelled'))::int overdue_work,count(*) filter(where status='waiting_on_client')::int waiting_on_client,count(*) filter(where status='review')::int review_queue from work_item where tenant_id=${ctx.tenantId}`;
-    const resource=await tx`select coalesce(sum(rp.standard_capacity_minutes_week),0)::bigint capacity_minutes,coalesce(sum(load.assigned),0)::bigint assigned_minutes from resource_profile rp left join lateral(select sum(coalesce(w.remaining_effort_minutes,w.planned_effort_minutes,w.estimated_effort_minutes,0)) assigned from work_item w where w.tenant_id=rp.tenant_id and w.assigned_member_id=rp.tenant_member_id and w.status not in ('completed','cancelled')) load on true where rp.tenant_id=${ctx.tenantId} and rp.resource_status='active'`;
-    const wipUnavailable=positions.some(item=>item.position.wipBalance===null),wip=wipUnavailable?null:positions.reduce((sum,item)=>sum+(item.position.wipBalance??0),0),capacityMinutes=Number(resource[0]?.capacity_minutes??0),assignedMinutes=Number(resource[0]?.assigned_minutes??0);
-    return response({item:{due_this_week:Number(work[0]?.due_this_week??0),overdue_work:Number(work[0]?.overdue_work??0),waiting_on_client:Number(work[0]?.waiting_on_client??0),review_queue:Number(work[0]?.review_queue??0),capacity_utilisation_percentage:capacityMinutes===0?0:Number((assignedMinutes*100/capacityMinutes).toFixed(2)),forecast_capacity_hours:Number(((capacityMinutes-assignedMinutes)/60).toFixed(2)),wip_amount:wip,economic_exceptions:positions.filter(item=>item.position.status.cost==="unavailable"||item.position.status.revenue==="unavailable").length,currency:positions.length?String(positions[0]!.row.currency):undefined}});
+    return response({items:positions.map(({row,position})=>({id:String(row.client_service_id),client_id:String(row.client_id),client_name:String(row.client_name),owner_name:row.owner_name?String(row.owner_name):null,team_name:row.team_name?String(row.team_name):null,service_name:String(row.service_name),workload_hours:Number((Number(row.workload_minutes)/60).toFixed(2)),overdue_work:Number(row.overdue_work),capacity_pressure:Number(row.overdue_work)>0?"attention":"normal",wip_amount:position.wipBalance,revenue_amount:position.acceptedRevenue,cost_amount:position.internalCost,contribution_amount:position.contribution,margin_percentage:position.marginPercent,currency:String(row.currency),commercial_value_state:position.status.revenue==="unavailable"?"unavailable":row.has_estimate?"estimated":"known"}))});
   });
 }
 

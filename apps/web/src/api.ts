@@ -1018,7 +1018,8 @@ export function sessionCacheTtlForPath(path: string): number {
     path.startsWith("/v1/practice/work") ||
     path.startsWith("/v1/practice/capacity") ||
     path.startsWith("/v1/practice/portfolio-economics") ||
-    path.startsWith("/v1/practice/economics/overview")
+    path.startsWith("/v1/practice/economics/overview") ||
+    /^\/v1\/engagements\/[^/]+\/dashboard$/.test(path)
   ) return 30_000;
   return 0;
 }
@@ -1072,7 +1073,14 @@ async function requestFromNetwork<T>(
   const performancePath = path.split("?")[0]!.replace(/[0-9a-f]{8}-[0-9a-f-]{27,}/gi, ":id");
   performance.measure(`pe:api:${performancePath}`, { start: fetchStartedAt, end: completedAt, detail: { status: response.status } });
   if (sessionCacheTtlForPath(path) && typeof window !== "undefined" && /(?:^|[-.])(dev|test)(?:[-.]|$)/i.test(window.location.hostname)) {
-    console.info("[pe-perf] api", JSON.stringify({ path: performancePath, authMs: Math.round(fetchStartedAt - startedAt), responseMs: Math.round(completedAt - fetchStartedAt), status: response.status }));
+    console.info("[pe-perf] api", JSON.stringify({
+      path: performancePath,
+      authMs: Math.round(fetchStartedAt - startedAt),
+      responseMs: Math.round(completedAt - fetchStartedAt),
+      responseBytes: Number(response.headers.get("x-pe-response-bytes")) || null,
+      serializationMs: Number(response.headers.get("x-pe-serialization-ms")) || 0,
+      status: response.status,
+    }));
   }
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {

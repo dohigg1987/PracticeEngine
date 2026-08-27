@@ -66,6 +66,10 @@ test("enforces active membership tenant scope permission and entitlement", () =>
     /where tenant_id=\$\{ctx\.tenantId\} and id=\$\{clientId\}/,
   );
 });
+test("rejects malformed tenant identifiers before database authorization", () => {
+  assert.match(service, /if \(!UUID\.test\(tenantId\)\)/);
+  assert.match(service, /"INVALID_TENANT"/);
+});
 test("uses organisation id directly and preserves Ledgerly routes", () => {
   assert.match(migration, /expands the established identifiers/);
   assert.match(migration, /ALTER TABLE organisation/);

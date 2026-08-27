@@ -3,6 +3,7 @@ import { ApiError } from "./core.js";
 import {
   assertPlatformEntitled,
   assertPlatformPermission,
+  assertPlatformRouteAccess,
   platformContext,
   platformDatabase,
   platformTransaction,
@@ -30,8 +31,21 @@ const ENGAGEMENT_TRANSITIONS: Record<string, ReadonlySet<string>> = {
   terminated: new Set(),
 };
 
-const response = (data: unknown, status = 200) =>
-  Response.json(data, { status, headers: { "cache-control": "no-store" } });
+const response = (data: unknown, status = 200) => {
+  const startedAt = performance.now();
+  const body = JSON.stringify(data);
+  const serializationMs = Math.round((performance.now() - startedAt) * 100) / 100;
+  const encodedBody = new TextEncoder().encode(body);
+  return new Response(encodedBody, {
+    status,
+    headers: {
+      "cache-control": "no-store",
+      "content-type": "application/json",
+      "x-pe-response-bytes": String(encodedBody.byteLength),
+      "x-pe-serialization-ms": String(serializationMs),
+    },
+  });
+};
 
 function orchestrate<T>(operation:()=>T):T { try{return operation();}catch(error){if(error instanceof OrchestrationError)throw new ApiError(error.status,error.code,error.message);throw error;} }
 
@@ -137,9 +151,7 @@ async function within<T>(request: Request, env: Env, actorId: string, permission
   const ctx = platformContext(request, actorId), sql = platformDatabase(env);
   try {
     return await platformTransaction(sql, ctx, async (tx) => {
-      await assertPlatformPermission(tx, permission);
-      await assertPlatformEntitled(tx, "practice.enabled");
-      await assertPlatformEntitled(tx, feature);
+      await assertPlatformRouteAccess(tx, permission, "practice.enabled", feature);
       return operation(tx, ctx);
     });
   } finally {
@@ -306,7 +318,24 @@ async function workCollection(request: Request, env: Env, actorId: string) {
       if (clientId) uuid(clientId, "Client"); if (assigned) uuid(assigned, "Member");
       if (status && !WORK_STATUSES.has(status)) throw new ApiError(400, "INVALID_REQUEST", "status is invalid");
       if (dueBefore && !validDate(dueBefore)) throw new ApiError(400, "INVALID_REQUEST", "dueBefore must be a valid ISO date");
-      return response({ items: await tx`select w.*,o.display_name client_name,s.name service_name,am.display_name assigned_member_name,at.name assigned_team_name from work_item w join organisation o on o.tenant_id=w.tenant_id and o.id=w.client_id join client_service cs on cs.tenant_id=w.tenant_id and cs.id=w.client_service_id join practice_service s on s.tenant_id=cs.tenant_id and s.id=cs.service_id left join tenant_member am on am.tenant_id=w.tenant_id and am.id=w.assigned_member_id left join team at on at.tenant_id=w.tenant_id and at.id=w.assigned_team_id where w.tenant_id=${ctx.tenantId} and (${clientId}::uuid is null or w.client_id=${clientId}) and (${status}::text is null or w.status=${status}) and (${dueBefore}::date is null or w.due_date<=${dueBefore}) and (${assigned}::uuid is null or w.assigned_member_id=${assigned}) order by w.due_date nulls last,case w.priority when 'urgent' then 1 when 'high' then 2 when 'normal' then 3 else 4 end,w.created_at desc` });
+      return response({ items: await tx`select
+        w.id,w.client_id,w.client_service_id,w.engagement_id,w.title,w.period_reference,w.status,w.priority,
+        w.assigned_member_id,w.assigned_team_id,w.planned_start_date,w.due_date,w.calculated_due_date,
+        w.due_date_overridden,w.due_date_override_reason,w.due_date_calculation,w.source_template_id,
+        w.source_template_version,w.completed_at,w.specialist_module_key,w.specialist_record_reference,
+        w.created_at,w.updated_at,o.display_name client_name,s.name service_name,
+        am.display_name assigned_member_name,at.name assigned_team_name
+        from work_item w
+        join organisation o on o.tenant_id=w.tenant_id and o.id=w.client_id
+        join client_service cs on cs.tenant_id=w.tenant_id and cs.id=w.client_service_id
+        join practice_service s on s.tenant_id=cs.tenant_id and s.id=cs.service_id
+        left join tenant_member am on am.tenant_id=w.tenant_id and am.id=w.assigned_member_id
+        left join team at on at.tenant_id=w.tenant_id and at.id=w.assigned_team_id
+        where w.tenant_id=${ctx.tenantId} and (${clientId}::uuid is null or w.client_id=${clientId})
+          and (${status}::text is null or w.status=${status})
+          and (${dueBefore}::date is null or w.due_date<=${dueBefore})
+          and (${assigned}::uuid is null or w.assigned_member_id=${assigned})
+        order by w.due_date nulls last,case w.priority when 'urgent' then 1 when 'high' then 2 when 'normal' then 3 else 4 end,w.created_at desc` });
     }
     const id = crypto.randomUUID(), clientId = uuid(required(input!, "clientId", 36), "Client"), clientServiceId = uuid(required(input!, "clientServiceId", 36), "Client service");
     const clientServices = await tx`select cs.*,s.required_entitlement_feature_key from client_service cs join practice_service s on s.tenant_id=cs.tenant_id and s.id=cs.service_id where cs.tenant_id=${ctx.tenantId} and cs.id=${clientServiceId} and cs.client_id=${clientId} and cs.status='active'`;

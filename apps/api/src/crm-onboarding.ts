@@ -3,6 +3,7 @@ import { ApiError } from "./core.js";
 import {
   assertPlatformEntitled,
   assertPlatformPermission,
+  assertPlatformRouteAccess,
   platformContext,
   platformDatabase,
   platformTransaction,
@@ -32,8 +33,21 @@ export type QuoteBenchCommercialContext = {
   serviceValues: Array<{ serviceId: string; value: number; currency: string }>;
 };
 
-const response = (data: unknown, status = 200) =>
-  Response.json(data, { status, headers: { "cache-control": "no-store" } });
+const response = (data: unknown, status = 200) => {
+  const startedAt = performance.now();
+  const body = JSON.stringify(data);
+  const serializationMs = Math.round((performance.now() - startedAt) * 100) / 100;
+  const encodedBody = new TextEncoder().encode(body);
+  return new Response(encodedBody, {
+    status,
+    headers: {
+      "cache-control": "no-store",
+      "content-type": "application/json",
+      "x-pe-response-bytes": String(encodedBody.byteLength),
+      "x-pe-serialization-ms": String(serializationMs),
+    },
+  });
+};
 
 async function requestBody(request: Request): Promise<Record<string, unknown>> {
   if (!(request.headers.get("content-type") ?? "").toLowerCase().includes("application/json"))
@@ -178,9 +192,7 @@ async function within<T>(request: Request, env: Env, actorId: string, permission
           throw new ApiError(403, "ENTITLEMENT_REQUIRED", "The QuoteBench integration is not enabled");
         return operation(tx, ctx);
       }
-      await assertPlatformPermission(tx, permission);
-      await assertPlatformEntitled(tx, "practice.enabled");
-      await assertPlatformEntitled(tx, feature);
+      await assertPlatformRouteAccess(tx, permission, "practice.enabled", feature);
       return operation(tx, ctx);
     });
   } finally { await sql.end(); }
@@ -190,13 +202,21 @@ async function prospectCollection(request: Request, env: Env, actorId: string) {
   const input = request.method === "POST" ? await requestBody(request) : null;
   return within(request, env, actorId, request.method === "GET" ? "crm.view" : "prospects.create", "practice.crm", async (tx, ctx) => {
     if (request.method === "GET") return response({ items: await tx`
+      with activity_rollup as (
+        select tenant_id,prospect_id,max(occurred_at) last_activity_at
+        from crm_activity where tenant_id=${ctx.tenantId} and prospect_id is not null group by tenant_id,prospect_id
+      ), opportunity_rollup as (
+        select tenant_id,prospect_id,count(*)::int open_opportunities
+        from opportunity where tenant_id=${ctx.tenantId} and prospect_id is not null and status='open' group by tenant_id,prospect_id
+      )
       select p.*,c.display_name primary_contact_name,c.email_normalized primary_contact_email,
         tm.display_name responsible_member_name,t.name responsible_team_name,
-        (select max(a.occurred_at) from crm_activity a where a.tenant_id=p.tenant_id and a.prospect_id=p.id) last_activity_at,
-        (select count(*)::int from opportunity o where o.tenant_id=p.tenant_id and o.prospect_id=p.id and o.status='open') open_opportunities
+        a.last_activity_at,coalesce(o.open_opportunities,0)::int open_opportunities
       from prospect p left join contact c on c.tenant_id=p.tenant_id and c.id=p.primary_contact_id
       left join tenant_member tm on tm.tenant_id=p.tenant_id and tm.id=p.responsible_member_id
       left join team t on t.tenant_id=p.tenant_id and t.id=p.responsible_team_id
+      left join activity_rollup a on a.tenant_id=p.tenant_id and a.prospect_id=p.id
+      left join opportunity_rollup o on o.tenant_id=p.tenant_id and o.prospect_id=p.id
       where p.tenant_id=${ctx.tenantId} order by p.updated_at desc,p.display_name` });
     const prospectId = crypto.randomUUID();
     const entityType = required(input!, "entityType", 40).toUpperCase();
@@ -240,19 +260,58 @@ async function prospectItem(request: Request, env: Env, actorId: string, prospec
 async function opportunityCollection(request: Request, env: Env, actorId: string) {
   const input = request.method === "POST" ? await requestBody(request) : null;
   return within(request, env, actorId, request.method === "GET" ? "crm.view" : "opportunities.create", "practice.crm", async (tx, ctx) => {
-    if (request.method === "GET") return response({ items: await tx`
-      select o.*,coalesce(p.display_name,c.display_name,c.legal_name) relationship_name,sd.display_name stage_name,
-        tm.display_name responsible_member_name,t.name responsible_team_name,
-        coalesce((select json_agg(json_build_object('id',os.id,'serviceId',s.id,'name',s.name,'accepted',os.accepted) order by s.name)
-          from opportunity_service os join practice_service s on s.tenant_id=os.tenant_id and s.id=os.service_id where os.tenant_id=o.tenant_id and os.opportunity_id=o.id),'[]') services,
-        (select q.status from quotebench_proposal_reference q where q.tenant_id=o.tenant_id and q.opportunity_id=o.id order by q.last_event_at desc limit 1) proposal_status
-      from opportunity o left join prospect p on p.tenant_id=o.tenant_id and p.id=o.prospect_id
-      left join organisation c on c.tenant_id=o.tenant_id and c.id=o.existing_client_id
-      join crm_stage_definition sd on sd.tenant_id=o.tenant_id and sd.stage_key=o.stage_key
-      left join tenant_member tm on tm.tenant_id=o.tenant_id and tm.id=o.responsible_member_id
-      left join team t on t.tenant_id=o.tenant_id and t.id=o.responsible_team_id
-      where o.tenant_id=${ctx.tenantId} order by o.status,o.expected_close_date nulls last,o.updated_at desc`,
-      capabilities: await opportunityCapabilities(tx, ctx.tenantId) });
+    if (request.method === "GET") {
+      const rows = await tx`
+      with capabilities as (
+        select actor_has_permission('opportunities.create') can_create,
+          actor_has_permission('opportunities.edit') can_edit,
+          actor_has_permission('opportunities.convert') can_convert,
+          tenant_feature_is_enabled(${ctx.tenantId}::uuid,'quotebench.enabled') and
+            tenant_feature_is_enabled(${ctx.tenantId}::uuid,'quotebench.proposals') quotebench_available
+      ), service_rollup as (
+        select os.tenant_id,os.opportunity_id,
+          json_agg(json_build_object('id',os.id,'serviceId',s.id,'name',s.name,'accepted',os.accepted) order by s.name) services
+        from opportunity_service os
+        join practice_service s on s.tenant_id=os.tenant_id and s.id=os.service_id
+        where os.tenant_id=${ctx.tenantId} group by os.tenant_id,os.opportunity_id
+      ), latest_proposal as (
+        select distinct on (tenant_id,opportunity_id) tenant_id,opportunity_id,status
+        from quotebench_proposal_reference where tenant_id=${ctx.tenantId}
+        order by tenant_id,opportunity_id,last_event_at desc
+      ), opportunity_rows as (
+        select o.*,coalesce(p.display_name,c.display_name,c.legal_name) relationship_name,sd.display_name stage_name,
+          tm.display_name responsible_member_name,t.name responsible_team_name,
+          coalesce(sr.services,'[]'::json) services,lp.status proposal_status
+        from opportunity o left join prospect p on p.tenant_id=o.tenant_id and p.id=o.prospect_id
+        left join organisation c on c.tenant_id=o.tenant_id and c.id=o.existing_client_id
+        join crm_stage_definition sd on sd.tenant_id=o.tenant_id and sd.stage_key=o.stage_key
+        left join tenant_member tm on tm.tenant_id=o.tenant_id and tm.id=o.responsible_member_id
+        left join team t on t.tenant_id=o.tenant_id and t.id=o.responsible_team_id
+        left join service_rollup sr on sr.tenant_id=o.tenant_id and sr.opportunity_id=o.id
+        left join latest_proposal lp on lp.tenant_id=o.tenant_id and lp.opportunity_id=o.id
+        where o.tenant_id=${ctx.tenantId}
+      )
+      select opportunity_rows.*,
+        capabilities.can_create __can_create,capabilities.can_edit __can_edit,
+        capabilities.can_convert __can_convert,capabilities.quotebench_available __quotebench_available
+      from capabilities
+      left join opportunity_rows on true
+      order by opportunity_rows.status,opportunity_rows.expected_close_date nulls last,opportunity_rows.updated_at desc`;
+      const capabilityRow = rows[0];
+      const items = rows.flatMap((row) => {
+        const { __can_create, __can_edit, __can_convert, __quotebench_available, ...item } = row;
+        return item.id ? [item] : [];
+      });
+      return response({
+        items,
+        capabilities: {
+          canCreate: Boolean(capabilityRow?.__can_create),
+          canEdit: Boolean(capabilityRow?.__can_edit),
+          canConvert: Boolean(capabilityRow?.__can_convert),
+          quoteBenchAvailable: Boolean(capabilityRow?.__quotebench_available),
+        },
+      });
+    }
     const opportunityId = crypto.randomUUID();
     const prospectId = input!.prospectId ? id(input!.prospectId, "prospectId") : null;
     const existingClientId = input!.existingClientId ? id(input!.existingClientId, "existingClientId") : null;

@@ -5,6 +5,7 @@ import test from "node:test";
 const root = new URL("../../../", import.meta.url);
 const migration = await readFile(new URL("packages/database/migrations/0035_resource_capacity_time_economics.sql", root), "utf8");
 const service = await readFile(new URL("apps/api/src/resource-economics.ts", root), "utf8");
+const platform = await readFile(new URL("apps/api/src/platform-core.ts", root), "utf8");
 const core = await readFile(new URL("apps/api/src/resource-economics-core.ts", root), "utf8");
 const docs = await Promise.all([
   "resource-management", "capacity-planning", "time-capture", "practice-economics", "wip", "portfolio-management"
@@ -68,9 +69,10 @@ test("commercial entitlements remain separate from functional permissions", () =
 });
 
 test("application boundary enforces permission and entitlement before resource or economic access", () => {
-  assert.match(service, /assertPlatformPermission\(tx, permission\)/);
-  assert.match(service, /assertPlatformEntitled\(tx, "practice\.enabled"\)/);
-  assert.match(service, /assertPlatformEntitled\(tx, entitlement\)/);
+  assert.match(service, /assertPlatformRouteAccess\(tx, permission, "practice\.enabled", entitlement\)/);
+  assert.match(platform, /actor_has_permission\(\$\{permissionKey\}::text\) allowed/);
+  assert.match(platform, /tenant_feature_decision\(\$\{baseFeatureKey\}::text\)/);
+  assert.match(platform, /tenant_feature_decision\(\$\{routeFeatureKey\}::text\)/);
   for (const route of ["resources", "capacity", "work-allocations", "time-entries", "cost-rates", "portfolio-economics", "economics/overview"]) {
     assert.ok(service.includes(route), route);
   }

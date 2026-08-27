@@ -138,9 +138,18 @@ const SECTOR_PROFILES = [
 ] as const;
 
 function json(data: unknown, status = 200): Response {
-  return Response.json(data, {
+  const startedAt = performance.now();
+  const body = JSON.stringify(data);
+  const serializationMs = Math.round((performance.now() - startedAt) * 100) / 100;
+  const encodedBody = new TextEncoder().encode(body);
+  return new Response(encodedBody, {
     status,
-    headers: { "cache-control": "no-store" },
+    headers: {
+      "cache-control": "no-store",
+      "content-type": "application/json",
+      "x-pe-response-bytes": String(encodedBody.byteLength),
+      "x-pe-serialization-ms": String(serializationMs),
+    },
   });
 }
 function withCors(response: Response, request: Request, env: Env): Response {
@@ -151,6 +160,10 @@ function withCors(response: Response, request: Request, env: Env): Response {
   headers.set(
     "access-control-allow-headers",
     "authorization,content-type,x-tenant-id,x-correlation-id,x-filename",
+  );
+  headers.set(
+    "access-control-expose-headers",
+    "x-correlation-id,x-pe-response-bytes,x-pe-serialization-ms",
   );
   headers.set("access-control-allow-methods", "GET,POST,PUT,PATCH,OPTIONS");
   headers.set("vary", "Origin");
@@ -182,6 +195,8 @@ function completeRequest(
       path: new URL(request.url).pathname,
       status: corsResponse.status,
       durationMs: Math.round((performance.now() - startedAt) * 100) / 100,
+      responseBytes: Number(corsResponse.headers.get("x-pe-response-bytes")) || null,
+      serializationMs: Number(corsResponse.headers.get("x-pe-serialization-ms")) || 0,
     }),
   );
   return new Response(corsResponse.body, {
@@ -501,22 +516,41 @@ async function listOrganisations(
   const sql = db(env);
   try {
     return await withTenantTransaction(sql, ctx, async (tx) => {
-      const role = await tenantRole(tx, ctx),
-        rawIncludeArchived = new URL(request.url).searchParams.get("includeArchived");
-      if (rawIncludeArchived !== null && rawIncludeArchived !== "true" && rawIncludeArchived !== "false")
+      const rawIncludeArchived = new URL(request.url).searchParams.get("includeArchived");
+      if (rawIncludeArchived !== null && rawIncludeArchived !== "true" && rawIncludeArchived !== "false") {
+        await tenantRole(tx, ctx);
         throw new ApiError(400, "VALIDATION_ERROR", "includeArchived must be true or false");
+      }
       const includeArchived = rawIncludeArchived === "true";
-      if (includeArchived && role !== "OWNER" && role !== "ADMIN")
-        throw new ApiError(403, "FORBIDDEN", "Only workspace owners and administrators can view archived clients");
-      const items =
-        await tx`select id,legal_name,legal_form,jurisdiction,lifecycle_status,archive_reason,archived_at,version,created_at,updated_at
-        from organisation where tenant_id=${ctx.tenantId} and (${includeArchived} or lifecycle_status='ACTIVE') order by lifecycle_status,legal_name,id`;
+      if (includeArchived) {
+        const role = await tenantRole(tx, ctx);
+        if (role !== "OWNER" && role !== "ADMIN")
+          throw new ApiError(403, "FORBIDDEN", "Only workspace owners and administrators can view archived clients");
+        const items = await tx`select id,legal_name,legal_form,jurisdiction,lifecycle_status,archive_reason,archived_at,version,created_at,updated_at
+          from organisation where tenant_id=${ctx.tenantId} order by lifecycle_status,legal_name,id`;
+        return json({ items });
+      }
+      const rows = await tx`
+        with actor_membership as (
+          select (select role_code from tenant_member where tenant_id=${ctx.tenantId} and actor_id=${ctx.actorId}) role_code
+        )
+        select o.id,o.legal_name,o.legal_form,o.jurisdiction,o.lifecycle_status,o.archive_reason,o.archived_at,
+          o.version,o.created_at,o.updated_at,actor_membership.role_code __role_code
+        from actor_membership left join organisation o on o.tenant_id=${ctx.tenantId} and o.lifecycle_status='ACTIVE'
+        order by o.lifecycle_status,o.legal_name,o.id`;
+      if (!rows[0]?.__role_code)
+        throw new ApiError(403, "FORBIDDEN", "Actor is not a member of this tenant");
+      const items = rows.flatMap((row) => {
+        const { __role_code, ...item } = row;
+        return item.id ? [item] : [];
+      });
       return json({ items });
     });
   } finally {
     await sql.end();
   }
 }
+
 async function createOrganisation(
   request: Request,
   env: Env,
@@ -5344,6 +5378,18 @@ function countsByStatus(
     rows.map((row) => [String(row.status), Number(row.count)]),
   );
 }
+
+function dashboardMetric(
+  rows: readonly Record<string, unknown>[],
+  metric: string,
+): { total: number; byStatus: Record<string, number> } {
+  const metricRows = rows.filter((row) => row.metric === metric);
+  return {
+    total: metricRows.reduce((sum, row) => sum + Number(row.count), 0),
+    byStatus: countsByStatus(metricRows),
+  };
+}
+
 async function dashboard(
   request: Request,
   env: Env,
@@ -5355,79 +5401,46 @@ async function dashboard(
   try {
     return await withTenantTransaction(sql, ctx, async (tx) => {
       await engagementAccess(tx, ctx, engagementId);
-      const journals =
-        await tx`select status,count(*)::int as count from journal where tenant_id=${ctx.tenantId} and engagement_id=${engagementId} group by status`;
-      const reconciliations =
-        await tx`select status,count(*)::int as count from reconciliation where tenant_id=${ctx.tenantId} and engagement_id=${engagementId} group by status`;
-      const tasks =
-        await tx`select status,count(*)::int as count from workflow_task where tenant_id=${ctx.tenantId} and engagement_id=${engagementId} group by status`;
-      const reviewPoints =
-        await tx`select status,count(*)::int as count from review_point where tenant_id=${ctx.tenantId} and engagement_id=${engagementId} group by status`;
-      const workingPapers =
-        await tx`select status,count(*)::int as count from working_paper where tenant_id=${ctx.tenantId} and engagement_id=${engagementId} group by status`;
-      const disclosures =
-        await tx`select status,count(*)::int as count from disclosure where tenant_id=${ctx.tenantId} and engagement_id=${engagementId} group by status`;
-      const accountsVersions =
-        await tx`select status,count(*)::int as count from accounts_version where tenant_id=${ctx.tenantId} and engagement_id=${engagementId} group by status`;
-      const signoffs =
-        await tx`select case when invalidated_at is null then 'ACTIVE' else 'INVALIDATED' end as status,count(*)::int as count from signoff where tenant_id=${ctx.tenantId} and engagement_id=${engagementId} group by (invalidated_at is null)`;
-      const filingAttempts =
-        await tx`select status,count(*)::int as count from filing_attempt where tenant_id=${ctx.tenantId} and engagement_id=${engagementId} group by status`;
-      const progressRows =
-        await tx`select count(*) filter(where status<>'CANCELLED')::int as total_tasks,count(*) filter(where status='COMPLETE')::int as completed_tasks from workflow_task where tenant_id=${ctx.tenantId} and engagement_id=${engagementId}`;
-      const blockerRows = await tx`select
-      (select count(*) from workflow_task where tenant_id=${ctx.tenantId} and engagement_id=${engagementId} and blocking and status not in ('COMPLETE','CANCELLED'))+
-      (select count(*) from review_point where tenant_id=${ctx.tenantId} and engagement_id=${engagementId} and severity='BLOCKING' and status<>'CLEARED')+
-      (select count(*) from reconciliation where tenant_id=${ctx.tenantId} and engagement_id=${engagementId} and status='EXCEPTION') as blocking_items`;
-      const totalTasks = Number(progressRows[0]!.total_tasks),
-        completedTasks = Number(progressRows[0]!.completed_tasks);
+      const metricRows = await tx`
+        select metric,status,count(*)::int as count
+        from (
+          select 'journals'::text metric,status::text from journal where tenant_id=${ctx.tenantId} and engagement_id=${engagementId}
+          union all select 'reconciliations',status::text from reconciliation where tenant_id=${ctx.tenantId} and engagement_id=${engagementId}
+          union all select 'tasks',status::text from workflow_task where tenant_id=${ctx.tenantId} and engagement_id=${engagementId}
+          union all select 'reviewPoints',status::text from review_point where tenant_id=${ctx.tenantId} and engagement_id=${engagementId}
+          union all select 'workingPapers',status::text from working_paper where tenant_id=${ctx.tenantId} and engagement_id=${engagementId}
+          union all select 'disclosures',status::text from disclosure where tenant_id=${ctx.tenantId} and engagement_id=${engagementId}
+          union all select 'accountsVersions',status::text from accounts_version where tenant_id=${ctx.tenantId} and engagement_id=${engagementId}
+          union all select 'signoffs',case when invalidated_at is null then 'ACTIVE' else 'INVALIDATED' end from signoff where tenant_id=${ctx.tenantId} and engagement_id=${engagementId}
+          union all select 'filingAttempts',status::text from filing_attempt where tenant_id=${ctx.tenantId} and engagement_id=${engagementId}
+          union all select 'blockingItems','BLOCKING' from workflow_task where tenant_id=${ctx.tenantId} and engagement_id=${engagementId} and blocking and status not in ('COMPLETE','CANCELLED')
+          union all select 'blockingItems','BLOCKING' from review_point where tenant_id=${ctx.tenantId} and engagement_id=${engagementId} and severity='BLOCKING' and status<>'CLEARED'
+          union all select 'blockingItems','BLOCKING' from reconciliation where tenant_id=${ctx.tenantId} and engagement_id=${engagementId} and status='EXCEPTION'
+        ) dashboard_metric
+        group by metric,status`;
+      const journals = dashboardMetric(metricRows, "journals"),
+        reconciliations = dashboardMetric(metricRows, "reconciliations"),
+        tasks = dashboardMetric(metricRows, "tasks"),
+        reviewPoints = dashboardMetric(metricRows, "reviewPoints"),
+        workingPapers = dashboardMetric(metricRows, "workingPapers"),
+        disclosures = dashboardMetric(metricRows, "disclosures"),
+        accountsVersions = dashboardMetric(metricRows, "accountsVersions"),
+        signoffs = dashboardMetric(metricRows, "signoffs"),
+        filingAttempts = dashboardMetric(metricRows, "filingAttempts"),
+        blockers = dashboardMetric(metricRows, "blockingItems"),
+        totalTasks = tasks.total - (tasks.byStatus.CANCELLED ?? 0),
+        completedTasks = tasks.byStatus.COMPLETE ?? 0;
       return json({
         engagementId,
-        journals: {
-          total: journals.reduce((sum, row) => sum + Number(row.count), 0),
-          byStatus: countsByStatus(journals),
-        },
-        reconciliations: {
-          total: reconciliations.reduce(
-            (sum, row) => sum + Number(row.count),
-            0,
-          ),
-          byStatus: countsByStatus(reconciliations),
-        },
-        tasks: {
-          total: tasks.reduce((sum, row) => sum + Number(row.count), 0),
-          byStatus: countsByStatus(tasks),
-        },
-        reviewPoints: {
-          total: reviewPoints.reduce((sum, row) => sum + Number(row.count), 0),
-          byStatus: countsByStatus(reviewPoints),
-        },
-        workingPapers: {
-          total: workingPapers.reduce((sum, row) => sum + Number(row.count), 0),
-          byStatus: countsByStatus(workingPapers),
-        },
-        disclosures: {
-          total: disclosures.reduce((sum, row) => sum + Number(row.count), 0),
-          byStatus: countsByStatus(disclosures),
-        },
-        accountsVersions: {
-          total: accountsVersions.reduce(
-            (sum, row) => sum + Number(row.count),
-            0,
-          ),
-          byStatus: countsByStatus(accountsVersions),
-        },
-        signoffs: {
-          total: signoffs.reduce((sum, row) => sum + Number(row.count), 0),
-          byStatus: countsByStatus(signoffs),
-        },
-        filingAttempts: {
-          total: filingAttempts.reduce(
-            (sum, row) => sum + Number(row.count),
-            0,
-          ),
-          byStatus: countsByStatus(filingAttempts),
-        },
+        journals,
+        reconciliations,
+        tasks,
+        reviewPoints,
+        workingPapers,
+        disclosures,
+        accountsVersions,
+        signoffs,
+        filingAttempts,
         progress: {
           completedTasks,
           totalTasks,
@@ -5435,7 +5448,7 @@ async function dashboard(
             ? Math.round((completedTasks * 100) / totalTasks)
             : 0,
         },
-        blockingItems: Number(blockerRows[0]!.blocking_items),
+        blockingItems: blockers.total,
       });
     });
   } finally {
@@ -5718,7 +5731,8 @@ export default {
       else if (platformCoreResponse) response = platformCoreResponse;
       else if (practiceManagementResponse)
         response = practiceManagementResponse;
-      else if (resourceEconomicsResponse) response = resourceEconomicsResponse;
+      else if (resourceEconomicsResponse)
+        response = resourceEconomicsResponse;
       else if (crmOnboardingResponse) response = crmOnboardingResponse;
       else if (clientCollaborationResponse) response = clientCollaborationResponse;
       else if (request.method === "GET" && url.pathname === "/v1/me/tenants")

@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const service=await readFile(new URL("../src/resource-economics.ts",import.meta.url),"utf8");
+const capacityService=await readFile(new URL("../src/resource-economics-capacity.ts",import.meta.url),"utf8");
 const migration=await readFile(new URL("../../../packages/database/migrations/0035_resource_capacity_time_economics.sql",import.meta.url),"utf8");
 
 test("resource and capacity routes are permission and entitlement gated",()=>{
@@ -16,7 +17,7 @@ test("resource planning preserves history and blocks invalid resource assignment
   assert.match(service,/RESOURCE_INACTIVE/);
   assert.match(service,/RESOURCE_OUTSIDE_TEAM/);
   assert.match(service,/WORK_REASSIGNED/);
-  assert.match(service,/forecast_remaining_hours/);
+  assert.match(capacityService,/forecast_remaining_hours/);
 });
 
 test("time capture validates work context and snapshots effective cost",()=>{

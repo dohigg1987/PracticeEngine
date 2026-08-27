@@ -54,6 +54,7 @@ describe("authenticated API boundary", () => {
     expect(sessionCacheTtlForPath("/v1/practice/resources")).toBe(300_000);
     expect(sessionCacheTtlForPath("/v1/platform/teams")).toBe(300_000);
     expect(sessionCacheTtlForPath("/v1/crm/prospects")).toBe(30_000);
+    expect(sessionCacheTtlForPath("/v1/engagements/engagement-1/dashboard")).toBe(30_000);
     expect(sessionCacheTtlForPath("/v1/engagements/engagement-1/report")).toBe(0);
   });
 

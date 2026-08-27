@@ -33,8 +33,21 @@ const RELATIONSHIP_TYPES = new Set([
   "BILLING_CONTACT",
   "OTHER",
 ]);
-const response = (data: unknown, status = 200) =>
-  Response.json(data, { status, headers: { "cache-control": "no-store" } });
+const response = (data: unknown, status = 200) => {
+  const startedAt = performance.now();
+  const body = JSON.stringify(data);
+  const serializationMs = Math.round((performance.now() - startedAt) * 100) / 100;
+  const encodedBody = new TextEncoder().encode(body);
+  return new Response(encodedBody, {
+    status,
+    headers: {
+      "cache-control": "no-store",
+      "content-type": "application/json",
+      "x-pe-response-bytes": String(encodedBody.byteLength),
+      "x-pe-serialization-ms": String(serializationMs),
+    },
+  });
+};
 export const platformDatabase = (env: Env): DB =>
   postgres(env.HYPERDRIVE.connectionString, { prepare: false, max: 5 });
 const db = platformDatabase;
@@ -46,6 +59,8 @@ export function platformContext(request: Request, actorId: string): Ctx {
       "TENANT_REQUIRED",
       "A tenant selection is required",
     );
+  if (!UUID.test(tenantId))
+    throw new ApiError(400, "INVALID_TENANT", "Tenant selection is invalid");
   return {
     tenantId,
     actorId,
@@ -206,6 +221,30 @@ export async function assertPlatformEntitled(tx: TX, key: string) {
     );
 }
 const entitled = assertPlatformEntitled;
+
+export async function assertPlatformRouteAccess(
+  tx: TX,
+  permissionKey: string,
+  baseFeatureKey: string,
+  routeFeatureKey: string,
+) {
+  const rows = await tx`select
+    actor_has_permission(${permissionKey}::text) allowed,
+    coalesce((select enabled from tenant_feature_decision(${baseFeatureKey}::text)),false) base_enabled,
+    coalesce((select enabled from tenant_feature_decision(${routeFeatureKey}::text)),false) route_enabled`;
+  if (!Boolean(rows[0]?.allowed))
+    throw new ApiError(
+      403,
+      "FORBIDDEN",
+      "Actor does not have permission for this operation",
+    );
+  if (!Boolean(rows[0]?.base_enabled) || !Boolean(rows[0]?.route_enabled))
+    throw new ApiError(
+      403,
+      "FEATURE_NOT_ENTITLED",
+      "This tenant is not entitled to the requested feature",
+    );
+}
 
 async function getContext(request: Request, env: Env, actorId: string) {
   const ctx = context(request, actorId),

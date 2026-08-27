@@ -551,7 +551,9 @@ function AccountsWorkspace({
   const [showEngagementSetup, setShowEngagementSetup] = useState(false);
   const [engagementOrganisationId, setEngagementOrganisationId] = useState("");
   const [engagements, setEngagements] = useState<Engagement[]>([]);
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedId, setSelectedId] = useState(
+    () => new URLSearchParams(window.location.search).get("engagement")?.trim() ?? "",
+  );
   const [lines, setLines] = useState<TrialBalanceLine[]>([]);
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [report, setReport] = useState<ReportLine[]>([]);
@@ -911,7 +913,7 @@ function AccountsWorkspace({
     if (!background) setDetailLoading(false);
   }, [context, selectedId]);
   const loadOperations = useCallback(async () => {
-    if (!selectedId) {
+    if (!selectedId || !configured) {
       setDashboard({});
       setJournals([]);
       setReconciliations([]);
@@ -924,6 +926,62 @@ function AccountsWorkspace({
     const requestEngagementId = selectedId;
     setOperationsLoading(true);
     setOperationsError("");
+    if (view === "overview") {
+      try {
+        const [dashboardResult, filingResult] = await Promise.allSettled([
+          api.dashboard(context, selectedId),
+          api.filingAttempts(context, selectedId),
+        ]);
+        if (
+          engagementResponseIsCurrent(
+            requestEngagementId,
+            operationsSelectionRef.current,
+          )
+        ) {
+          if (dashboardResult.status === "fulfilled")
+            setDashboard(dashboardResult.value);
+          else setDashboard({});
+          if (filingResult.status === "fulfilled")
+            setFilingAttempts(filingResult.value.items);
+          else setFilingAttempts([]);
+          const failure =
+            dashboardResult.status === "rejected"
+              ? dashboardResult.reason
+              : filingResult.status === "rejected"
+                ? filingResult.reason
+                : null;
+          if (failure)
+            setOperationsError(
+              failure instanceof Error
+                ? failure.message
+                : "The engagement overview could not be loaded.",
+            );
+        }
+      } catch (reason) {
+        if (
+          engagementResponseIsCurrent(
+            requestEngagementId,
+            operationsSelectionRef.current,
+          )
+        ) {
+          setDashboard({});
+          setFilingAttempts([]);
+          setOperationsError(
+            reason instanceof Error
+              ? reason.message
+              : "The engagement overview could not be loaded.",
+          );
+        }
+      } finally {
+        if (
+          engagementResponseIsCurrent(
+            requestEngagementId,
+            operationsSelectionRef.current,
+          )
+        ) setOperationsLoading(false);
+      }
+      return;
+    }
     const results = await Promise.allSettled([
       api.dashboard(context, selectedId),
       api.journals(context, selectedId),
@@ -970,7 +1028,7 @@ function AccountsWorkspace({
           "Some engagement operations could not be loaded.",
       );
     setOperationsLoading(false);
-  }, [context, selectedId]);
+  }, [configured, context, selectedId, view]);
   useEffect(() => {
     loadMemberships();
   }, [loadMemberships]);
@@ -1016,11 +1074,16 @@ function AccountsWorkspace({
     setOperationsLoading(false);
   }, [selectedId]);
   useEffect(() => {
-    loadDetail();
-  }, [loadDetail]);
+    if (
+      workspacePage === "engagement" &&
+      engagement &&
+      view !== "portal"
+    ) loadDetail();
+  }, [engagement, loadDetail, view, workspacePage]);
   useEffect(() => {
-    loadOperations();
-  }, [loadOperations]);
+    if (workspacePage === "engagement" && isOperationalView(view))
+      loadOperations();
+  }, [loadOperations, view, workspacePage]);
 
   const { mapped, unmapped } = mappingPopulation(lines),
     debit = lines.reduce((n, line) => n + Number(line.debit || 0), 0),
@@ -1142,25 +1205,38 @@ function AccountsWorkspace({
     { id: "overview", label: "Overview" },
     { id: "data", label: "Source data" },
     { id: "mapping", label: "Mapping", count: unmapped || undefined },
-    { id: "journals", label: "Journals", count: journals.length || undefined },
+    {
+      id: "journals",
+      label: "Journals",
+      count: dashboard.journals?.total || journals.length || undefined,
+    },
     {
       id: "reconciliations",
       label: "Reconciliations",
       count:
-        reconciliations.filter(isOutstandingReconciliation).length ||
+        (dashboard.reconciliations
+          ? dashboard.reconciliations.total -
+            (dashboard.reconciliations.byStatus.RECONCILED ?? 0) -
+            (dashboard.reconciliations.byStatus.REVIEWED ?? 0)
+          : reconciliations.filter(isOutstandingReconciliation).length) ||
         undefined,
     },
     {
       id: "tasks",
       label: "Tasks",
       count:
-        tasks.filter(isOpenWorkflowTask).length || undefined,
+        (dashboard.progress
+          ? dashboard.progress.totalTasks - dashboard.progress.completedTasks
+          : tasks.filter(isOpenWorkflowTask).length) || undefined,
     },
     {
       id: "review",
       label: "Review points",
       count:
-        reviewPoints.filter(isOutstandingReviewPoint).length || undefined,
+        (dashboard.reviewPoints
+          ? dashboard.reviewPoints.total -
+            (dashboard.reviewPoints.byStatus.CLEARED ?? 0)
+          : reviewPoints.filter(isOutstandingReviewPoint).length) || undefined,
     },
     { id: "working-papers", label: "Working papers" },
     { id: "disclosures", label: "Disclosures" },
@@ -1218,7 +1294,21 @@ function AccountsWorkspace({
       label: "Adjustments",
       target: "journals",
       views: ["journals", "reconciliations"],
-      state: adjustmentsStageState(journals, reconciliations),
+      state:
+        dashboard.journals && dashboard.reconciliations
+          ? dashboard.journals.total + dashboard.reconciliations.total === 0
+            ? "pending"
+            : dashboard.journals.total -
+                  (dashboard.journals.byStatus.POSTED ?? 0) -
+                  (dashboard.journals.byStatus.VOIDED ?? 0) >
+                0 ||
+                dashboard.reconciliations.total -
+                  (dashboard.reconciliations.byStatus.RECONCILED ?? 0) -
+                  (dashboard.reconciliations.byStatus.REVIEWED ?? 0) >
+                0
+              ? "attention"
+              : "ready"
+          : adjustmentsStageState(journals, reconciliations),
     },
     {
       label: "Accounts builder",
@@ -3488,7 +3578,15 @@ function Overview({
   tasks: WorkflowTask[];
   reviewPoints: ReviewPoint[];
 }) {
-  const taskStats = taskProgress(tasks);
+  const taskStats = dashboard.progress
+    ? {
+        completedTasks: dashboard.progress.completedTasks,
+        totalTasks: dashboard.progress.totalTasks,
+        openTasks:
+          dashboard.progress.totalTasks - dashboard.progress.completedTasks,
+        percent: dashboard.progress.percent,
+      }
+    : taskProgress(tasks);
   const cards = [
     {
       label: "Journals",

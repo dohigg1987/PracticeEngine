@@ -6,6 +6,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "preview_urls": false,
+  "placement": { "mode": "smart" },
   "vars": {
     "APP_VERSION": "a288e35ed6d89b9b2a3d92197f92053e4572c042",
     "WEB_ORIGIN": "https://practiceengine-dev.pages.dev",

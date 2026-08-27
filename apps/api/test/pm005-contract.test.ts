@@ -6,6 +6,7 @@ import { notificationDeliveryAdapter } from "../src/publisher.ts";
 const root = new URL("../../../", import.meta.url);
 const migration = await readFile(new URL("packages/database/migrations/0033_crm_onboarding_notifications.sql", root), "utf8");
 const service = await readFile(new URL("apps/api/src/crm-onboarding.ts", root), "utf8");
+const platform = await readFile(new URL("apps/api/src/platform-core.ts", root), "utf8");
 const worker = await readFile(new URL("apps/api/src/notification-worker.ts", root), "utf8");
 const publisher = await readFile(new URL("apps/api/src/publisher.ts", root), "utf8");
 const ui = await readFile(new URL("apps/web/src/CrmOnboarding.tsx", root), "utf8");
@@ -75,8 +76,9 @@ test("new tenant data is forced-RLS protected and least-privilege granted", () =
 test("functional permissions and commercial entitlements remain separate", () => {
   for (const permission of ["crm.view", "crm.manage", "prospects.create", "opportunities.convert", "onboarding.view", "onboarding.complete", "notifications.view"])
     assert.match(migration, new RegExp(permission.replace(".", "\\.")));
-  assert.match(service, /assertPlatformPermission\(tx, permission\)/);
-  assert.match(service, /assertPlatformEntitled\(tx, feature\)/);
+  assert.match(service, /assertPlatformRouteAccess\(tx, permission, "practice\.enabled", feature\)/);
+  assert.match(platform, /actor_has_permission\(\$\{permissionKey\}::text\) allowed/);
+  assert.match(platform, /tenant_feature_decision\(\$\{routeFeatureKey\}::text\)/);
   assert.doesNotMatch(service, /package(?:Name|_name)|professional_plan|premium_plan/i);
 });
 

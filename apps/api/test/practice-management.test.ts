@@ -18,8 +18,9 @@ test("exposes the complete Practice Management route surface", () => {
 
 test("enforces tenant context permissions and commercial entitlements server-side", () => {
   assert.match(service, /platformContext\(request, actorId\)/);
-  assert.match(service, /assertPlatformPermission/);
-  assert.match(service, /assertPlatformEntitled\(tx, "practice\.enabled"\)/);
+  assert.match(service, /assertPlatformRouteAccess\(tx, permission, "practice\.enabled", feature\)/);
+  assert.match(platform, /actor_has_permission\(\$\{permissionKey\}::text\) allowed/);
+  assert.match(platform, /tenant_feature_decision\(\$\{baseFeatureKey\}::text\)/);
   assert.match(service, /assertPlatformEntitled\(tx, "ledgerly\.enabled"\)/);
   assert.match(service, /where tenant_id=\$\{ctx\.tenantId\}/);
   for (const permission of ["services.view", "services.manage", "engagements.view", "engagements.manage", "work.view", "work.create", "work.edit", "work.assign", "work.complete", "tasks.view", "tasks.manage", "worktemplates.manage"])
@@ -45,7 +46,7 @@ test("keeps Ledgerly accounting ownership behind a validated stable link", () =>
 });
 
 test("uses the shared Platform Core transaction and decision seam", () => {
-  for (const exported of ["platformDatabase", "platformContext", "platformTransaction", "assertPlatformPermission", "assertPlatformEntitled"])
+  for (const exported of ["platformDatabase", "platformContext", "platformTransaction", "assertPlatformPermission", "assertPlatformEntitled", "assertPlatformRouteAccess"])
     assert.match(platform, new RegExp(`export (?:const |async function |function )${exported}\\b`));
   assert.match(service, /platformTransaction\(sql, ctx/);
 });
