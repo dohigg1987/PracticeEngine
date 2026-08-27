@@ -944,14 +944,23 @@ export type CrmProspect = {
 };
 export type PlatformTeam = { id: string; name: string; status: string; member_count: number };
 export type OpportunityService = { id: string; serviceId?: string; service_id?: string; name?: string; service_name?: string; accepted?: boolean };
+export type OpportunityCapabilities = { canCreate: boolean; canEdit: boolean; canConvert: boolean; quoteBenchAvailable: boolean };
+export type OpportunityConversion = {
+  id: string; client_id: string; client_name?: string | null; engagement_id: string; engagement_name?: string | null;
+  onboarding_case_id: string; onboarding_status?: string | null; proposal_reference_id: string;
+  proposal_id?: string | null; proposal_version?: string | null; proposal_status?: string | null; converted_at: string;
+  activated_services?: Array<{ clientServiceId: string; opportunityServiceId: string; serviceId: string; serviceName?: string }>;
+};
 export type CrmOpportunity = {
   id: string; prospect_id?: string | null; existing_client_id?: string | null; relationship_name?: string;
   name: string; stage_key: string; stage_name?: string; status: "open" | "won" | "lost" | "cancelled";
+  stage_sequence?: number; terminal_outcome?: "won" | "lost" | null;
   expected_close_date?: string | null; probability?: number | null; estimated_value?: string | number | null; currency: string;
+  responsible_member_id?: string | null; responsible_team_id?: string | null; source?: string | null; outcome_reason?: string | null;
   responsible_member_name?: string | null; responsible_team_name?: string | null;
   services?: OpportunityService[]; proposal_status?: string | null; conversion_state: string;
   proposals?: Array<Record<string, unknown>>; activities?: Array<Record<string, unknown>>;
-  conversion?: Record<string, unknown> | null;
+  conversion?: OpportunityConversion | null; capabilities?: OpportunityCapabilities;
 };
 export type OnboardingCase = {
   id: string; client_id: string; client_name?: string; opportunity_id: string; opportunity_name?: string;
@@ -2207,9 +2216,10 @@ export const api = {
   updateCrmProspect: (context: ApiContext, id: string, body: Record<string, unknown>) => request<{ item: CrmProspect }>(`/v1/crm/prospects/${encodeURIComponent(id)}`, context, { method: "PATCH", body: JSON.stringify(body) }),
   platformTeams: (context: ApiContext) => request<{ items: PlatformTeam[] }>("/v1/platform/teams", context),
   createPlatformTeam: (context: ApiContext, name: string) => request<{ item: PlatformTeam }>("/v1/platform/teams", context, { method: "POST", body: JSON.stringify({ name }) }),
-  crmOpportunities: (context: ApiContext) => request<{ items: CrmOpportunity[] }>("/v1/crm/opportunities", context),
+  crmOpportunities: (context: ApiContext) => request<{ items: CrmOpportunity[]; capabilities?: OpportunityCapabilities }>("/v1/crm/opportunities", context),
   createCrmOpportunity: (context: ApiContext, body: Record<string, unknown>) => request<{ item: CrmOpportunity }>("/v1/crm/opportunities", context, { method: "POST", body: JSON.stringify(body) }),
   crmOpportunity: (context: ApiContext, id: string) => request<{ item: CrmOpportunity }>(`/v1/crm/opportunities/${encodeURIComponent(id)}`, context),
+  updateCrmOpportunity: (context: ApiContext, id: string, body: Record<string, unknown>) => request<{ item: CrmOpportunity }>(`/v1/crm/opportunities/${encodeURIComponent(id)}`, context, { method: "PATCH", body: JSON.stringify(body) }),
   updateOpportunityStage: (context: ApiContext, id: string, stageKey: string, outcomeReason?: string) => request<{ item: CrmOpportunity }>(`/v1/crm/opportunities/${encodeURIComponent(id)}/stage`, context, { method: "POST", body: JSON.stringify({ stageKey, outcomeReason }) }),
   linkQuoteBenchProposal: (context: ApiContext, id: string, proposalId: string, proposalVersion = "1") => request<{ item: Record<string, unknown> }>(`/v1/crm/opportunities/${encodeURIComponent(id)}/proposals`, context, { method: "POST", body: JSON.stringify({ proposalId, proposalVersion }) }),
   onboardingCases: (context: ApiContext) => request<{ items: OnboardingCase[] }>("/v1/onboarding", context),

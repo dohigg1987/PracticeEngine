@@ -12,6 +12,7 @@ import {
   globalSettingForPath,
   manifestForPath,
   navigationItemForPath,
+  quoteBenchProposalAccessAllowed,
   suiteIdentity,
 } from "./application-manifests";
 
@@ -57,6 +58,9 @@ describe("PracticeEngine application manifests", () => {
 
   it("resolves the active application and deep navigation route", () => {
     expect(manifestForPath("/practice/work/abc")?.id).toBe("practice");
+    expect(navigationItemForPath("/practice/crm/opportunities/new")?.id).toBe("practice-opportunities");
+    expect(navigationItemForPath("/practice/crm/opportunities/opportunity-1")?.id).toBe("practice-opportunities");
+    expect(navigationItemForPath("/practice/crm/prospects/prospect-1")?.id).toBe("practice-prospects");
     expect(navigationItemForPath("/ledgerly/working-papers/wp-1")?.id).toBe("ledgerly-working-papers");
     expect(manifestForPath("/settings")).toBeUndefined();
   });
@@ -80,6 +84,13 @@ describe("PracticeEngine application manifests", () => {
     expect(applicationManifests.find((app) => app.id === "practice")!.settings.map((item) => item.label)).toContain("Service catalogue");
     expect(applicationManifests.find((app) => app.id === "ledgerly")!.settings.map((item) => item.label)).toEqual(["Accounting configuration", "Accounts & filing"]);
     expect(globalSettings.map((item) => item.label)).not.toContain("Service catalogue");
+  });
+
+  it("requires both QuoteBench application and proposal entitlements", () => {
+    expect(quoteBenchProposalAccessAllowed({ "quotebench.enabled": true, "quotebench.proposals": true }, true)).toBe(true);
+    expect(quoteBenchProposalAccessAllowed({ "quotebench.enabled": true, "quotebench.proposals": false }, true)).toBe(false);
+    expect(quoteBenchProposalAccessAllowed({ "quotebench.enabled": false, "quotebench.proposals": true }, true)).toBe(false);
+    expect(quoteBenchProposalAccessAllowed({ "quotebench.enabled": true, "quotebench.proposals": true }, false)).toBe(false);
   });
 
   it("gives every advertised global settings route one distinct semantic content owner", () => {

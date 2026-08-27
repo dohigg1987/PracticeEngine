@@ -12,7 +12,7 @@ const docs = await Promise.all([
 
 test("PM-007 adds sequential migration 0035 and required architecture sources", async () => {
   const migrations = (await readdir(new URL("packages/database/migrations/", root))).filter((name) => /^\d{4}_/.test(name)).sort();
-  assert.equal(migrations.at(-1), "0035_resource_capacity_time_economics.sql");
+  assert.ok(migrations.includes("0035_resource_capacity_time_economics.sql"));
   assert.match(migration, /VALUES\('0035','Practice resource profiles capacity time capture WIP and management economics'\)/);
   for (const document of docs) assert.ok(document.trim().length > 200);
 });

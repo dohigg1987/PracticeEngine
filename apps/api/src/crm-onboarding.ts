@@ -13,7 +13,6 @@ import { evaluateRecurrence, type RecurrenceRule } from "./practice-scheduling.j
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const PROSPECT_STATUSES = new Set(["prospect", "qualified", "converted", "lost", "archived"]);
-const OPPORTUNITY_STATUSES = new Set(["open", "won", "lost", "cancelled"]);
 const PROPOSAL_EVENTS = new Map([
   ["quotebench.proposal.created", "created"],
   ["quotebench.proposal.sent", "sent"],
@@ -82,6 +81,36 @@ function numberValue(input: Record<string, unknown>, key: string): number | null
   const value = Number(input[key]);
   if (!Number.isFinite(value)) throw new ApiError(400, "INVALID_REQUEST", `${key} must be numeric`);
   return value;
+}
+
+function boundedNumberValue(input: Record<string, unknown>, key: string, minimum: number, maximum?: number): number | null {
+  const value = numberValue(input, key);
+  if (value !== null && (value < minimum || (maximum !== undefined && value > maximum)))
+    throw new ApiError(400, "INVALID_REQUEST", `${key} must be between ${minimum} and ${maximum ?? "the supported maximum"}`);
+  return value;
+}
+
+function dateValue(input: Record<string, unknown>, key: string): string | null | undefined {
+  const value = optional(input, key, 10);
+  if (value === undefined || value === null) return value;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(parsed.valueOf()) || parsed.toISOString().slice(0, 10) !== value)
+    throw new ApiError(400, "INVALID_REQUEST", `${key} must be a valid date in YYYY-MM-DD format`);
+  return value;
+}
+
+async function opportunityCapabilities(tx: PlatformTX, tenantId: string) {
+  const rows = await tx`select actor_has_permission('opportunities.create') can_create,
+    actor_has_permission('opportunities.edit') can_edit,
+    actor_has_permission('opportunities.convert') can_convert,
+    tenant_feature_is_enabled(${tenantId}::uuid,'quotebench.enabled') and
+      tenant_feature_is_enabled(${tenantId}::uuid,'quotebench.proposals') quotebench_available`;
+  return {
+    canCreate: Boolean(rows[0]?.can_create),
+    canEdit: Boolean(rows[0]?.can_edit),
+    canConvert: Boolean(rows[0]?.can_convert),
+    quoteBenchAvailable: Boolean(rows[0]?.quotebench_available),
+  };
 }
 
 export function quoteBenchCommercialContext(input: Record<string, unknown>): QuoteBenchCommercialContext {
@@ -222,34 +251,152 @@ async function opportunityCollection(request: Request, env: Env, actorId: string
       join crm_stage_definition sd on sd.tenant_id=o.tenant_id and sd.stage_key=o.stage_key
       left join tenant_member tm on tm.tenant_id=o.tenant_id and tm.id=o.responsible_member_id
       left join team t on t.tenant_id=o.tenant_id and t.id=o.responsible_team_id
-      where o.tenant_id=${ctx.tenantId} order by o.status,o.expected_close_date nulls last,o.updated_at desc` });
+      where o.tenant_id=${ctx.tenantId} order by o.status,o.expected_close_date nulls last,o.updated_at desc`,
+      capabilities: await opportunityCapabilities(tx, ctx.tenantId) });
     const opportunityId = crypto.randomUUID();
     const prospectId = input!.prospectId ? id(input!.prospectId, "prospectId") : null;
     const existingClientId = input!.existingClientId ? id(input!.existingClientId, "existingClientId") : null;
     if (!prospectId && !existingClientId) throw new ApiError(400, "INVALID_REQUEST", "prospectId or existingClientId is required");
+    if (prospectId && existingClientId) throw new ApiError(400, "INVALID_REQUEST", "Choose either a prospect or an existing client");
+    if (prospectId) {
+      const prospect = await tx`select id from prospect where tenant_id=${ctx.tenantId} and id=${prospectId} and status in ('prospect','qualified')`;
+      if (!prospect.length) throw new ApiError(400, "INVALID_REQUEST", "prospectId must identify an active prospect");
+    }
+    if (existingClientId) {
+      const client = await tx`select id from organisation where tenant_id=${ctx.tenantId} and id=${existingClientId} and lifecycle_status='ACTIVE'`;
+      if (!client.length) throw new ApiError(400, "INVALID_REQUEST", "existingClientId must identify an active client");
+    }
     const stageKey = optional(input!, "stageKey", 50) ?? "qualification";
     const stage = await tx`select default_probability from crm_stage_definition where tenant_id=${ctx.tenantId} and stage_key=${stageKey} and status='active'`;
     if (!stage.length) throw new ApiError(400, "INVALID_REQUEST", "stageKey is not active");
     const currency = (optional(input!, "currency", 3) ?? "GBP").toUpperCase();
     if (!/^[A-Z]{3}$/.test(currency)) throw new ApiError(400, "INVALID_REQUEST", "currency must be an ISO-style code");
+    const responsibleMemberId = optional(input!, "responsibleMemberId", 36);
+    const responsibleTeamId = optional(input!, "responsibleTeamId", 36);
+    if (responsibleMemberId) id(responsibleMemberId, "responsibleMemberId");
+    if (responsibleTeamId) id(responsibleTeamId, "responsibleTeamId");
+    if (responsibleMemberId) {
+      const member = await tx`select id from tenant_member where tenant_id=${ctx.tenantId} and id=${responsibleMemberId} and membership_status='ACTIVE'`;
+      if (!member.length) throw new ApiError(400, "INVALID_REQUEST", "responsibleMemberId must identify an active member");
+    }
+    if (responsibleTeamId) {
+      const team = await tx`select id from team where tenant_id=${ctx.tenantId} and id=${responsibleTeamId} and status='ACTIVE'`;
+      if (!team.length) throw new ApiError(400, "INVALID_REQUEST", "responsibleTeamId must identify an active team");
+    }
+    const serviceIds = ids(input!, "serviceIds");
+    for (const serviceId of serviceIds) {
+      const service = await tx`select id from practice_service where tenant_id=${ctx.tenantId} and id=${serviceId} and status='active'`;
+      if (!service.length) throw new ApiError(400, "INVALID_REQUEST", "serviceIds must identify active services");
+    }
     const rows = await tx`insert into opportunity(id,tenant_id,prospect_id,existing_client_id,name,stage_key,responsible_member_id,responsible_team_id,expected_close_date,probability,estimated_value,currency,source,status,created_by,updated_by)
-      values(${opportunityId},${ctx.tenantId},${prospectId},${existingClientId},${required(input!, "name", 240)},${stageKey},${optional(input!, "responsibleMemberId", 36) ?? null},${optional(input!, "responsibleTeamId", 36) ?? null},${optional(input!, "expectedCloseDate", 10) ?? null},${numberValue(input!, "probability") ?? stage[0]!.default_probability},${numberValue(input!, "estimatedValue")},${currency},${optional(input!, "source", 120) ?? null},'open',${ctx.actorId},${ctx.actorId}) returning *`;
-    for (const serviceId of ids(input!, "serviceIds")) await tx`insert into opportunity_service(id,tenant_id,opportunity_id,service_id,created_by) values(${crypto.randomUUID()},${ctx.tenantId},${opportunityId},${serviceId},${ctx.actorId})`;
-    await recordMutation(tx, ctx, "OPPORTUNITY_CREATED", "OPPORTUNITY", opportunityId, existingClientId, { prospectId, existingClientId, stageKey }, "opportunity.created");
+      values(${opportunityId},${ctx.tenantId},${prospectId},${existingClientId},${required(input!, "name", 240)},${stageKey},${responsibleMemberId ?? null},${responsibleTeamId ?? null},${dateValue(input!, "expectedCloseDate") ?? null},${boundedNumberValue(input!, "probability", 0, 100) ?? stage[0]!.default_probability},${boundedNumberValue(input!, "estimatedValue", 0)},${currency},${optional(input!, "source", 120) ?? null},'open',${ctx.actorId},${ctx.actorId}) returning *`;
+    for (const serviceId of serviceIds) await tx`insert into opportunity_service(id,tenant_id,opportunity_id,service_id,created_by) values(${crypto.randomUUID()},${ctx.tenantId},${opportunityId},${serviceId},${ctx.actorId})`;
+    await tx`insert into crm_activity(id,tenant_id,prospect_id,opportunity_id,activity_type,summary,created_by)
+      values(${crypto.randomUUID()},${ctx.tenantId},${prospectId},${opportunityId},'system','Opportunity created',${ctx.actorId})`;
+    await recordMutation(tx, ctx, "OPPORTUNITY_CREATED", "OPPORTUNITY", opportunityId, existingClientId, { prospectId, existingClientId, stageKey, serviceIds }, "opportunity.created");
     return response({ item: rows[0] }, 201);
   });
 }
 
-async function opportunityDetail(request: Request, env: Env, actorId: string, opportunityId: string) {
+async function opportunityItem(request: Request, env: Env, actorId: string, opportunityId: string) {
   id(opportunityId, "opportunityId");
-  return within(request, env, actorId, "crm.view", "practice.crm", async (tx, ctx) => {
-    const rows = await tx`select o.*,coalesce(p.display_name,c.display_name,c.legal_name) relationship_name from opportunity o left join prospect p on p.tenant_id=o.tenant_id and p.id=o.prospect_id left join organisation c on c.tenant_id=o.tenant_id and c.id=o.existing_client_id where o.tenant_id=${ctx.tenantId} and o.id=${opportunityId}`;
+  const input = request.method === "PATCH" ? await requestBody(request) : null;
+  return within(request, env, actorId, request.method === "GET" ? "crm.view" : "opportunities.edit", "practice.crm", async (tx, ctx) => {
+    const rows = await tx`select o.*,coalesce(p.display_name,c.display_name,c.legal_name) relationship_name,
+      sd.display_name stage_name,sd.sequence stage_sequence,sd.terminal_outcome,
+      tm.display_name responsible_member_name,t.name responsible_team_name
+      from opportunity o
+      left join prospect p on p.tenant_id=o.tenant_id and p.id=o.prospect_id
+      left join organisation c on c.tenant_id=o.tenant_id and c.id=o.existing_client_id
+      join crm_stage_definition sd on sd.tenant_id=o.tenant_id and sd.stage_key=o.stage_key
+      left join tenant_member tm on tm.tenant_id=o.tenant_id and tm.id=o.responsible_member_id
+      left join team t on t.tenant_id=o.tenant_id and t.id=o.responsible_team_id
+      where o.tenant_id=${ctx.tenantId} and o.id=${opportunityId}${request.method === "PATCH" ? tx` for update of o` : tx``}`;
     if (!rows.length) throw new ApiError(404, "NOT_FOUND", "Opportunity not found");
+    if (request.method === "PATCH") {
+      if (rows[0]!.status !== "open") throw new ApiError(409, "OPPORTUNITY_TERMINAL", "A terminal opportunity is read-only");
+      const changes: Record<string, unknown> = {};
+      const changedFields: string[] = [];
+      const setChange = (column: string, field: string, value: unknown, equal?: (current: unknown, next: unknown) => boolean) => {
+        const current = rows[0]![column];
+        if (!(equal?.(current, value) ?? ((current === null ? null : String(current)) === (value === null ? null : String(value))))) {
+          changes[column] = value;
+          changedFields.push(field);
+        }
+      };
+      if ("name" in input!) setChange("name", "name", required(input!, "name", 240));
+      if ("responsibleMemberId" in input!) {
+        const value = optional(input!, "responsibleMemberId", 36); if (value) id(value, "responsibleMemberId");
+        if (value) { const member = await tx`select id from tenant_member where tenant_id=${ctx.tenantId} and id=${value} and membership_status='ACTIVE'`; if (!member.length) throw new ApiError(400, "INVALID_REQUEST", "responsibleMemberId must identify an active member"); }
+        setChange("responsible_member_id", "responsibleMemberId", value ?? null);
+      }
+      if ("responsibleTeamId" in input!) {
+        const value = optional(input!, "responsibleTeamId", 36); if (value) id(value, "responsibleTeamId");
+        if (value) { const team = await tx`select id from team where tenant_id=${ctx.tenantId} and id=${value} and status='ACTIVE'`; if (!team.length) throw new ApiError(400, "INVALID_REQUEST", "responsibleTeamId must identify an active team"); }
+        setChange("responsible_team_id", "responsibleTeamId", value ?? null);
+      }
+      if ("expectedCloseDate" in input!) setChange("expected_close_date", "expectedCloseDate", dateValue(input!, "expectedCloseDate") ?? null);
+      const sameNumber = (current: unknown, next: unknown) => current === null || next === null ? current === next : Number(current) === Number(next);
+      if ("probability" in input!) setChange("probability", "probability", boundedNumberValue(input!, "probability", 0, 100), sameNumber);
+      if ("estimatedValue" in input!) setChange("estimated_value", "estimatedValue", boundedNumberValue(input!, "estimatedValue", 0), sameNumber);
+      if ("currency" in input!) {
+        const value = required(input!, "currency", 3).toUpperCase();
+        if (!/^[A-Z]{3}$/.test(value)) throw new ApiError(400, "INVALID_REQUEST", "currency must be an ISO-style code");
+        setChange("currency", "currency", value);
+      }
+      if ("source" in input!) setChange("source", "source", optional(input!, "source", 120) ?? null);
+      let serviceIds: string[] | null = null;
+      if ("serviceIds" in input!) {
+        serviceIds = ids(input!, "serviceIds");
+        for (const serviceId of serviceIds) {
+          const service = await tx`select s.id from practice_service s where s.tenant_id=${ctx.tenantId} and s.id=${serviceId}
+            and (s.status='active' or exists(select 1 from opportunity_service os where os.tenant_id=s.tenant_id and os.opportunity_id=${opportunityId} and os.service_id=s.id))`;
+          if (!service.length) throw new ApiError(400, "INVALID_REQUEST", "serviceIds must identify available services");
+        }
+        const existingServices = await tx`select service_id from opportunity_service where tenant_id=${ctx.tenantId} and opportunity_id=${opportunityId}`;
+        const existingIds = existingServices.map((item) => String(item.service_id)).sort();
+        if (existingIds.join(",") !== [...serviceIds].sort().join(",")) changedFields.push("serviceIds");
+      }
+      if (!changedFields.length) throw new ApiError(400, "NO_SUPPORTED_CHANGES", "No supported changes were supplied");
+      if (Object.keys(changes).length) {
+        changes.updated_by = ctx.actorId; changes.updated_at = new Date().toISOString();
+        const columns = Object.keys(changes);
+        const updated = await tx`update opportunity set ${tx(changes, ...columns)} where tenant_id=${ctx.tenantId} and id=${opportunityId} returning *`;
+        Object.assign(rows[0]!, updated[0]);
+      }
+      if (serviceIds) {
+        const retained = new Set(serviceIds);
+        const currentServices = await tx`select id,service_id from opportunity_service where tenant_id=${ctx.tenantId} and opportunity_id=${opportunityId}`;
+        for (const item of currentServices) if (!retained.has(String(item.service_id)))
+          await tx`delete from opportunity_service where tenant_id=${ctx.tenantId} and id=${item.id}`;
+        for (const serviceId of serviceIds) await tx`insert into opportunity_service(id,tenant_id,opportunity_id,service_id,created_by)
+          values(${crypto.randomUUID()},${ctx.tenantId},${opportunityId},${serviceId},${ctx.actorId}) on conflict(tenant_id,opportunity_id,service_id) do nothing`;
+      }
+      await tx`insert into crm_activity(id,tenant_id,prospect_id,opportunity_id,activity_type,summary,created_by)
+        values(${crypto.randomUUID()},${ctx.tenantId},${rows[0]!.prospect_id},${opportunityId},'system',${`Opportunity updated: ${changedFields.join(", ")}`},${ctx.actorId})`;
+      await recordMutation(tx, ctx, "OPPORTUNITY_UPDATED", "OPPORTUNITY", opportunityId, rows[0]!.existing_client_id ? String(rows[0]!.existing_client_id) : null, { changedFields }, "opportunity.updated");
+      const labels = await tx`select tm.display_name responsible_member_name,t.name responsible_team_name
+        from opportunity o left join tenant_member tm on tm.tenant_id=o.tenant_id and tm.id=o.responsible_member_id
+        left join team t on t.tenant_id=o.tenant_id and t.id=o.responsible_team_id
+        where o.tenant_id=${ctx.tenantId} and o.id=${opportunityId}`;
+      Object.assign(rows[0]!, labels[0]);
+    }
     const services = await tx`select os.*,s.name service_name,s.category from opportunity_service os join practice_service s on s.tenant_id=os.tenant_id and s.id=os.service_id where os.tenant_id=${ctx.tenantId} and os.opportunity_id=${opportunityId} order by s.name`;
     const proposals = await tx`select * from quotebench_proposal_reference where tenant_id=${ctx.tenantId} and opportunity_id=${opportunityId} order by last_event_at desc`;
     const activities = await tx`select * from crm_activity where tenant_id=${ctx.tenantId} and opportunity_id=${opportunityId} order by occurred_at desc,id limit 100`;
-    const conversion = await tx`select * from crm_conversion where tenant_id=${ctx.tenantId} and opportunity_id=${opportunityId}`;
-    return response({ item: { ...rows[0], services, proposals, activities, conversion: conversion[0] ?? null } });
+    const conversion = await tx`select cv.*,coalesce(c.display_name,c.legal_name) client_name,e.name engagement_name,oc.status onboarding_status,
+      q.proposal_id,q.proposal_version,q.status proposal_status,
+      coalesce((select json_agg(json_build_object('clientServiceId',ocs.client_service_id,'opportunityServiceId',ocs.opportunity_service_id,'serviceId',cs.service_id,'serviceName',ps.name) order by ps.name)
+        from onboarding_case_service ocs join client_service cs on cs.tenant_id=ocs.tenant_id and cs.id=ocs.client_service_id
+        join practice_service ps on ps.tenant_id=cs.tenant_id and ps.id=cs.service_id
+        where ocs.tenant_id=cv.tenant_id and ocs.onboarding_case_id=cv.onboarding_case_id),'[]') activated_services
+      from crm_conversion cv join organisation c on c.tenant_id=cv.tenant_id and c.id=cv.client_id
+      join practice_engagement e on e.tenant_id=cv.tenant_id and e.id=cv.engagement_id
+      join onboarding_case oc on oc.tenant_id=cv.tenant_id and oc.id=cv.onboarding_case_id
+      join quotebench_proposal_reference q on q.tenant_id=cv.tenant_id and q.id=cv.proposal_reference_id
+      where cv.tenant_id=${ctx.tenantId} and cv.opportunity_id=${opportunityId}`;
+    return response({ item: { ...rows[0], services, proposals, activities, conversion: conversion[0] ?? null,
+      capabilities: await opportunityCapabilities(tx, ctx.tenantId) } });
   });
 }
 
@@ -262,11 +409,14 @@ async function opportunityStage(request: Request, env: Env, actorId: string, opp
     const current = await tx`select * from opportunity where tenant_id=${ctx.tenantId} and id=${opportunityId} for update`;
     if (!current.length) throw new ApiError(404, "NOT_FOUND", "Opportunity not found");
     if (current[0]!.status !== "open") throw new ApiError(409, "OPPORTUNITY_TERMINAL", "A terminal opportunity cannot change stage");
+    if (String(current[0]!.stage_key) === stageKey) throw new ApiError(409, "NO_OP_STAGE_TRANSITION", "Choose a stage other than the current stage");
     if (stage[0]!.terminal_outcome === "won") throw new ApiError(409, "ACCEPTANCE_REQUIRED", "Only accepted proposal conversion can mark an opportunity won");
     const status = stage[0]!.terminal_outcome === "lost" ? "lost" : "open";
-    const rows = await tx`update opportunity set stage_key=${stageKey},status=${status},probability=${numberValue(input, "probability") ?? stage[0]!.default_probability},outcome_reason=${optional(input, "outcomeReason", 1000) ?? null},updated_by=${ctx.actorId},updated_at=now() where tenant_id=${ctx.tenantId} and id=${opportunityId} returning *`;
-    await tx`insert into crm_activity(id,tenant_id,prospect_id,opportunity_id,activity_type,summary,created_by) values(${crypto.randomUUID()},${ctx.tenantId},${current[0]!.prospect_id},${opportunityId},'stage_change',${`Stage changed from ${current[0]!.stage_key} to ${stageKey}`},${ctx.actorId})`;
-    await recordMutation(tx, ctx, "OPPORTUNITY_STAGE_CHANGED", "OPPORTUNITY", opportunityId, current[0]!.existing_client_id ? String(current[0]!.existing_client_id) : null, { fromStage: String(current[0]!.stage_key), toStage: stageKey, status }, "opportunity.stage_changed");
+    const outcomeReason = stage[0]!.terminal_outcome === "lost" ? required(input, "outcomeReason", 1000) : null;
+    const rows = await tx`update opportunity set stage_key=${stageKey},status=${status},probability=${boundedNumberValue(input, "probability", 0, 100) ?? stage[0]!.default_probability},outcome_reason=${outcomeReason},updated_by=${ctx.actorId},updated_at=now() where tenant_id=${ctx.tenantId} and id=${opportunityId} returning *`;
+    const activitySummary = outcomeReason ? `Stage changed from ${current[0]!.stage_key} to ${stageKey}. Lost reason: ${outcomeReason}` : `Stage changed from ${current[0]!.stage_key} to ${stageKey}`;
+    await tx`insert into crm_activity(id,tenant_id,prospect_id,opportunity_id,activity_type,summary,created_by) values(${crypto.randomUUID()},${ctx.tenantId},${current[0]!.prospect_id},${opportunityId},'stage_change',${activitySummary},${ctx.actorId})`;
+    await recordMutation(tx, ctx, "OPPORTUNITY_STAGE_CHANGED", "OPPORTUNITY", opportunityId, current[0]!.existing_client_id ? String(current[0]!.existing_client_id) : null, { fromStage: String(current[0]!.stage_key), toStage: stageKey, status, outcomeReason }, "opportunity.stage_changed");
     return response({ item: rows[0] });
   });
 }
@@ -281,6 +431,8 @@ async function linkProposal(request: Request, env: Env, actorId: string, opportu
     if (!services.length) throw new ApiError(409, "SERVICES_REQUIRED", "Select at least one service before linking a proposal");
     const proposalReferenceId = crypto.randomUUID(), proposalId = required(input, "proposalId", 200), version = optional(input, "proposalVersion", 80) ?? "1";
     const rows = await tx`insert into quotebench_proposal_reference(id,tenant_id,opportunity_id,proposal_id,proposal_version,status,created_by,updated_by) values(${proposalReferenceId},${ctx.tenantId},${opportunityId},${proposalId},${version},'created',${ctx.actorId},${ctx.actorId}) returning *`;
+    await tx`insert into crm_activity(id,tenant_id,prospect_id,opportunity_id,activity_type,summary,created_by)
+      values(${crypto.randomUUID()},${ctx.tenantId},${opportunity[0]!.prospect_id},${opportunityId},'system',${`QuoteBench proposal ${proposalId} linked`},${ctx.actorId})`;
     await recordMutation(tx, ctx, "PROPOSAL_LINKED", "QUOTEBENCH_PROPOSAL_REFERENCE", proposalReferenceId, opportunity[0]!.existing_client_id ? String(opportunity[0]!.existing_client_id) : null, { opportunityId, proposalId, proposalVersion: version, serviceIds: services.map((item) => String(item.service_id)) }, "proposal.linked");
     return response({ item: rows[0], sharedContext: { tenantId: ctx.tenantId, opportunityId, prospectId: opportunity[0]!.prospect_id, clientId: opportunity[0]!.existing_client_id, responsibleMemberId: opportunity[0]!.responsible_member_id, currency: opportunity[0]!.currency, services } }, 201);
   });
@@ -402,6 +554,8 @@ export async function convertAcceptedProposal(tx: PlatformTX, ctx: PlatformConte
   await tx`update opportunity set stage_key='won',status='won',probability=100,conversion_state='converted',updated_by=${ctx.actorId},updated_at=now() where tenant_id=${ctx.tenantId} and id=${opportunityId}`;
   if (opportunity.prospect_id) await tx`update prospect set status='converted',converted_client_id=${clientId},converted_at=now(),updated_by=${ctx.actorId},updated_at=now() where tenant_id=${ctx.tenantId} and id=${opportunity.prospect_id} and status<>'converted'`;
   await tx`update organisation set originating_prospect_id=coalesce(originating_prospect_id,${opportunity.prospect_id}),originating_opportunity_id=coalesce(originating_opportunity_id,${opportunityId}),originating_proposal_reference_id=coalesce(originating_proposal_reference_id,${proposal.id}),converted_at=coalesce(converted_at,now()) where tenant_id=${ctx.tenantId} and id=${clientId}`;
+  await tx`insert into crm_activity(id,tenant_id,prospect_id,opportunity_id,activity_type,summary,created_by)
+    values(${crypto.randomUUID()},${ctx.tenantId},${opportunity.prospect_id},${opportunityId},'system','QuoteBench proposal accepted; opportunity converted to client and onboarding',${ctx.actorId})`;
   await recordMutation(tx, ctx, "PROSPECT_CONVERTED", "PROSPECT", String(opportunity.prospect_id ?? opportunityId), clientId, { opportunityId, clientId, proposalReferenceId: String(proposal.id) }, "prospect.converted");
   await recordMutation(tx, ctx, "ONBOARDING_STARTED", "ONBOARDING_CASE", onboardingCaseId, clientId, { opportunityId, engagementId, workItemId, clientServiceIds: activated.map((item) => item.clientServiceId) }, "onboarding.started");
   const recipient = await tx`select actor_id from tenant_member where tenant_id=${ctx.tenantId} and id=${opportunity.responsible_member_id} and membership_status='ACTIVE'`;
@@ -443,6 +597,9 @@ async function quoteBenchEvent(request: Request, env: Env, actorId: string) {
       await recordMutation(tx, ctx, "PROPOSAL_ACCEPTED", "QUOTEBENCH_PROPOSAL_REFERENCE", String(proposal.id), String(conversion.client_id), { proposalId, proposalVersion: version, opportunityId: String(proposal.opportunity_id), acceptanceEventId: eventId, acceptedValueKnown: commercial.acceptedValue !== null, serviceValueCount: commercial.serviceValues.length }, "proposal.accepted");
     } else {
       await tx`update quotebench_proposal_reference set status=${status},last_event_at=now(),updated_by=${ctx.actorId},updated_at=now() where tenant_id=${ctx.tenantId} and id=${proposal.id}`;
+      await tx`insert into crm_activity(id,tenant_id,prospect_id,opportunity_id,activity_type,summary,created_by)
+        select ${crypto.randomUUID()},${ctx.tenantId},o.prospect_id,o.id,'system',${`QuoteBench proposal ${status}`},${ctx.actorId}
+        from opportunity o where o.tenant_id=${ctx.tenantId} and o.id=${proposal.opportunity_id}`;
       await recordMutation(tx, ctx, `PROPOSAL_${status.toUpperCase()}`, "QUOTEBENCH_PROPOSAL_REFERENCE", String(proposal.id), null, { proposalId, proposalVersion: version, opportunityId: String(proposal.opportunity_id) }, eventType);
     }
     await tx`insert into specialist_event_receipt(id,tenant_id,module_key,event_id,event_type,payload_version,status,subject_reference,correlation_id) values(${crypto.randomUUID()},${ctx.tenantId},'quotebench',${eventId},${eventType},${Number(input.payloadVersion ?? 1)},'processed',${proposalId},${ctx.correlationId})`;
@@ -531,7 +688,7 @@ export async function handleCrmOnboardingRoute(request: Request, env: Env, actor
   if (match && ["GET", "PATCH"].includes(request.method)) return prospectItem(request, env, actorId, match[1]!);
   if (path === "/v1/crm/opportunities" && ["GET", "POST"].includes(request.method)) return opportunityCollection(request, env, actorId);
   match = path.match(/^\/v1\/crm\/opportunities\/([^/]+)$/);
-  if (match && request.method === "GET") return opportunityDetail(request, env, actorId, match[1]!);
+  if (match && ["GET", "PATCH"].includes(request.method)) return opportunityItem(request, env, actorId, match[1]!);
   match = path.match(/^\/v1\/crm\/opportunities\/([^/]+)\/stage$/);
   if (match && request.method === "POST") return opportunityStage(request, env, actorId, match[1]!);
   match = path.match(/^\/v1\/crm\/opportunities\/([^/]+)\/proposals$/);

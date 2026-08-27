@@ -251,6 +251,15 @@ export function applicationAccessAllowed(
   return !manifest || !decisionsLoaded || decisions[manifest.entitlement] === true;
 }
 
+export function quoteBenchProposalAccessAllowed(
+  decisions: Readonly<Record<string, boolean>>,
+  decisionsLoaded: boolean,
+): boolean {
+  return decisionsLoaded &&
+    decisions["quotebench.enabled"] === true &&
+    decisions["quotebench.proposals"] === true;
+}
+
 export function contextualApplicationPath(
   path: string,
   context: Readonly<Record<string, string | undefined>>,

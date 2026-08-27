@@ -165,6 +165,7 @@ import {
   globalSettingForPath,
   manifestForPath,
   navigationItemForPath,
+  quoteBenchProposalAccessAllowed,
   type ApplicationManifest,
   type ApplicationNavigationItem,
   type ApplicationSetting,
@@ -498,7 +499,7 @@ function AccountsWorkspace({
   const [pathname, setPathname] = useState(() => canonicalPath(window.location.pathname));
   const [locationSearch, setLocationSearch] = useState(() => window.location.search);
   const [entitlementDecisions, setEntitlementDecisions] = useState<Record<string, boolean>>(
-    demoMode ? { "practice.enabled": true, "ledgerly.enabled": true, "quotebench.enabled": false } : {},
+    demoMode ? { "practice.enabled": true, "ledgerly.enabled": true, "quotebench.enabled": false, "quotebench.proposals": false } : {},
   );
   const [entitlementsLoaded, setEntitlementsLoaded] = useState(demoMode);
   const [practiceSection, setPracticeSection] = useState<PracticeView>("work");
@@ -637,6 +638,10 @@ function AccountsWorkspace({
   const activeApplicationDenied = Boolean(
     !applicationAccessAllowed(activeApplication, entitlementDecisions, entitlementsLoaded),
   );
+  const quoteBenchProposalAvailable = quoteBenchProposalAccessAllowed(
+    entitlementDecisions,
+    entitlementsLoaded,
+  );
   const navigate = useCallback((nextPath: string, replace = false) => {
     const canonical = canonicalPath(nextPath);
     const target = new URL(canonical, window.location.origin);
@@ -695,14 +700,18 @@ function AccountsWorkspace({
     let cancelled = false;
     setEntitlementsLoaded(false);
     void Promise.all(
-      applicationManifests
-        .filter((manifest) => manifest.status !== "future")
-        .map(async (manifest) => {
+      [...new Set([
+        ...applicationManifests
+          .filter((manifest) => manifest.status !== "future")
+          .map((manifest) => manifest.entitlement),
+        "quotebench.proposals",
+      ])]
+        .map(async (entitlement) => {
           try {
-            const result = await api.entitlementDecision(context, manifest.entitlement);
-            return [manifest.entitlement, result.item.enabled] as const;
+            const result = await api.entitlementDecision(context, entitlement);
+            return [entitlement, result.item.enabled] as const;
           } catch {
-            return [manifest.entitlement, false] as const;
+            return [entitlement, false] as const;
           }
         }),
     ).then((entries) => {
@@ -1742,7 +1751,11 @@ function AccountsWorkspace({
                 <CrmOnboarding
                   view={workspacePage === "crm-prospects" ? "prospects" : workspacePage === "crm-opportunities" ? "opportunities" : "onboarding"}
                   context={context}
-                  onOpenQuoteBench={entitlementDecisions["quotebench.enabled"] ? (opportunityId) => {
+                  routePath={pathname}
+                  routeSearch={locationSearch}
+                  onNavigate={navigate}
+                  quoteBenchAvailable={quoteBenchProposalAvailable}
+                  onOpenQuoteBench={quoteBenchProposalAvailable ? (opportunityId) => {
                     const quoteBench = applicationManifests.find((manifest) => manifest.id === "quotebench")!;
                     const target = `${quoteBench.externalUrl ?? quoteBench.homeRoute}?opportunity=${encodeURIComponent(opportunityId)}`;
                     if (quoteBench.externalUrl) window.location.assign(target);
@@ -1756,12 +1769,14 @@ function AccountsWorkspace({
               context={context}
               items={organisations}
               engagements={engagements}
+              requestedClientId={new URLSearchParams(locationSearch).get("client")?.trim() || ""}
               canCreateClient={["OWNER", "ADMIN"].includes(
                 selectedMembership?.role_code || "",
               )}
               loading={organisationLoading}
               error={organisationError}
               reload={loadOrganisations}
+              onSelectClient={(clientId) => navigate(clientId ? `/practice/clients?client=${encodeURIComponent(clientId)}` : "/practice/clients")}
               onCreateEngagement={(organisationId) => {
                 setEngagementOrganisationId(organisationId || "");
                 setShowEngagementSetup(true);
@@ -2618,10 +2633,12 @@ function ClientsView({
   context,
   items,
   engagements,
+  requestedClientId,
   canCreateClient,
   loading,
   error,
   reload,
+  onSelectClient,
   onCreateEngagement,
   onOpenEngagement,
   onOpenWorkspace,
@@ -2629,16 +2646,19 @@ function ClientsView({
   context: ApiContext;
   items: Organisation[];
   engagements: Engagement[];
+  requestedClientId: string;
   canCreateClient: boolean;
   loading: boolean;
   error: string;
   reload: () => Promise<void>;
+  onSelectClient: (clientId: string) => void;
   onCreateEngagement: (organisationId?: string) => void;
   onOpenEngagement: (engagementId: string) => void;
   onOpenWorkspace: () => void;
 }) {
   const [creating, setCreating] = useState(false);
   const [selectedOrganisationId, setSelectedOrganisationId] = useState("");
+  useEffect(() => setSelectedOrganisationId(requestedClientId), [requestedClientId]);
   const [form, setForm] = useState({
     legalName: "",
     legalForm: "PRIVATE_LIMITED_COMPANY",
@@ -2656,7 +2676,7 @@ function ClientsView({
             as="button"
             className="client-name-button"
             title={item.legal_name}
-            onClick={() => setSelectedOrganisationId(item.id)}
+            onClick={() => { setSelectedOrganisationId(item.id); onSelectClient(item.id); }}
           >
             {item.legal_name}
           </FluentLink>
@@ -2712,7 +2732,7 @@ function ClientsView({
         ),
       }),
     ],
-    [engagements, onCreateEngagement, onOpenEngagement],
+    [engagements, onCreateEngagement, onOpenEngagement, onSelectClient],
   );
   async function create(event: React.FormEvent) {
     event.preventDefault();
@@ -2759,7 +2779,7 @@ function ClientsView({
       <ClientPermanentFile
         context={context}
         organisationId={selectedOrganisationId}
-        onBack={() => setSelectedOrganisationId("")}
+        onBack={() => { setSelectedOrganisationId(""); onSelectClient(""); }}
         onOpenEngagement={onOpenEngagement}
       />
     );
