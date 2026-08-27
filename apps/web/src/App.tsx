@@ -5069,14 +5069,20 @@ function AuthScreen({
           </FluentButton>
         </form>
         {(mode === "sign-in" || mode === "sign-up") && (
-          <FluentButton
-            type="button"
-            className="auth-submit"
-            disabled={busy}
-            onClick={signInWithGoogle}
-          >
-            Continue with Google
-          </FluentButton>
+          <div className="auth-provider">
+            <div className="auth-provider-separator" aria-hidden="true">
+              <span>or</span>
+            </div>
+            <FluentButton
+              appearance="secondary"
+              type="button"
+              className="auth-submit"
+              disabled={busy}
+              onClick={signInWithGoogle}
+            >
+              Continue with Google
+            </FluentButton>
+          </div>
         )}
         {mode === "sign-in" && (
           <div className="auth-switch">

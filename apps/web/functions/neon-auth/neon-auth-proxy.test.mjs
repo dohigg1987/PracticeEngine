@@ -47,3 +47,40 @@ test("invalid environment overrides fail closed", async () => {
   assert.equal(response.status, 503);
   assert.equal(await response.text(), "Authentication proxy is not configured.");
 });
+
+test("forwards Google social sign-in POST requests to Neon Auth", async (t) => {
+  const originalFetch = globalThis.fetch;
+  let forwarded;
+  globalThis.fetch = async (request) => {
+    forwarded = request;
+    return Response.json({ url: "https://accounts.google.com/o/oauth2/v2/auth" });
+  };
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const response = await onRequest({
+    env: { ENVIRONMENT: "dev", NEON_AUTH_URL: developmentAuthUrl },
+    request: new Request(
+      "https://practiceengine-dev.pages.dev/neon-auth/sign-in/social",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          provider: "google",
+          callbackURL: "https://practiceengine-dev.pages.dev",
+        }),
+      },
+    ),
+    params: { path: ["sign-in", "social"] },
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(forwarded.method, "POST");
+  assert.equal(forwarded.url, `${developmentAuthUrl}/sign-in/social`);
+  assert.equal(forwarded.headers.get("origin"), "https://practiceengine-dev.pages.dev");
+  assert.deepEqual(await forwarded.json(), {
+    provider: "google",
+    callbackURL: "https://practiceengine-dev.pages.dev",
+  });
+});

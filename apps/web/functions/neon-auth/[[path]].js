@@ -78,7 +78,7 @@ export async function onRequest(context) {
     headers,
     body: context.request.method === "GET" || context.request.method === "HEAD"
       ? undefined
-      : context.request.body,
+      : await context.request.arrayBuffer(),
     redirect: "manual",
   });
   const upstream = await fetch(upstreamRequest);

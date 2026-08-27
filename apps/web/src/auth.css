@@ -129,6 +129,28 @@
   height: 43px;
   margin-top: 4px;
 }
+.auth-provider {
+  display: grid;
+}
+.auth-provider .auth-submit {
+  width: 100%;
+  margin-top: 0;
+}
+.auth-provider-separator {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+  color: var(--colorNeutralForeground3);
+  font-size: 12px;
+}
+.auth-provider-separator::before,
+.auth-provider-separator::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: var(--colorNeutralStroke2);
+}
 .auth-switch {
   border-top: 1px solid var(--colorNeutralStroke2);
   margin-top: 24px;
