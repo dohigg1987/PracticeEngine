@@ -936,10 +936,13 @@ export type PracticeClientSummary = {
 export type CrmProspect = {
   id: string; display_name: string; legal_name?: string | null; entity_type: string;
   status: "prospect" | "qualified" | "converted" | "lost" | "archived";
+  primary_contact_id?: string | null; responsible_member_id?: string | null; responsible_team_id?: string | null;
   primary_contact_name?: string | null; primary_contact_email?: string | null;
   responsible_member_name?: string | null; responsible_team_name?: string | null;
   source?: string | null; last_activity_at?: string | null; open_opportunities?: number;
+  contacts?: Array<Record<string, unknown>>; activities?: Array<Record<string, unknown>>;
 };
+export type PlatformTeam = { id: string; name: string; status: string; member_count: number };
 export type OpportunityService = { id: string; serviceId?: string; service_id?: string; name?: string; service_name?: string; accepted?: boolean };
 export type CrmOpportunity = {
   id: string; prospect_id?: string | null; existing_client_id?: string | null; relationship_name?: string;
@@ -1202,9 +1205,21 @@ export const api = {
     context: ApiContext,
     body: { legalName: string; legalForm: string; jurisdiction: string },
   ) =>
-    request<{ item: Organisation }>("/v1/organisations", context, {
+    request<{ item: Organisation }>("/v1/clients", context, {
       method: "POST",
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        displayName: body.legalName,
+        legalName: body.legalName,
+        entityType: body.legalForm === "LLP"
+          ? "PARTNERSHIP"
+          : body.legalForm === "CHARITABLE_COMPANY"
+            ? "CHARITY"
+            : body.legalForm === "OTHER"
+              ? "OTHER"
+              : "COMPANY",
+        legalForm: body.legalForm,
+        jurisdiction: body.jurisdiction,
+      }),
     }),
   createEngagement: (
     context: ApiContext,
@@ -2187,6 +2202,9 @@ export const api = {
   practiceEconomicsOverview: async (context: ApiContext) => (await request<{item:PracticeEconomicsOverview}>("/v1/practice/economics/overview",context)).item,
   crmProspects: (context: ApiContext) => request<{ items: CrmProspect[] }>("/v1/crm/prospects", context),
   createCrmProspect: (context: ApiContext, body: Record<string, unknown>) => request<{ item: CrmProspect }>("/v1/crm/prospects", context, { method: "POST", body: JSON.stringify(body) }),
+  crmProspect: (context: ApiContext, id: string) => request<{ item: CrmProspect }>(`/v1/crm/prospects/${encodeURIComponent(id)}`, context),
+  updateCrmProspect: (context: ApiContext, id: string, body: Record<string, unknown>) => request<{ item: CrmProspect }>(`/v1/crm/prospects/${encodeURIComponent(id)}`, context, { method: "PATCH", body: JSON.stringify(body) }),
+  platformTeams: (context: ApiContext) => request<{ items: PlatformTeam[] }>("/v1/platform/teams", context),
   crmOpportunities: (context: ApiContext) => request<{ items: CrmOpportunity[] }>("/v1/crm/opportunities", context),
   createCrmOpportunity: (context: ApiContext, body: Record<string, unknown>) => request<{ item: CrmOpportunity }>("/v1/crm/opportunities", context, { method: "POST", body: JSON.stringify(body) }),
   crmOpportunity: (context: ApiContext, id: string) => request<{ item: CrmOpportunity }>(`/v1/crm/opportunities/${encodeURIComponent(id)}`, context),

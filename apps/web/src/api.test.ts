@@ -627,6 +627,59 @@ describe("authenticated API boundary", () => {
     expect(fetchMock.mock.calls.every((_, index) => call(index).headers["x-tenant-id"] === "tenant-1")).toBe(true);
   });
 
+  it("creates clients through the canonical Practice client command", async () => {
+    await api.createOrganisation(
+      { tenantId: "tenant-1" },
+      {
+        legalName: "North Star Accounts Ltd",
+        legalForm: "PRIVATE_LIMITED_COMPANY",
+        jurisdiction: "ENGLAND_AND_WALES",
+      },
+    );
+    expect(call(0)).toMatchObject({
+      url: "/v1/clients",
+      body: {
+        displayName: "North Star Accounts Ltd",
+        legalName: "North Star Accounts Ltd",
+        entityType: "COMPANY",
+        legalForm: "PRIVATE_LIMITED_COMPANY",
+        jurisdiction: "ENGLAND_AND_WALES",
+      },
+      headers: { "x-tenant-id": "tenant-1" },
+    });
+    expect(call(0).init.method).toBe("POST");
+  });
+
+  it("loads and updates prospect details through the audited prospect item route", async () => {
+    const context = { tenantId: "tenant-1" };
+    await api.crmProspect(context, "prospect/1");
+    await api.updateCrmProspect(context, "prospect/1", {
+      displayName: "Cedar Advisory Group",
+      legalName: "Cedar Advisory Group Ltd",
+      source: "Referral",
+      status: "qualified",
+      responsibleMemberId: "member-1",
+      responsibleTeamId: "team-1",
+    });
+
+    expect(call(0)).toMatchObject({
+      url: "/v1/crm/prospects/prospect%2F1",
+      headers: { "x-tenant-id": "tenant-1" },
+    });
+    expect(call(1)).toMatchObject({
+      url: "/v1/crm/prospects/prospect%2F1",
+      body: {
+        displayName: "Cedar Advisory Group",
+        legalName: "Cedar Advisory Group Ltd",
+        source: "Referral",
+        status: "qualified",
+        responsibleMemberId: "member-1",
+        responsibleTeamId: "team-1",
+      },
+    });
+    expect(call(1).init.method).toBe("PATCH");
+  });
+
   it("uploads portal evidence as multipart without overriding its content type", async () => {
     const file = new File(["evidence"], "evidence.pdf", { type: "application/pdf" });
     await api.uploadClientRequestDocument({ tenantId: "tenant-1" }, "request/1", file, "upload-key");

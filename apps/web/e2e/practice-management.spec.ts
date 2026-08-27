@@ -40,6 +40,30 @@ test("CRM pipeline and onboarding stay operational at narrow width", async ({ pa
   expect(widths.root).toBeLessThanOrEqual(widths.viewport + 1);
 });
 
+test("prospects can be opened and edited through the product UI", async ({ page }) => {
+  await start(page);
+  await openNav(page);
+  await page.locator('button[value="crm-prospects"]').click();
+  await page.getByRole("button", { name: "Cedar Advisory Group" }).click();
+  await expect(page.getByRole("heading", { name: "Prospect details" })).toBeVisible();
+  await page.getByRole("textbox", { name: "Legal name" }).fill("Cedar Advisory Group Limited");
+  await page.getByLabel("Status").selectOption("qualified");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByRole("textbox", { name: "Legal name" })).toHaveValue("Cedar Advisory Group Limited");
+  await page.getByRole("button", { name: "Back to prospects" }).click();
+  await expect(page.getByRole("table", { name: "CRM prospects" })).toContainText("Cedar Advisory Group Limited");
+});
+
+test("clients are created through the canonical Practice client command", async ({ page }) => {
+  await start(page);
+  await openNav(page);
+  await page.locator('button[value="clients"]').click();
+  await page.getByRole("button", { name: "New client" }).click();
+  await page.getByRole("textbox", { name: "Legal name" }).fill("DEV Review Client Ltd");
+  await page.getByRole("button", { name: "Create client" }).click();
+  await expect(page.getByRole("grid", { name: "Clients" })).toContainText("DEV Review Client Ltd");
+});
+
 test("practice settings exposes service and template configuration at narrow width", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 720 });
   await start(page);

@@ -1320,6 +1320,8 @@ function practiceDemoRead(path: string): unknown | undefined {
   const messageMatch = path.match(/^\/v1\/portal\/messages\/([^/]+)$/);
   if (messageMatch) return { item: structuredClone(demoPortalThreads.find((item) => item.id === messageMatch[1])), messages: structuredClone(demoPortalMessages) };
   if (path === "/v1/crm/prospects") return {items:structuredClone(demoProspects)};
+  const prospectMatch=path.match(/^\/v1\/crm\/prospects\/([^/]+)$/);if(prospectMatch)return {item:structuredClone({...demoProspects.find(item=>item.id===prospectMatch[1]),contacts:[],activities:[]})};
+  if (path === "/v1/platform/teams") return {items:[{id:"team-accounts",name:"Accounts",status:"ACTIVE",member_count:1},{id:"team-advisory",name:"Advisory",status:"ACTIVE",member_count:1},{id:"team-business-services",name:"Business services",status:"ACTIVE",member_count:1}]};
   if (path === "/v1/crm/opportunities") return {items:structuredClone(demoOpportunities)};
   const opportunityMatch=path.match(/^\/v1\/crm\/opportunities\/([^/]+)$/);if(opportunityMatch)return {item:structuredClone(demoOpportunities.find(item=>item.id===opportunityMatch[1]))};
   if (path === "/v1/onboarding") return {items:structuredClone(demoOnboarding)};
@@ -1363,6 +1365,19 @@ export function demoRequest(path: string, init?: RequestInit): unknown {
     demoPracticeServices = [...demoPracticeServices, item];
     return { item: structuredClone(item) };
   }
+  if (method === "POST" && path === "/v1/clients") {
+    const body = JSON.parse(String(init?.body || "{}")) as Record<string, unknown>;
+    const item = {
+      id: `demo-org-${Date.now()}`,
+      legal_name: String(body.legalName || body.displayName || "New client"),
+      legal_form: String(body.legalForm || body.entityType || "OTHER"),
+      jurisdiction: String(body.jurisdiction || "UK"),
+      created_at: now,
+    };
+    const organisations = reads.find(([pattern]) => pattern.test("/v1/organisations"))?.[1] as { items: Array<typeof item> } | undefined;
+    if (organisations) organisations.items = [...organisations.items, item];
+    return { item: structuredClone(item) };
+  }
   const assignmentMatch = path.match(/^\/v1\/practice\/work\/([^/]+)\/resource-assignment$/);
   if (method === "POST" && assignmentMatch) {
     const body = JSON.parse(String(init?.body || "{}")) as { assignedMemberId?: string };
@@ -1396,6 +1411,7 @@ export function demoRequest(path: string, init?: RequestInit): unknown {
     return { item: structuredClone(item) };
   }
   if(method==="POST"&&path==="/v1/crm/prospects"){const body=JSON.parse(String(init?.body||"{}")) as Record<string,unknown>;const item:CrmProspect={id:`prospect-${Date.now()}`,display_name:String(body.displayName||"New prospect"),entity_type:String(body.entityType||"OTHER"),status:"prospect",source:body.source?String(body.source):null,open_opportunities:0};demoProspects=[item,...demoProspects];return {item:structuredClone(item)};}
+  const prospectPatchMatch=path.match(/^\/v1\/crm\/prospects\/([^/]+)$/);if(method==="PATCH"&&prospectPatchMatch){const body=JSON.parse(String(init?.body||"{}")) as Record<string,unknown>;demoProspects=demoProspects.map(item=>item.id===prospectPatchMatch[1]?{...item,display_name:body.displayName===undefined?item.display_name:String(body.displayName),legal_name:body.legalName===undefined?item.legal_name:body.legalName?String(body.legalName):null,source:body.source===undefined?item.source:body.source?String(body.source):null,status:body.status===undefined?item.status:body.status as CrmProspect["status"],responsible_member_id:body.responsibleMemberId===undefined?item.responsible_member_id:body.responsibleMemberId?String(body.responsibleMemberId):null,responsible_team_id:body.responsibleTeamId===undefined?item.responsible_team_id:body.responsibleTeamId?String(body.responsibleTeamId):null,responsible_member_name:body.responsibleMemberId===undefined?item.responsible_member_name:demoResources.find(resource=>resource.id===body.responsibleMemberId)?.display_name??null,responsible_team_name:body.responsibleTeamId===undefined?item.responsible_team_name:({"team-accounts":"Accounts","team-advisory":"Advisory","team-business-services":"Business services"} as Record<string,string>)[String(body.responsibleTeamId)]??null}:item);return {item:structuredClone(demoProspects.find(item=>item.id===prospectPatchMatch[1]))};}
   if(method==="POST"&&path==="/v1/crm/opportunities"){const body=JSON.parse(String(init?.body||"{}")) as Record<string,unknown>,prospect=demoProspects.find(item=>item.id===body.prospectId),service=demoPracticeServices.find(item=>item.id===(body.serviceIds as string[]|undefined)?.[0]);const item:CrmOpportunity={id:`opportunity-${Date.now()}`,prospect_id:String(body.prospectId||""),relationship_name:prospect?.display_name,name:String(body.name||"New opportunity"),stage_key:"qualification",status:"open",expected_close_date:body.expectedCloseDate?String(body.expectedCloseDate):null,currency:"GBP",services:service?[{id:`opportunity-service-${Date.now()}`,serviceId:service.id,name:service.name,accepted:false}]:[],conversion_state:"not_converted"};demoOpportunities=[item,...demoOpportunities];return {item:structuredClone(item)};}
   const opportunityStageMatch=path.match(/^\/v1\/crm\/opportunities\/([^/]+)\/stage$/);if(method==="POST"&&opportunityStageMatch){const body=JSON.parse(String(init?.body||"{}")) as {stageKey:string};demoOpportunities=demoOpportunities.map(item=>item.id===opportunityStageMatch[1]?{...item,stage_key:body.stageKey,status:body.stageKey==="lost"?"lost":"open"}:item);return {item:structuredClone(demoOpportunities.find(item=>item.id===opportunityStageMatch[1]))};}
   const proposalMatch=path.match(/^\/v1\/crm\/opportunities\/([^/]+)\/proposals$/);if(method==="POST"&&proposalMatch){const body=JSON.parse(String(init?.body||"{}")) as {proposalId:string;proposalVersion?:string};demoOpportunities=demoOpportunities.map(item=>item.id===proposalMatch[1]?{...item,proposal_status:"created",proposals:[...(item.proposals||[]),{id:`proposal-${Date.now()}`,proposal_id:body.proposalId,proposal_version:body.proposalVersion||"1",status:"created"}]}:item);return {item:{proposal_id:body.proposalId}};}
