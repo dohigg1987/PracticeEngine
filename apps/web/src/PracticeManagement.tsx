@@ -128,7 +128,7 @@ function WorkList({ context, onOpenWork }: Props) {
   const load = useCallback(async () => { setLoading(true); setError(""); try { setItems((await api.practiceWork(context)).items); } catch (e) { setError(errorText(e)); } finally { setLoading(false); } }, [context]);
   useEffect(() => { void load(); }, [load]);
   const visible = useMemo(() => filterPracticeWork(items, query, status, priority), [items, query, status, priority]);
-  if (loading) return <Loading text="Loading practice work" />;
+  if (loading) return <section className="pm-page"><Head title="Work" body="Operational deliverables across clients, services and teams." /><Loading text="Loading practice work" /></section>;
   return <section className="pm-page"><Head title="Work" body="Operational deliverables across clients, services and teams." />{error && <Failure message={error} retry={load} />}
     <div className="pm-filters" aria-label="Work filters">
       <Field label="Search"><Input value={query} onChange={(_, data) => setQuery(data.value)} placeholder="Client, service or work item" /></Field>

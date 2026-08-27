@@ -989,16 +989,60 @@ const demoTransport =
     window.location.hostname === "pm-002-progress.ledgerly-accounts.pages.dev") ||
   (import.meta.env.DEV && import.meta.env.VITE_DEMO_MODE === "true");
 
-async function request<T>(
+type SessionCacheEntry = {
+  value?: unknown;
+  expiresAt: number;
+  inFlight?: Promise<unknown>;
+};
+
+const sessionRequestCache = new Map<string, SessionCacheEntry>();
+
+export function clearSessionRequestCache(): void {
+  sessionRequestCache.clear();
+}
+
+export function sessionCacheTtlForPath(path: string): number {
+  if (
+    path === "/v1/practice/resources" ||
+    path === "/v1/platform/teams" ||
+    path === "/v1/practice/services" ||
+    path.startsWith("/v1/platform/entitlements/")
+  ) return 5 * 60_000;
+  if (
+    path === "/v1/organisations" ||
+    path === "/v1/engagements" ||
+    path.startsWith("/v1/crm/prospects") ||
+    path.startsWith("/v1/crm/opportunities") ||
+    path.startsWith("/v1/practice/work") ||
+    path.startsWith("/v1/practice/capacity") ||
+    path.startsWith("/v1/practice/portfolio-economics") ||
+    path.startsWith("/v1/practice/economics/overview")
+  ) return 30_000;
+  return 0;
+}
+
+function sessionCacheKey(path: string, context?: ApiContext): string {
+  return `${context?.tenantId || "identity"}:${path}`;
+}
+
+function invalidateSessionCache(context?: ApiContext): void {
+  const prefix = `${context?.tenantId || "identity"}:`;
+  for (const key of sessionRequestCache.keys()) {
+    if (key.startsWith(prefix)) sessionRequestCache.delete(key);
+  }
+}
+
+async function requestFromNetwork<T>(
   path: string,
   context?: ApiContext,
   init?: RequestInit,
 ): Promise<T> {
-  if (demoTransport)
-    return (await import("./demo")).demoRequest(path, init) as T;
+  const startedAt = performance.now();
+  let fetchStartedAt = startedAt;
   let response: Response;
   try {
     const token = await freshAuthToken();
+    fetchStartedAt = performance.now();
     response = await fetch(`${apiBase}${path}`, {
       ...init,
       headers: {
@@ -1021,6 +1065,12 @@ async function request<T>(
       "OFFLINE",
     );
   }
+  const completedAt = performance.now();
+  const performancePath = path.split("?")[0]!.replace(/[0-9a-f]{8}-[0-9a-f-]{27,}/gi, ":id");
+  performance.measure(`pe:api:${performancePath}`, { start: fetchStartedAt, end: completedAt, detail: { status: response.status } });
+  if (sessionCacheTtlForPath(path) && typeof window !== "undefined" && /(?:^|[-.])(dev|test)(?:[-.]|$)/i.test(window.location.hostname)) {
+    console.info("[pe-perf] api", JSON.stringify({ path: performancePath, authMs: Math.round(fetchStartedAt - startedAt), responseMs: Math.round(completedAt - fetchStartedAt), status: response.status }));
+  }
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     const error = payload?.error;
@@ -1032,6 +1082,45 @@ async function request<T>(
     );
   }
   return payload as T;
+}
+
+async function request<T>(
+  path: string,
+  context?: ApiContext,
+  init?: RequestInit,
+): Promise<T> {
+  if (demoTransport)
+    return (await import("./demo")).demoRequest(path, init) as T;
+  const method = (init?.method || "GET").toUpperCase();
+  const ttl = method === "GET" ? sessionCacheTtlForPath(path) : 0;
+  if (!ttl) {
+    const result = await requestFromNetwork<T>(path, context, init);
+    if (method !== "GET") invalidateSessionCache(context);
+    return result;
+  }
+
+  const key = sessionCacheKey(path, context);
+  const cached = sessionRequestCache.get(key);
+  if (cached?.value !== undefined && cached.expiresAt > Date.now()) return cached.value as T;
+  if (cached?.inFlight) return cached.inFlight as Promise<T>;
+
+  const inFlight = requestFromNetwork<T>(path, context, init).then((value) => {
+    sessionRequestCache.set(key, { value, expiresAt: Date.now() + ttl });
+    return value;
+  }).catch((error) => {
+    if (cached?.value !== undefined) {
+      sessionRequestCache.set(key, { value: cached.value, expiresAt: Date.now() + Math.min(ttl, 5_000) });
+      return cached.value as T;
+    }
+    sessionRequestCache.delete(key);
+    throw error;
+  });
+  sessionRequestCache.set(key, { value: cached?.value, expiresAt: cached?.expiresAt ?? 0, inFlight });
+  if (cached?.value !== undefined) {
+    void inFlight;
+    return cached.value as T;
+  }
+  return inFlight;
 }
 
 async function requestBlob(path: string, context: ApiContext): Promise<Blob> {
@@ -1076,6 +1165,7 @@ async function requestBlob(path: string, context: ApiContext): Promise<Blob> {
 
 let unauthorizedHandler: (() => void) | null = null;
 function notifyUnauthorized() {
+  clearSessionRequestCache();
   unauthorizedHandler?.();
 }
 export function onUnauthorized(handler: (() => void) | null) {

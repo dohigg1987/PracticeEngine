@@ -30,7 +30,7 @@ test("CRM pipeline and onboarding stay operational at narrow width", async ({ pa
   await expect(page.getByRole("table", { name: "CRM prospects" })).toContainText("Cedar Advisory Group");
   await openNav(page);
   await page.locator('button[value="crm-opportunities"]').click();
-  await expect(page.getByRole("table", { name: "CRM opportunities" })).toBeVisible();
+  await expect(page.getByRole("grid", { name: "CRM opportunities" })).toBeVisible();
   await page.getByRole("button", { name: "Finance function and annual accounts" }).click();
   await expect(page.getByRole("table", { name: "Opportunity proposed services" })).toBeVisible();
   await openNav(page);

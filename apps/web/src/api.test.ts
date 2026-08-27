@@ -9,7 +9,7 @@ vi.mock("./auth", () => ({
   AuthRequiredError: class AuthRequiredError extends Error {},
 }));
 
-import { api } from "./api";
+import { api, clearSessionRequestCache, sessionCacheTtlForPath } from "./api";
 
 const fetchMock = vi.fn(
   async () =>
@@ -38,9 +38,28 @@ const call = (index: number) => {
 
 describe("authenticated API boundary", () => {
   beforeEach(() => {
+    clearSessionRequestCache();
     fetchMock.mockClear();
     token.mockClear();
     vi.stubGlobal("fetch", fetchMock);
+  });
+
+  it("uses tenant-scoped session caching only for measured navigation and stable reference reads", () => {
+    expect(sessionCacheTtlForPath("/v1/practice/resources")).toBe(300_000);
+    expect(sessionCacheTtlForPath("/v1/platform/teams")).toBe(300_000);
+    expect(sessionCacheTtlForPath("/v1/crm/prospects")).toBe(30_000);
+    expect(sessionCacheTtlForPath("/v1/engagements/engagement-1/report")).toBe(0);
+  });
+
+  it("deduplicates repeated route-list reads for the same tenant without sharing across tenants", async () => {
+    await Promise.all([
+      api.resourceProfiles({ tenantId: "tenant-1" }),
+      api.resourceProfiles({ tenantId: "tenant-1" }),
+    ]);
+    await api.resourceProfiles({ tenantId: "tenant-2" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(call(0).headers["x-tenant-id"]).toBe("tenant-1");
+    expect(call(1).headers["x-tenant-id"]).toBe("tenant-2");
   });
 
   it("discovers tenants with a fresh bearer token and no tenant or actor header", async () => {

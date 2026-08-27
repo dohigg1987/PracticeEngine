@@ -30,6 +30,32 @@ test("application switching changes navigation and preserves practice context", 
   await expect(page.getByRole("button", { name: "Resources", exact: true })).toHaveCount(0);
 });
 
+test("representative sidebar routes keep the shell and expose destination context without a workspace blank", async ({ page }) => {
+  await page.goto("/practice/home");
+  const shell = page.locator(".app-shell");
+  await expect(shell).toBeVisible();
+
+  for (const [button, heading] of [
+    ["Prospects", "Prospects"],
+    ["Opportunities", "Opportunities"],
+    ["Clients", "Clients"],
+    ["Work", "Work"],
+    ["Resources", "Resources"],
+    ["Capacity", "Capacity"],
+    ["Portfolio economics", "Portfolio economics"],
+  ] as const) {
+    await page.getByRole("button", { name: button, exact: true }).click();
+    await expect(shell).toBeVisible();
+    await expect(page.getByRole("heading", { name: heading, exact: true })).toBeVisible();
+    await expect(page.getByText("Loading workspace…", { exact: true })).toHaveCount(0);
+  }
+
+  await page.goBack();
+  await expect(page.getByRole("heading", { name: "Capacity", exact: true })).toBeVisible();
+  await page.goForward();
+  await expect(page.getByRole("heading", { name: "Portfolio economics", exact: true })).toBeVisible();
+});
+
 test("contextual Ledgerly switch retains canonical client and linked engagement", async ({ page }) => {
   await page.goto("/practice/work");
   await page.getByRole("button", { name: /2026 Annual Accounts/ }).click();

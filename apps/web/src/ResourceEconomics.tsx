@@ -139,7 +139,7 @@ function ResourcesView({ context }: Omit<Props, "view">) {
     createTableColumn({ columnId: "overdue", renderHeaderCell: () => "Overdue", renderCell: (item) => <span className={item.overdue_work > 0 ? "re-exception" : undefined}>{item.overdue_work}</span> }),
     createTableColumn({ columnId: "status", renderHeaderCell: () => "Status", renderCell: (item) => <Status value={item.status} /> }),
   ];
-  if (loading) return <Loading text="Loading resources" />;
+  if (loading) return <section className="re-page"><Head title="Resources" body="Operational capacity, workload and delivery exceptions for practice members." /><Loading text="Loading resources" /></section>;
   return <section className="re-page"><Head title="Resources" body="Operational capacity, workload and delivery exceptions for practice members." />{error && <Failure message={error} retry={load} />}
     <div className="re-filters"><Field label="Search"><Input type="search" value={query} onChange={(_, data) => setQuery(data.value)} placeholder="Person, role or team" /></Field><Field label="Team"><Select value={team} onChange={(_, data) => setTeam(data.value)}><option value="">All teams</option>{teams.map((value) => <option key={value}>{value}</option>)}</Select></Field><Field label="Status"><Select value={status} onChange={(_, data) => setStatus(data.value)}><option value="">All statuses</option>{["active", "unavailable", "future_starter", "inactive"].map((value) => <option value={value} key={value}>{label(value)}</option>)}</Select></Field></div>
     <p className="re-result-count" aria-live="polite">{visible.length} resource{visible.length === 1 ? "" : "s"}</p>
@@ -153,7 +153,7 @@ function CapacityView({ context }: Omit<Props, "view">) {
   const [loading, setLoading] = useState(true), [error, setError] = useState("");
   const load = useCallback(async () => { setLoading(true); setError(""); try { setItems((await api.capacity(context, { from, to })).items); } catch (reason) { setError(errorText(reason)); } finally { setLoading(false); } }, [context, from, to]);
   useEffect(() => { void load(); }, [load]);
-  if (loading) return <Loading text="Loading capacity plan" />;
+  if (loading) return <section className="re-page"><Head title="Capacity" body="Available capacity less committed work and unavailable time. Forecast work is shown separately." /><Loading text="Loading capacity plan" /></section>;
   const periods = items[0]?.periods || [];
   return <section className="re-page"><Head title="Capacity" body="Available capacity less committed work and unavailable time. Forecast work is shown separately." />{error && <Failure message={error} retry={load} />}
     <div className="re-filters re-range"><Field label="From"><Input type="date" value={from} onChange={(_, data) => setFrom(data.value)} /></Field><Field label="To"><Input type="date" value={to} onChange={(_, data) => setTo(data.value)} /></Field></div>
@@ -201,7 +201,7 @@ function PortfolioView({ context }: Omit<Props, "view">) {
   useEffect(() => { void load(); }, [load]);
   const teams = [...new Set(items.map((item) => item.team_name).filter((value): value is string => Boolean(value)))].sort();
   const visible = team ? items.filter((item) => item.team_name === team) : items;
-  if (loading) return <Loading text="Loading portfolio economics" />;
+  if (loading) return <section className="re-page"><Head title="Portfolio economics" body="Workload, delivery pressure and explainable economic performance by client." /><Loading text="Loading portfolio economics" /></section>;
   return <section className="re-page"><Head title="Portfolio economics" body="Workload, delivery pressure and explainable economic performance by client." />{error && <Failure message={error} retry={load} />}
     <div className="re-filters re-single-filter"><Field label="Team"><Select value={team} onChange={(_, data) => setTeam(data.value)}><option value="">All teams</option>{teams.map((value) => <option key={value}>{value}</option>)}</Select></Field></div>
     {visible.length ? <div className="re-table-scroll"><Table aria-label="Client portfolio economics"><TableHeader><TableRow><TableHeaderCell>Client / service</TableHeaderCell><TableHeaderCell>Owner</TableHeaderCell><TableHeaderCell>Workload</TableHeaderCell><TableHeaderCell>Delivery</TableHeaderCell><TableHeaderCell>WIP</TableHeaderCell><TableHeaderCell>Revenue / value</TableHeaderCell><TableHeaderCell>Cost</TableHeaderCell><TableHeaderCell>Contribution</TableHeaderCell><TableHeaderCell>Margin</TableHeaderCell><TableHeaderCell>Basis</TableHeaderCell></TableRow></TableHeader><TableBody>{visible.map((item) => <TableRow key={item.id}><TableCell><span className="re-primary-cell"><strong>{item.client_name}</strong><small>{item.service_name || "All active services"}</small></span></TableCell><TableCell>{item.owner_name || item.team_name || "Unassigned"}</TableCell><TableCell>{hours(item.workload_hours)}</TableCell><TableCell><span className={item.overdue_work > 0 || item.capacity_pressure === "overallocated" ? "re-exception" : undefined}>{item.overdue_work} overdue · {label(item.capacity_pressure)}</span></TableCell><TableCell>{formatEconomicValue(item.wip_amount, item.currency, item.commercial_value_state)}</TableCell><TableCell>{formatEconomicValue(item.revenue_amount, item.currency, item.commercial_value_state)}</TableCell><TableCell>{formatEconomicValue(item.cost_amount, item.currency, item.commercial_value_state)}</TableCell><TableCell>{formatEconomicValue(item.contribution_amount, item.currency, item.commercial_value_state)}</TableCell><TableCell>{item.margin_percentage == null || item.commercial_value_state === "unavailable" ? "Unavailable" : `${Math.round(item.margin_percentage)}%`}</TableCell><TableCell><Status value={item.commercial_value_state} /></TableCell></TableRow>)}</TableBody></Table></div> : <Empty>No portfolio records match the current team.</Empty>}
@@ -212,7 +212,7 @@ function ManagementView({ context }: Omit<Props, "view">) {
   const [overview, setOverview] = useState<PracticeEconomicsOverview | null>(null), [loading, setLoading] = useState(true), [error, setError] = useState("");
   const load = useCallback(async () => { setLoading(true); setError(""); try { setOverview(await api.practiceEconomicsOverview(context)); } catch (reason) { setError(errorText(reason)); } finally { setLoading(false); } }, [context]);
   useEffect(() => { void load(); }, [load]);
-  if (loading) return <Loading text="Loading practice overview" />;
+  if (loading) return <section className="re-page"><Head title="Practice overview" body="A decision-focused view of delivery, capacity and economics across the practice." /><Loading text="Loading practice overview" /></section>;
   if (!overview) return <section className="re-page"><Head title="Practice overview" body="Operational exceptions that require a management decision." /><Failure message={error || "The practice overview is unavailable."} retry={load} /></section>;
   const measures = [
     ["Due this week", overview.due_this_week, "Work requiring scheduling"],

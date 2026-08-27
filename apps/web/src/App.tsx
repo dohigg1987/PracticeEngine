@@ -89,6 +89,7 @@ import {
   AccountsVersion,
   AuditEvent,
   CanonicalAccount,
+  clearSessionRequestCache,
   Dashboard,
   Disclosure,
   Engagement,
@@ -121,6 +122,16 @@ import {
 } from "./displayFormat";
 import { statusBadgeProps } from "./statusBadge";
 import { RoutePanelBoundary } from "./RoutePanelBoundary";
+import {
+  importClientCollaboration,
+  importCommercialWorkspace,
+  importCrmOnboarding,
+  importEngagementProduction,
+  importPracticeManagement,
+  importResourceEconomics,
+  preloadNavigationItem,
+  preloadPrimaryPracticeRoutes,
+} from "./route-preload";
 import {
   authClient,
   authConfigured,
@@ -269,12 +280,12 @@ function applicationNavigationValue(item: ApplicationNavigationItem): string {
   if (item.practiceView) return item.practiceView === "work" ? "work" : item.id;
   return item.ledgerlyView ?? (item.primary === false ? item.id : item.page);
 }
-const EngagementProduction = lazy(() => import("./EngagementProduction"));
-const CommercialWorkspace = lazy(() => import("./CommercialWorkspace"));
-const PracticeManagement = lazy(() => import("./PracticeManagement"));
-const ResourceEconomics = lazy(() => import("./ResourceEconomics"));
-const CrmOnboarding = lazy(() => import("./CrmOnboarding"));
-const ClientCollaboration = lazy(() => import("./ClientCollaboration"));
+const EngagementProduction = lazy(importEngagementProduction);
+const CommercialWorkspace = lazy(importCommercialWorkspace);
+const PracticeManagement = lazy(importPracticeManagement);
+const ResourceEconomics = lazy(importResourceEconomics);
+const CrmOnboarding = lazy(importCrmOnboarding);
+const ClientCollaboration = lazy(importClientCollaboration);
 type CsvRow = {
   accountCode: string;
   accountName: string;
@@ -368,19 +379,32 @@ function Empty({
     </div>
   );
 }
-function Skeleton() {
+const routeLoadingContext: ReadonlyArray<{ match: (pathname: string) => boolean; title: string; label: string }> = [
+  { match: (path) => path === "/practice/home", title: "Practice overview", label: "Loading practice overview" },
+  { match: (path) => path.startsWith("/practice/crm/prospects"), title: "Prospects", label: "Loading prospects" },
+  { match: (path) => path.startsWith("/practice/crm/opportunities"), title: "Opportunities", label: "Loading opportunities" },
+  { match: (path) => path === "/practice/clients", title: "Clients", label: "Loading clients" },
+  { match: (path) => path === "/practice/work", title: "Work", label: "Loading practice work" },
+  { match: (path) => path === "/practice/resources", title: "Resources", label: "Loading resources" },
+  { match: (path) => path === "/practice/capacity", title: "Capacity", label: "Loading capacity plan" },
+  { match: (path) => path === "/practice/portfolio-economics", title: "Portfolio economics", label: "Loading portfolio economics" },
+  { match: (path) => path === "/ledgerly/overview" || path === "/ledgerly/engagements", title: "Ledgerly overview", label: "Loading Ledgerly overview" },
+  { match: (path) => path.startsWith("/ledgerly"), title: "Ledgerly", label: "Loading Ledgerly content" },
+];
+
+function Skeleton({ pathname, label = "Loading content" }: { pathname?: string; label?: string }) {
+  const context = pathname ? routeLoadingContext.find((item) => item.match(pathname)) : undefined;
+  const loadingLabel = context?.label ?? label;
   return (
-    <FluentSkeleton
-      className="skeleton"
-      role="status"
-      aria-live="polite"
-      aria-label="Loading workspace"
-    >
-      <span className="sr-only">Loading workspace…</span>
-      {Array.from({ length: 7 }, (_, i) => (
-        <SkeletonItem aria-hidden="true" key={i} size={i === 0 ? 24 : 12} />
-      ))}
-    </FluentSkeleton>
+    <section className="route-loading">
+      {context ? <header className="page-head"><div><h1>{context.title}</h1></div></header> : null}
+      <FluentSkeleton className="skeleton" role="status" aria-live="polite" aria-label={loadingLabel}>
+        <span className="sr-only">{loadingLabel}…</span>
+        {Array.from({ length: 7 }, (_, i) => (
+          <SkeletonItem aria-hidden="true" key={i} size={i === 0 ? 24 : 12} />
+        ))}
+      </FluentSkeleton>
+    </section>
   );
 }
 
@@ -462,6 +486,7 @@ export function App() {
       return;
     }
     await authClient?.signOut();
+    clearSessionRequestCache();
     setUser(null);
     setSessionMessage("You have been signed out.");
   }
@@ -643,6 +668,7 @@ function AccountsWorkspace({
     entitlementsLoaded,
   );
   const navigate = useCallback((nextPath: string, replace = false) => {
+    performance.mark("pe:navigation:start");
     const canonical = canonicalPath(nextPath);
     const target = new URL(canonical, window.location.origin);
     window.history[replace ? "replaceState" : "pushState"](null, "", `${target.pathname}${target.search}`);
@@ -656,6 +682,23 @@ function AccountsWorkspace({
     if (item.practiceView) setPracticeSection(item.practiceView);
     navigate(item.path);
   }, [navigate]);
+
+  useEffect(() => {
+    if (configured) preloadPrimaryPracticeRoutes();
+  }, [configured]);
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      const started = performance.getEntriesByName("pe:navigation:start").at(-1)?.startTime;
+      if (started === undefined) return;
+      const completed = performance.now();
+      performance.measure(`pe:navigation:${pathname}`, { start: started, end: completed });
+      if (/(?:^|[-.])(dev|test)(?:[-.]|$)/i.test(window.location.hostname)) {
+        console.info("[pe-perf] route-context", JSON.stringify({ path: pathname, durationMs: Math.round(completed - started) }));
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [pathname]);
 
   useEffect(() => {
     const syncLocation = () => {
@@ -1601,6 +1644,8 @@ function AccountsWorkspace({
                         "icon" in item && item.icon === "people" ? <PeopleTeamRegular /> :
                         "icon" in item && item.icon === "open" ? <OpenRegular /> : <DocumentRegular />}
                       onClick={() => isApplicationNavigationItem(item) ? activateNavigationItem(item) : navigate(item.path)}
+                      onMouseEnter={() => { if (isApplicationNavigationItem(item)) void preloadNavigationItem(item); }}
+                      onFocus={() => { if (isApplicationNavigationItem(item)) void preloadNavigationItem(item); }}
                     >
                       {item.label}
                     </NavItem>
@@ -1663,7 +1708,7 @@ function AccountsWorkspace({
               }}
             />
           ) : membershipLoading ? (
-            <Skeleton />
+            <Skeleton pathname={pathname} />
           ) : membershipError && !usingLocalFallback ? (
             <MembershipError
               message={membershipError}
@@ -1694,7 +1739,7 @@ function AccountsWorkspace({
           ) : workspacePage === "work" ||
             workspacePage === "practice-settings" ? (
             <RoutePanelBoundary resetKey={workspacePage}>
-              <Suspense fallback={<Skeleton />}>
+              <Suspense fallback={<Skeleton pathname={pathname} />}>
                   <PracticeManagement
                   view={
                     workspacePage === "work" ? practiceView : "settings"
@@ -1723,7 +1768,7 @@ function AccountsWorkspace({
             </RoutePanelBoundary>
           ) : ["resources", "capacity", "allocation", "time", "portfolio", "management"].includes(workspacePage) ? (
             <RoutePanelBoundary resetKey={workspacePage}>
-              <Suspense fallback={<Skeleton />}>
+              <Suspense fallback={<Skeleton pathname={pathname} />}>
                 <ResourceEconomics
                   context={context}
                   view={workspacePage as "resources" | "capacity" | "allocation" | "time" | "portfolio" | "management"}
@@ -1738,7 +1783,7 @@ function AccountsWorkspace({
             </RoutePanelBoundary>
           ) : workspacePage === "collaboration" || workspacePage === "client-portal" ? (
             <RoutePanelBoundary resetKey={workspacePage}>
-              <Suspense fallback={<Skeleton />}>
+              <Suspense fallback={<Skeleton pathname={pathname} />}>
                 <ClientCollaboration
                   context={context}
                   mode={workspacePage === "client-portal" ? "portal" : "staff"}
@@ -1747,7 +1792,7 @@ function AccountsWorkspace({
             </RoutePanelBoundary>
           ) : ["crm-prospects", "crm-opportunities", "onboarding"].includes(workspacePage) ? (
             <RoutePanelBoundary resetKey={workspacePage}>
-              <Suspense fallback={<Skeleton />}>
+              <Suspense fallback={<Skeleton pathname={pathname} />}>
                 <CrmOnboarding
                   view={workspacePage === "crm-prospects" ? "prospects" : workspacePage === "crm-opportunities" ? "opportunities" : "onboarding"}
                   context={context}
@@ -1805,7 +1850,7 @@ function AccountsWorkspace({
             />
           ) : ["integrations", "inbox", "settings"].includes(workspacePage) ? (
             <RoutePanelBoundary resetKey={`${workspacePage}:${selectedId}`}>
-              <Suspense fallback={<Skeleton />}>
+              <Suspense fallback={<Skeleton pathname={pathname} />}>
                 <CommercialWorkspace
                   view={workspacePage as "integrations" | "inbox" | "settings"}
                   context={context}
@@ -1821,7 +1866,7 @@ function AccountsWorkspace({
               </Suspense>
             </RoutePanelBoundary>
           ) : loading ? (
-            <Skeleton />
+            <Skeleton pathname={pathname} />
           ) : error ? (
             <section className="error-state">
               <span aria-hidden="true">
