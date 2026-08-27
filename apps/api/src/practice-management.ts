@@ -9,7 +9,7 @@ import {
   type PlatformContext,
   type PlatformTX,
 } from "./platform-core.js";
-import { addDays, addMonths, calculateDeadline, dateInTimeZone, evaluateRecurrence, validateRecurrenceRule, type DeadlineRule, type RecurrenceRule } from "./practice-scheduling.js";
+import { addDays, addMonths, calculateDeadline, databaseDate, dateInTimeZone, evaluateRecurrence, validateRecurrenceRule, type DeadlineRule, type RecurrenceRule } from "./practice-scheduling.js";
 import { DEPENDENCY_TYPES, REVIEW_POINT_STATUSES, REVIEW_STATUSES, STAGE_STATUSES, STAGE_TYPES, OrchestrationError, assertAutomationChain, assertReviewPointTransition, assertReviewTransition, assertStageTransition, automationConditionsMatch, boundedReplayRange, evaluateStageGates, validateAutomationDefinition, wouldCreateDependencyCycle, type AutomationAction, type AutomationCondition } from "./practice-orchestration.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -620,11 +620,11 @@ async function generateSchedule(request: Request, env: Env, actorId: string, sch
       }
     }
     const today = dateInTimeZone(new Date(), String(schedule.timezone)), limit = schedule.generation_horizon_type === "next" ? 1 : Number(schedule.generation_horizon_value ?? 120);
-    const through = schedule.generation_horizon_type === "date" ? String(schedule.generation_horizon_date) : addMonths(today, schedule.generation_horizon_type === "next" ? 120 : limit);
-    const occurrences = evaluateRecurrence(schedule.recurrence_rule as unknown as RecurrenceRule, String(schedule.effective_from), through, schedule.effective_to ? String(schedule.effective_to) : null, 120).filter((item) => !schedule.last_generated_occurrence || item.occurrenceDate > String(schedule.last_generated_occurrence)).slice(0, limit);
+    const through = schedule.generation_horizon_type === "date" ? databaseDate(schedule.generation_horizon_date) : addMonths(today, schedule.generation_horizon_type === "next" ? 120 : limit);
+    const occurrences = evaluateRecurrence(schedule.recurrence_rule as unknown as RecurrenceRule, databaseDate(schedule.effective_from), through, schedule.effective_to ? databaseDate(schedule.effective_to) : null, 120).filter((item) => !schedule.last_generated_occurrence || item.occurrenceDate > databaseDate(schedule.last_generated_occurrence)).slice(0, limit);
     const generated: string[] = [];
     for (const occurrence of occurrences) { const id = await instantiateOccurrence(tx, ctx, schedule, occurrence); if (id) generated.push(id); }
-    const last = occurrences.at(-1), next = last ? evaluateRecurrence(schedule.recurrence_rule as unknown as RecurrenceRule, addDays(last.periodEnd, 1), addMonths(last.periodEnd, 24), schedule.effective_to ? String(schedule.effective_to) : null, 1)[0] : undefined;
+    const last = occurrences.at(-1), next = last ? evaluateRecurrence(schedule.recurrence_rule as unknown as RecurrenceRule, addDays(last.periodEnd, 1), addMonths(last.periodEnd, 24), schedule.effective_to ? databaseDate(schedule.effective_to) : null, 1)[0] : undefined;
     await tx`update recurring_work_schedule set last_generated_at=now(),last_generated_occurrence=${last?.occurrenceDate ?? schedule.last_generated_occurrence},next_occurrence_date=${next?.occurrenceDate ?? null},generation_block_reason=null,updated_by=${ctx.actorId},updated_at=now() where tenant_id=${ctx.tenantId} and id=${scheduleId}`;
     return response({ generated: generated.length, workItemIds: generated });
   });
@@ -925,7 +925,7 @@ async function recurrenceOperation(request:Request,env:Env,actorId:string,mode:"
     let generated=0,blocked=0,skipped=0,failures=0;const prospective:Array<Record<string,unknown>>=[];
     for(const schedule of schedules){
       let occurrences:ReturnType<typeof evaluateRecurrence>;
-      try{occurrences=evaluateRecurrence(schedule.recurrence_rule as unknown as RecurrenceRule,String(schedule.effective_from),range.to,schedule.effective_to?String(schedule.effective_to):null,120).filter(item=>item.occurrenceDate>=range.from&&item.occurrenceDate<=range.to);}catch(error){failures++;const summary=String(error instanceof Error?error.message:error).slice(0,1000);await tx`insert into recurrence_execution_item(id,tenant_id,recurrence_execution_id,recurring_schedule_id,outcome,diagnostic_code,diagnostic_summary) values(${crypto.randomUUID()},${ctx.tenantId},${executionId},${schedule.id},'failed','INVALID_RECURRENCE_RULE',${summary})`;prospective.push({scheduleId:String(schedule.id),outcome:"failed",diagnosticSummary:summary});continue;}
+      try{occurrences=evaluateRecurrence(schedule.recurrence_rule as unknown as RecurrenceRule,databaseDate(schedule.effective_from),range.to,schedule.effective_to?databaseDate(schedule.effective_to):null,120).filter(item=>item.occurrenceDate>=range.from&&item.occurrenceDate<=range.to);}catch(error){failures++;const summary=String(error instanceof Error?error.message:error).slice(0,1000);await tx`insert into recurrence_execution_item(id,tenant_id,recurrence_execution_id,recurring_schedule_id,outcome,diagnostic_code,diagnostic_summary) values(${crypto.randomUUID()},${ctx.tenantId},${executionId},${schedule.id},'failed','INVALID_RECURRENCE_RULE',${summary})`;prospective.push({scheduleId:String(schedule.id),outcome:"failed",diagnosticSummary:summary});continue;}
       for(const occurrence of occurrences){
         const duplicate=await tx`select work_item_id from recurrence_generation where tenant_id=${ctx.tenantId} and recurring_schedule_id=${schedule.id} and occurrence_date=${occurrence.occurrenceDate}`;
         let outcome="prospective",workId:null|string=null,dueDate:null|string=null;

@@ -19,6 +19,11 @@ function date(value: string): Date {
   return result;
 }
 const iso = (value: Date) => value.toISOString().slice(0, 10);
+export function databaseDate(value: unknown): string {
+  if (value instanceof Date) return iso(value);
+  const text = String(value);
+  return /^\d{4}-\d{2}-\d{2}/.test(text) ? text.slice(0, 10) : text;
+}
 export function addDays(value: string, days: number): string { const result = date(value); result.setUTCDate(result.getUTCDate() + days); return iso(result); }
 export function addMonths(value: string, months: number, preferredDay?: number): string {
   const source = date(value), day = preferredDay ?? source.getUTCDate();

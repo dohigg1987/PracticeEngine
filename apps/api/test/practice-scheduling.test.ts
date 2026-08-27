@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { addMonths, calculateDeadline, dateInTimeZone, evaluateRecurrence } from "../src/practice-scheduling.ts";
+import { addMonths, calculateDeadline, databaseDate, dateInTimeZone, evaluateRecurrence } from "../src/practice-scheduling.ts";
+
+test("database dates normalize before recurrence evaluation", () => {
+  assert.equal(databaseDate(new Date("2026-08-26T00:00:00.000Z")), "2026-08-26");
+  assert.equal(databaseDate("2026-08-26T00:00:00.000Z"), "2026-08-26");
+});
 
 test("monthly recurrence is deterministic and clamps month ends", () => {
   assert.equal(addMonths("2027-01-31", 1), "2027-02-28");
