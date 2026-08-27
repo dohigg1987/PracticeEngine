@@ -1347,16 +1347,18 @@ function AccountsWorkspace({
           />
         </Tooltip>
         <Menu>
-          <MenuTrigger disableButtonEnhancement>
-            <FluentButton
-              className="app-launcher-button"
-              appearance="subtle"
-              icon={<BuildingRegular />}
-              aria-label="Open PracticeEngine application launcher"
-            >
-              Apps
-            </FluentButton>
-          </MenuTrigger>
+          <Tooltip content="Switch PracticeEngine application" relationship="description">
+            <MenuTrigger disableButtonEnhancement>
+              <FluentButton
+                className="brand app-launcher-button"
+                appearance="subtle"
+                aria-label="Open PracticeEngine application launcher"
+              >
+                <span className="brand-mark" aria-hidden="true">{suiteIdentity.mark}</span>
+                <b>{suiteIdentity.name}</b>
+              </FluentButton>
+            </MenuTrigger>
+          </Tooltip>
           <MenuPopover className="app-launcher-popover">
             <MenuList aria-label="Licensed PracticeEngine applications">
               {entitledApplications.map((manifest) => (
@@ -1379,10 +1381,6 @@ function AccountsWorkspace({
             </MenuList>
           </MenuPopover>
         </Menu>
-        <FluentLink className="brand" href="/">
-          <span>{suiteIdentity.mark}</span>
-          <b>{suiteIdentity.name}</b>
-        </FluentLink>
         <div className="global-search">
           <SearchBox
             className="global-search-box"

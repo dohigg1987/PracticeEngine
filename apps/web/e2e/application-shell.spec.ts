@@ -8,7 +8,7 @@ async function openApps(page: Page) {
 
 test("suite branding and launcher expose only entitled applications", async ({ page }) => {
   await page.goto("/practice/home");
-  await expect(page.getByRole("link", { name: /PracticeEngine/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open PracticeEngine application launcher" })).toBeVisible();
   await expect(page).toHaveTitle("Practice Management · PracticeEngine");
   await openApps(page);
   await expect(page.getByRole("menuitem", { name: /Practice Management/ })).toBeVisible();

@@ -143,12 +143,12 @@ textarea {
 }
 @media (max-width: 620px) {
   .topbar .brand {
-    display: none;
+    display: inline-flex;
   }
   .global-search {
     right: auto;
-    left: 48px;
-    width: calc(100vw - 112px);
+    left: 108px;
+    width: calc(100vw - 172px);
     max-width: none;
     transform: none;
   }

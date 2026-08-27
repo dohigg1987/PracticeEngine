@@ -1271,6 +1271,30 @@ tfoot td {
 }
 .app-launcher-button {
   flex: 0 0 auto;
+  min-width: 0;
+  padding-inline: var(--spacingHorizontalS);
+}
+.app-launcher-button.brand {
+  gap: var(--spacingHorizontalS);
+  font-size: var(--fontSizeBase400);
+  font-weight: var(--fontWeightSemibold);
+}
+.app-launcher-button.brand:hover,
+.app-launcher-button.brand:focus-visible {
+  color: var(--colorBrandForeground1);
+}
+.app-launcher-button.brand .brand-mark {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border: var(--strokeWidthThin) solid var(--colorNeutralStroke1);
+  border-radius: var(--borderRadiusLarge);
+  color: var(--colorBrandForeground1);
+  background: var(--colorNeutralBackground1);
+  font-size: var(--fontSizeBase200);
+  font-weight: var(--fontWeightRegular);
 }
 .app-launcher-entry {
   display: grid;
@@ -1306,9 +1330,15 @@ tfoot td {
 @media (max-width: 620px) {
   .app-launcher-button {
     min-width: 44px;
+    padding-inline: var(--spacingHorizontalXS);
   }
-  .app-launcher-button > span:last-child,
-  .brand b {
+  .app-launcher-button.brand {
+    width: 44px !important;
+    min-width: 44px !important;
+    max-width: 44px !important;
+    padding-inline: 0;
+  }
+  .app-launcher-button.brand b {
     display: none;
   }
   .global-search {
