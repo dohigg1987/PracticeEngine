@@ -3,6 +3,27 @@ import type {
   OrganisationPermanentFile,
   PermanentFileAdviser,
   PermanentFileOfficer,
+  PracticeService,
+  PracticeReview,
+  PracticeWorkStage,
+  AutomationRule,
+  RecurrenceExecution,
+  PracticeTask,
+  PracticeWorkItem,
+  PracticeWorkTemplate,
+  RecurringWorkSchedule,
+  ResourceProfile,
+  CapacityRow,
+  WorkAllocation,
+  TimeEntry,
+  PortfolioEconomicsRow,
+  PracticeEconomicsOverview,
+  CrmProspect,
+  CrmOpportunity,
+  OnboardingCase,
+  ClientRequestItem,
+  PortalMessageItem,
+  PortalThreadItem,
   WorkingPaper,
   WorkingPaperAttachment,
   WorkingPaperCategory,
@@ -13,6 +34,69 @@ import type {
 } from "./api";
 
 const now = "2027-03-18T09:30:00.000Z";
+let demoClientRequests: ClientRequestItem[] = [
+  { id: "client-request-1", client_id: "demo-org", client_name: "Northstar Community Foundation", title: "Confirm trustee details", description: "Check the current trustee list and confirm that it is complete.", request_type: "confirmation", status: "open", priority: "high", due_at: "2027-03-25T17:00:00.000Z", engagement_name: "2026 accounts engagement", responsible_member_id: "member-demo", response_count: 0, completion_mode: "manual" },
+  { id: "client-request-2", client_id: "demo-org-2", client_name: "Harbour Trading Ltd", title: "Upload quarterly bank statements", description: "Upload statements for each trading account for the quarter.", request_type: "document", status: "responded", priority: "normal", due_at: "2027-03-20T17:00:00.000Z", work_title: "Q1 VAT Return", responsible_member_id: "member-demo", response_count: 1, last_response_at: now, completion_mode: "manual" },
+];
+let demoPortalThreads: PortalThreadItem[] = [{ id: "portal-thread-1", client_id: "demo-org", client_name: "Northstar Community Foundation", subject: "Trustee information", status: "open", last_message_at: now, updated_at: now }];
+let demoPortalMessages: PortalMessageItem[] = [{ id: "portal-message-1", sender_context: "practice", body: "Please let us know if any trustees changed during the year.", sent_at: now }];
+let demoPracticeServices: PracticeService[] = [
+  { id: "service-accounts", name: "Annual accounts", description: "Statutory accounts preparation and filing support", category: "accounts", status: "active", default_frequency: "annual", specialist_module_key: "ledgerly", entitlement_feature_key: "ledgerly.accounts" },
+  { id: "service-vat", name: "VAT returns", description: "Periodic VAT return preparation", category: "tax", status: "active", default_frequency: "quarterly" },
+  { id: "service-advisory", name: "Advisory", description: "General business advisory engagements", category: "advisory", status: "active" },
+];
+let demoPracticeWork: PracticeWorkItem[] = [
+  { id: "work-accounts-2026", client_id: "demo-org", client_name: "Northstar Community Foundation", client_service_id: "client-service-accounts", service_name: "Annual accounts", engagement_id: "practice-engagement-1", engagement_name: "2026 accounts engagement", title: "2026 Annual Accounts", period_reference: "Year ended 31 December 2026", status: "in_progress", priority: "high", assigned_member_id: "member-demo", assigned_member_name: "Demo Partner", assigned_team_name: "Accounts", planned_start_date: "2027-01-08", due_date: "2027-09-30", specialist_module_key: "ledgerly", specialist_record_reference: "demo-engagement" },
+  { id: "work-vat-q1", client_id: "demo-org-2", client_name: "Harbour Trading Ltd", client_service_id: "client-service-vat", service_name: "VAT returns", title: "Q1 VAT Return", period_reference: "Quarter ended 31 March 2027", status: "waiting_on_client", priority: "urgent", assigned_member_name: "Demo Partner", assigned_team_name: "Business services", planned_start_date: "2027-04-02", due_date: "2027-05-07" },
+  { id: "work-advisory", client_id: "demo-org", client_name: "Northstar Community Foundation", client_service_id: "client-service-advisory", service_name: "Advisory", title: "Funding model review", status: "ready", priority: "normal", assigned_team_name: "Advisory", due_date: "2027-04-15" },
+];
+let demoPracticeTasks: PracticeTask[] = [
+  { id: "pm-task-1", work_item_id: "work-accounts-2026", title: "Confirm engagement scope", status: "completed", assignee_name: "Demo Partner", sequence: 10, due_date: "2027-01-10", completed_at: now },
+  { id: "pm-task-2", work_item_id: "work-accounts-2026", title: "Prepare accounts", description: "Complete Ledgerly accounts-production work", status: "in_progress", assignee_name: "Demo Partner", team_name: "Accounts", sequence: 20, due_date: "2027-08-31" },
+  { id: "pm-task-3", work_item_id: "work-accounts-2026", title: "Partner review", status: "not_started", reviewer_member_id: "member-reviewer", sequence: 30, due_date: "2027-09-15" },
+];
+const demoPracticeTemplates: PracticeWorkTemplate[] = [
+  { id: "template-accounts", name: "Annual accounts delivery", service_id: "service-accounts", service_name: "Annual accounts", version: 1, status: "published", tasks: [{ title: "Confirm scope", sequence: 10, mandatory: true }, { title: "Prepare accounts", sequence: 20, mandatory: true }, { title: "Partner review", sequence: 30, mandatory: true }] },
+];
+const demoRecurringSchedules: RecurringWorkSchedule[] = [
+  { id: "schedule-accounts", client_id: "demo-org", client_name: "Northstar Community Foundation", client_service_id: "client-service-accounts", service_name: "Annual accounts", work_template_id: "template-accounts", template_name: "Annual accounts delivery", recurrence_rule: { frequency: "annually" }, next_occurrence_date: "2027-12-31", next_due_date: "2028-09-30", owner_name: "Demo Partner", team_name: "Accounts", specialist_module_key: "ledgerly", status: "active" },
+  { id: "schedule-vat", client_id: "demo-org-2", client_name: "Harbour Trading Ltd", client_service_id: "client-service-vat", service_name: "VAT returns", work_template_id: "template-accounts", template_name: "Quarterly VAT delivery", recurrence_rule: { frequency: "quarterly" }, next_occurrence_date: "2027-06-30", next_due_date: "2027-08-07", team_name: "Business services", status: "active" },
+];
+const demoResources: ResourceProfile[] = [
+  { id: "member-demo", display_name: "Demo Partner", team_name: "Accounts", role_title: "Partner", status: "active", weekly_capacity_hours: 37.5, assigned_hours: 31, available_hours: 6.5, utilisation_percentage: 82.7, overdue_work: 1 },
+  { id: "member-reviewer", display_name: "Review Manager", team_name: "Accounts", role_title: "Manager", status: "active", weekly_capacity_hours: 30, assigned_hours: 21, available_hours: 9, utilisation_percentage: 70, overdue_work: 0 },
+];
+const demoCapacity: CapacityRow[] = demoResources.map((resource, index) => ({
+  resource_id: resource.id,
+  display_name: resource.display_name,
+  team_name: resource.team_name,
+  periods: [
+    { key: "2026-W35", label: "24–30 Aug", available_hours: resource.weekly_capacity_hours, committed_hours: index ? 21 : 31, forecast_hours: index ? 5 : 9, unavailable_hours: index ? 0 : 4, remaining_hours: index ? 9 : 2.5 },
+    { key: "2026-W36", label: "31 Aug–6 Sep", available_hours: resource.weekly_capacity_hours, committed_hours: index ? 18 : 40, forecast_hours: 6, unavailable_hours: 0, remaining_hours: index ? 12 : -2.5 },
+  ],
+}));
+let demoAllocations: WorkAllocation[] = [
+  { id: "work-accounts-2026", work_title: "2026 Annual Accounts", client_id: "demo-org", client_name: "Northstar Community Foundation", client_service_id: "client-service-accounts", service_name: "Annual accounts", due_date: "2026-09-30", planned_hours: 42, remaining_hours: 18, resource_name: "Demo Partner", team_name: "Accounts", assignment_state: "confirmed", status: "in_progress" },
+  { id: "work-vat-q1", work_title: "Q3 VAT Return", client_id: "demo-org-2", client_name: "Harbour Trading Ltd", client_service_id: "client-service-vat", service_name: "VAT returns", due_date: "2026-10-07", planned_hours: 12, remaining_hours: 12, resource_name: null, team_name: "Business services", assignment_state: "proposed", status: "ready" },
+];
+let demoTimeEntries: TimeEntry[] = [
+  { id: "time-demo-1", date: "2026-08-26", resource_name: "Demo Partner", client_name: "Northstar Community Foundation", work_title: "2026 Annual Accounts", service_name: "Annual accounts", duration_hours: 3.5, billable: true, status: "submitted" },
+];
+const demoPortfolio: PortfolioEconomicsRow[] = [
+  { id: "client-service-accounts", client_name: "Northstar Community Foundation", owner_name: "Demo Partner", team_name: "Accounts", service_name: "Annual accounts", workload_hours: 18, overdue_work: 1, capacity_pressure: "attention", wip_amount: 1250, revenue_amount: 5200, cost_amount: 2100, contribution_amount: 3100, margin_percentage: 59.6, currency: "GBP", commercial_value_state: "known" },
+  { id: "client-service-vat", client_name: "Harbour Trading Ltd", owner_name: null, team_name: "Business services", service_name: "VAT returns", workload_hours: 12, overdue_work: 0, capacity_pressure: "normal", wip_amount: null, revenue_amount: null, cost_amount: 480, contribution_amount: null, margin_percentage: null, currency: "GBP", commercial_value_state: "unavailable" },
+];
+const demoEconomicsOverview: PracticeEconomicsOverview = { due_this_week: 4, overdue_work: 1, waiting_on_client: 2, review_queue: 3, capacity_utilisation_percentage: 78, forecast_capacity_hours: 15.5, wip_amount: null, economic_exceptions: 1, currency: "GBP" };
+let demoWorkStages:PracticeWorkStage[]=[
+  {id:"stage-prep",work_item_id:"work-accounts-2026",name:"Preparation",sequence:10,stage_type:"preparation",status:"active",source_template_version:1},
+  {id:"stage-review",work_item_id:"work-accounts-2026",name:"Partner review",sequence:20,stage_type:"approval",status:"not_started",source_template_version:1},
+];
+let demoPracticeReviews:PracticeReview[]=[{id:"practice-review-1",work_item_id:"work-accounts-2026",work_title:"2026 Annual Accounts",client_name:"Northstar Community Foundation",service_name:"Annual accounts",stage_name:"Partner review",preparer_name:"Demo Partner",reviewer_name:"Review Partner",due_date:"2027-09-15",status:"requested",requested_at:now,waiting_hours:4,review_points:[{id:"practice-point-1",description:"Confirm the operational delivery checklist is complete",status:"open"}]}];
+let demoAutomationRules:AutomationRule[]=[{id:"automation-1",name:"Assign urgent work to service team",enabled:true,trigger_type:"work.created",conditions:[{field:"workStatus",operator:"equals",value:"ready"}],actions:[{type:"assign_team",teamId:"team-accounts"}],priority:100,recent_executions:[]}];
+let demoRecurrenceExecutions:RecurrenceExecution[]=[{id:"recurrence-run-1",trigger_type:"scheduled",status:"succeeded",schedules_evaluated:2,work_generated:1,blocked_entitlement:0,skipped_idempotent:1,failures:0,started_at:now,completed_at:now}];
+let demoProspects:CrmProspect[]=[{id:"prospect-1",display_name:"Cedar Advisory Group",legal_name:"Cedar Advisory Group Ltd",entity_type:"COMPANY",status:"qualified",primary_contact_name:"Morgan Reed",primary_contact_email:"morgan@example.test",responsible_member_name:"Demo Partner",responsible_team_name:"Advisory",source:"Referral",last_activity_at:now,open_opportunities:1}];
+let demoOpportunities:CrmOpportunity[]=[{id:"opportunity-1",prospect_id:"prospect-1",relationship_name:"Cedar Advisory Group",name:"Finance function and annual accounts",stage_key:"proposal",stage_name:"Proposal",status:"open",expected_close_date:"2027-04-30",probability:65,estimated_value:"12500.00",currency:"GBP",responsible_member_name:"Demo Partner",responsible_team_name:"Advisory",services:[{id:"opportunity-service-1",serviceId:"service-accounts",name:"Annual accounts",accepted:false},{id:"opportunity-service-2",serviceId:"service-advisory",name:"Advisory",accepted:false}],proposal_status:"sent",conversion_state:"not_converted",proposals:[{id:"proposal-reference-1",proposal_id:"QB-2027-0042",proposal_version:"2",status:"sent"}],activities:[]}];
+let demoOnboarding:OnboardingCase[]=[{id:"onboarding-1",client_id:"demo-org-2",client_name:"Harbour Trading Ltd",opportunity_id:"opportunity-converted",opportunity_name:"Bookkeeping and VAT onboarding",engagement_id:"practice-engagement-onboarding",engagement_name:"2027 bookkeeping and VAT",work_item_id:"work-onboarding",work_title:"Client onboarding — Service setup",status:"in_progress",mandatory_gates_complete:false,open_blockers:1,updated_at:now,tasks:[{id:"onboarding-task-1",work_item_id:"work-onboarding",title:"Confirm client details",status:"completed",sequence:10,completed_at:now},{id:"onboarding-task-2",work_item_id:"work-onboarding",title:"Request software access",status:"blocked",sequence:20}],stages:[{id:"onboarding-stage-1",work_item_id:"work-onboarding",name:"Client information",sequence:10,stage_type:"client_input",status:"blocked",block_reason:"Awaiting software authority",source_template_version:1}],blockers:[{id:"onboarding-blocker-1",summary:"Software authority is outstanding",status:"open"}]}];
 const engagement = {
   id: "demo-engagement",
   organisation_id: "demo-org",
@@ -1221,8 +1305,118 @@ const reads: Array<[RegExp, unknown]> = [
   ],
 ];
 
+function practiceDemoRead(path: string): unknown | undefined {
+  if (path === "/v1/practice/resources") return { items: structuredClone(demoResources) };
+  if (path.startsWith("/v1/practice/capacity?")) return { items: structuredClone(demoCapacity) };
+  if (path.startsWith("/v1/practice/work-allocations?")) return { items: structuredClone(demoAllocations) };
+  if (path.startsWith("/v1/practice/time-entries?")) return { items: structuredClone(demoTimeEntries) };
+  if (path === "/v1/practice/portfolio-economics") return { items: structuredClone(demoPortfolio) };
+  if (path === "/v1/practice/economics/overview") return { item: structuredClone(demoEconomicsOverview) };
+  if (path === "/v1/client-requests" || path === "/v1/portal/requests") return { items: structuredClone(demoClientRequests) };
+  if (path === "/v1/portal/documents") return { items: [] };
+  const requestMatch = path.match(/^\/v1\/client-requests\/([^/]+)$/);
+  if (requestMatch) return { item: { ...structuredClone(demoClientRequests.find((item) => item.id === requestMatch[1])), recipients: [], responses: [], documents: [] } };
+  if (path === "/v1/portal-threads" || path === "/v1/portal/messages") return { items: structuredClone(demoPortalThreads) };
+  const messageMatch = path.match(/^\/v1\/portal\/messages\/([^/]+)$/);
+  if (messageMatch) return { item: structuredClone(demoPortalThreads.find((item) => item.id === messageMatch[1])), messages: structuredClone(demoPortalMessages) };
+  if (path === "/v1/crm/prospects") return {items:structuredClone(demoProspects)};
+  if (path === "/v1/crm/opportunities") return {items:structuredClone(demoOpportunities)};
+  const opportunityMatch=path.match(/^\/v1\/crm\/opportunities\/([^/]+)$/);if(opportunityMatch)return {item:structuredClone(demoOpportunities.find(item=>item.id===opportunityMatch[1]))};
+  if (path === "/v1/onboarding") return {items:structuredClone(demoOnboarding)};
+  const onboardingMatch=path.match(/^\/v1\/onboarding\/([^/]+)$/);if(onboardingMatch)return {item:structuredClone(demoOnboarding.find(item=>item.id===onboardingMatch[1]))};
+  if (path === "/v1/practice/services") return { items: structuredClone(demoPracticeServices) };
+  if (path === "/v1/practice/work-templates") return { items: structuredClone(demoPracticeTemplates) };
+  if (path === "/v1/practice/recurring-schedules") return { items: structuredClone(demoRecurringSchedules) };
+  if (path.startsWith("/v1/practice/reviews")) return {items:structuredClone(demoPracticeReviews)};
+  if (path === "/v1/practice/automation-rules") return {items:structuredClone(demoAutomationRules)};
+  if (path === "/v1/practice/recurrence-operations") return {items:structuredClone(demoRecurrenceExecutions)};
+  if (path.startsWith("/v1/practice/work?" ) || path === "/v1/practice/work") return { items: structuredClone(demoPracticeWork) };
+  const workMatch = path.match(/^\/v1\/practice\/work\/([^/]+)$/);
+  if (workMatch) {const item=demoPracticeWork.find((entry)=>entry.id===workMatch[1]);return { item: structuredClone(item?{...item,tasks:demoPracticeTasks.filter(task=>task.work_item_id===item.id),stages:demoWorkStages.filter(stage=>stage.work_item_id===item.id),reviews:demoPracticeReviews.filter(review=>review.work_item_id===item.id)}:undefined) };}
+  const workflowMatch=path.match(/^\/v1\/practice\/work\/([^/]+)\/workflow$/);if(workflowMatch)return {items:structuredClone(demoWorkStages.filter(stage=>stage.work_item_id===workflowMatch[1]))};
+  const tasksMatch = path.match(/^\/v1\/practice\/work\/([^/]+)\/tasks$/);
+  if (tasksMatch) return { items: structuredClone(demoPracticeTasks.filter((item) => item.work_item_id === tasksMatch[1])) };
+  const summaryMatch = path.match(/^\/v1\/practice\/clients\/([^/]+)\/summary$/);
+  if (summaryMatch) {
+    const clientId = summaryMatch[1];
+    const clientName = clientId === "demo-org-2" ? "Harbour Trading Ltd" : "Northstar Community Foundation";
+    return { item: {
+      client: { id: clientId, legal_name: clientName },
+      services: demoPracticeServices.slice(0, clientId === "demo-org-2" ? 2 : 3).map((service, index) => ({ id: `client-${service.id}`, client_id: clientId, service_id: service.id, service_name: service.name, status: "active", frequency: service.default_frequency, responsible_team_id: index ? null : "team-accounts", specialist_module_key: service.specialist_module_key })),
+      engagements: [{ id: "practice-engagement-1", client_id: clientId, client_name: clientName, reference: "PE-2027-001", name: "2027 professional services", status: "active", acceptance_state: "accepted", start_date: "2027-01-01", responsible_owner_id: "member-demo" }],
+      workItems: structuredClone(demoPracticeWork.filter((item) => item.client_id === clientId)),
+      upcomingTasks: structuredClone(demoPracticeTasks.filter((item) => item.status !== "completed")),
+    } };
+  }
+  return undefined;
+}
+
 export function demoRequest(path: string, init?: RequestInit): unknown {
   const method = init?.method ?? "GET";
+  if (method === "GET") {
+    const practiceRead = practiceDemoRead(path);
+    if (practiceRead !== undefined) return practiceRead;
+  }
+  if (method === "POST" && path === "/v1/practice/services") {
+    const body = JSON.parse(String(init?.body || "{}")) as Partial<PracticeService>;
+    const item: PracticeService = { id: `service-${Date.now()}`, name: body.name || "New service", description: body.description, category: body.category, status: body.status || "active", default_frequency: body.default_frequency, specialist_module_key: body.specialist_module_key };
+    demoPracticeServices = [...demoPracticeServices, item];
+    return { item: structuredClone(item) };
+  }
+  const assignmentMatch = path.match(/^\/v1\/practice\/work\/([^/]+)\/resource-assignment$/);
+  if (method === "POST" && assignmentMatch) {
+    const body = JSON.parse(String(init?.body || "{}")) as { assignedMemberId?: string };
+    const resource = demoResources.find((item) => item.id === body.assignedMemberId);
+    demoAllocations = demoAllocations.map((item) => item.id === assignmentMatch[1] ? { ...item, resource_name: resource?.display_name || null, team_name: resource?.team_name || item.team_name, assignment_state: "confirmed" } : item);
+    return { item: structuredClone(demoAllocations.find((item) => item.id === assignmentMatch[1])) };
+  }
+  if (method === "POST" && path === "/v1/practice/time-entries") {
+    const body = JSON.parse(String(init?.body || "{}")) as Record<string, unknown>;
+    const resource = demoResources.find((item) => item.id === body.tenantMemberId);
+    const work = demoAllocations.find((item) => item.id === body.workItemId);
+    const item: TimeEntry = { id: `time-demo-${Date.now()}`, date: String(body.entryDate), resource_name: resource?.display_name || "Unknown resource", client_name: work?.client_name || "Unknown client", work_title: work?.work_title, service_name: work?.service_name, duration_hours: Number(body.durationMinutes) / 60, billable: body.classification === "billable", status: "draft" };
+    demoTimeEntries = [item, ...demoTimeEntries];
+    return { item: structuredClone(item) };
+  }
+  const completeRequestMatch = path.match(/^\/v1\/client-requests\/([^/]+)\/complete$/);
+  if (method === "POST" && completeRequestMatch) {
+    demoClientRequests = demoClientRequests.map((item) => item.id === completeRequestMatch[1] ? { ...item, status: "completed" } : item);
+    return { item: structuredClone(demoClientRequests.find((item) => item.id === completeRequestMatch[1])) };
+  }
+  const portalResponseMatch = path.match(/^\/v1\/portal\/requests\/([^/]+)\/responses$/);
+  if (method === "POST" && portalResponseMatch) {
+    demoClientRequests = demoClientRequests.map((item) => item.id === portalResponseMatch[1] ? { ...item, status: "responded", response_count: (item.response_count ?? 0) + 1, last_response_at: now } : item);
+    return { item: { id: `demo-response-${Date.now()}`, submitted_at: now } };
+  }
+  const portalMessageMatch = path.match(/^\/v1\/portal\/messages\/([^/]+)$/);
+  if (method === "POST" && portalMessageMatch) {
+    const body = JSON.parse(String(init?.body || "{}")) as { body?: string };
+    const item: PortalMessageItem = { id: `portal-message-${Date.now()}`, sender_context: "portal", body: body.body || "Message", sent_at: now };
+    demoPortalMessages = [...demoPortalMessages, item];
+    return { item: structuredClone(item) };
+  }
+  if(method==="POST"&&path==="/v1/crm/prospects"){const body=JSON.parse(String(init?.body||"{}")) as Record<string,unknown>;const item:CrmProspect={id:`prospect-${Date.now()}`,display_name:String(body.displayName||"New prospect"),entity_type:String(body.entityType||"OTHER"),status:"prospect",source:body.source?String(body.source):null,open_opportunities:0};demoProspects=[item,...demoProspects];return {item:structuredClone(item)};}
+  if(method==="POST"&&path==="/v1/crm/opportunities"){const body=JSON.parse(String(init?.body||"{}")) as Record<string,unknown>,prospect=demoProspects.find(item=>item.id===body.prospectId),service=demoPracticeServices.find(item=>item.id===(body.serviceIds as string[]|undefined)?.[0]);const item:CrmOpportunity={id:`opportunity-${Date.now()}`,prospect_id:String(body.prospectId||""),relationship_name:prospect?.display_name,name:String(body.name||"New opportunity"),stage_key:"qualification",status:"open",expected_close_date:body.expectedCloseDate?String(body.expectedCloseDate):null,currency:"GBP",services:service?[{id:`opportunity-service-${Date.now()}`,serviceId:service.id,name:service.name,accepted:false}]:[],conversion_state:"not_converted"};demoOpportunities=[item,...demoOpportunities];return {item:structuredClone(item)};}
+  const opportunityStageMatch=path.match(/^\/v1\/crm\/opportunities\/([^/]+)\/stage$/);if(method==="POST"&&opportunityStageMatch){const body=JSON.parse(String(init?.body||"{}")) as {stageKey:string};demoOpportunities=demoOpportunities.map(item=>item.id===opportunityStageMatch[1]?{...item,stage_key:body.stageKey,status:body.stageKey==="lost"?"lost":"open"}:item);return {item:structuredClone(demoOpportunities.find(item=>item.id===opportunityStageMatch[1]))};}
+  const proposalMatch=path.match(/^\/v1\/crm\/opportunities\/([^/]+)\/proposals$/);if(method==="POST"&&proposalMatch){const body=JSON.parse(String(init?.body||"{}")) as {proposalId:string;proposalVersion?:string};demoOpportunities=demoOpportunities.map(item=>item.id===proposalMatch[1]?{...item,proposal_status:"created",proposals:[...(item.proposals||[]),{id:`proposal-${Date.now()}`,proposal_id:body.proposalId,proposal_version:body.proposalVersion||"1",status:"created"}]}:item);return {item:{proposal_id:body.proposalId}};}
+  const onboardingStatusMatch=path.match(/^\/v1\/onboarding\/([^/]+)\/status$/);if(method==="POST"&&onboardingStatusMatch){const body=JSON.parse(String(init?.body||"{}")) as {status:OnboardingCase["status"]};if(["ready_for_delivery","completed"].includes(body.status))throw new Error("Mandatory onboarding gates remain incomplete");demoOnboarding=demoOnboarding.map(item=>item.id===onboardingStatusMatch[1]?{...item,status:body.status}:item);return {item:structuredClone(demoOnboarding.find(item=>item.id===onboardingStatusMatch[1]))};}
+  const stageMatch=path.match(/^\/v1\/practice\/workflow-stages\/([^/]+)\/advance$/);if(method==="POST"&&stageMatch){const body=JSON.parse(String(init?.body||"{}")) as {status:PracticeWorkStage["status"]};demoWorkStages=demoWorkStages.map(stage=>stage.id===stageMatch[1]?{...stage,status:body.status}:stage);return {item:structuredClone(demoWorkStages.find(stage=>stage.id===stageMatch[1]))};}
+  const reviewMatch=path.match(/^\/v1\/practice\/reviews\/([^/]+)\/decision$/);if(method==="POST"&&reviewMatch){const body=JSON.parse(String(init?.body||"{}")) as {status:PracticeReview["status"]};demoPracticeReviews=demoPracticeReviews.map(review=>review.id===reviewMatch[1]?{...review,status:body.status}:review);return {item:structuredClone(demoPracticeReviews.find(review=>review.id===reviewMatch[1]))};}
+  if(method==="POST"&&path==="/v1/practice/automation-rules"){const body=JSON.parse(String(init?.body||"{}")) as Record<string,unknown>;const item:AutomationRule={id:`automation-${Date.now()}`,name:String(body.name||"New automation"),enabled:body.enabled===true,trigger_type:String(body.triggerType||"work.created"),conditions:Array.isArray(body.conditions)?body.conditions as Array<Record<string,unknown>>:[],actions:Array.isArray(body.actions)?body.actions as Array<Record<string,unknown>>:[{type:"mark_blocked"}],priority:Number(body.priority||100),recent_executions:[]};demoAutomationRules=[...demoAutomationRules,item];return {item:structuredClone(item)};}
+  const automationMatch=path.match(/^\/v1\/practice\/automation-rules\/([^/]+)$/);if(method==="PATCH"&&automationMatch){const body=JSON.parse(String(init?.body||"{}")) as {enabled?:boolean};demoAutomationRules=demoAutomationRules.map(rule=>rule.id===automationMatch[1]?{...rule,...body}:rule);return {item:structuredClone(demoAutomationRules.find(rule=>rule.id===automationMatch[1]))};}
+  if(method==="POST"&&(path==="/v1/practice/recurrence-operations/dry-run"||path==="/v1/practice/recurrence-operations/replay")){const body=JSON.parse(String(init?.body||"{}")) as {from:string;to:string},replay=path.endsWith("replay"),item:RecurrenceExecution={id:`recurrence-${Date.now()}`,trigger_type:replay?"replay":"dry_run",status:"succeeded",range_from:body.from,range_to:body.to,schedules_evaluated:demoRecurringSchedules.length,work_generated:replay?1:0,blocked_entitlement:0,skipped_idempotent:1,failures:0,started_at:now,completed_at:now};demoRecurrenceExecutions=[item,...demoRecurrenceExecutions];return {item:structuredClone(item)};}
+  const workStatusMatch = path.match(/^\/v1\/practice\/work\/([^/]+)\/status$/);
+  if (method === "POST" && workStatusMatch) {
+    const body = JSON.parse(String(init?.body || "{}")) as { status: PracticeWorkItem["status"] };
+    demoPracticeWork = demoPracticeWork.map((item) => item.id === workStatusMatch[1] ? { ...item, status: body.status, completed_at: body.status === "completed" ? now : item.completed_at } : item);
+    return { item: structuredClone(demoPracticeWork.find((item) => item.id === workStatusMatch[1])) };
+  }
+  const taskStatusMatch = path.match(/^\/v1\/practice\/tasks\/([^/]+)\/status$/);
+  if (method === "POST" && taskStatusMatch) {
+    const body = JSON.parse(String(init?.body || "{}")) as { status: PracticeTask["status"] };
+    demoPracticeTasks = demoPracticeTasks.map((item) => item.id === taskStatusMatch[1] ? { ...item, status: body.status, completed_at: body.status === "completed" ? now : item.completed_at } : item);
+    return { item: structuredClone(demoPracticeTasks.find((item) => item.id === taskStatusMatch[1])) };
+  }
   if (method === "POST" && path.endsWith("/mappings")) {
     const body = JSON.parse(String(init?.body || "{}")) as {
       sourceAccountId?: string;

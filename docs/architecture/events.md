@@ -32,13 +32,35 @@ Events describe completed facts. Consumers must be idempotent by `eventId`. Sens
 | `service.activated` | Practice Management | Service enabled for client; service/client IDs, effective date. |
 | `service.terminated` | Practice Management | Service ended; service/client IDs, effective date and reason category. |
 | `engagement.created` | Practice Management | Generic engagement created; client, service and engagement IDs. |
-| `engagement.accepted` | Practice Management | Acceptance decision recorded; engagement ID and decision version. |
-| `engagement.closed` | Practice Management | Engagement closed; ID, closure time and outcome category. |
-| `job.created` | Practice Management | Operational job created; job, engagement/service/client IDs and due date. |
-| `job.completed` | Practice Management | Job completion accepted; job ID, completion time and version. |
-| `task.completed` | Practice Management | Task completed; task/job IDs and completion actor/time. |
+| `engagement.activated` | Practice Management | Engagement activated; engagement ID, client ID and effective date. |
+| `engagement.completed` | Practice Management | Engagement completed; ID, completion time and version. |
+| `engagement.terminated` | Practice Management | Engagement terminated; ID, effective time and reason category where recorded. |
+| `work.created` | Practice Management | Operational work created; work, engagement/service/client IDs and due date. |
+| `work.assigned` | Practice Management | Work responsibility changed; work ID and member/team references. |
+| `work.status_changed` | Practice Management | Work status changed; work ID, prior/current states and version. |
+| `work.completed` | Practice Management | Work completion accepted; work ID, completion time and version. |
+| `recurring_schedule.created` | Practice Management | Recurring definition created; schedule, client-service and template-version references. |
+| `recurring_schedule.generation_blocked` | Practice Management | Generation blocked without deleting history; schedule ID and bounded reason category. |
+| `work.generated` | Practice Management | Idempotent occurrence generated; schedule/work IDs, period and occurrence date. |
+| `work.template_instantiated` | Practice Management | Historical template version instantiated; work/template IDs, version and task count. |
+| `work.deadline_calculated` | Practice Management | Deadline calculated; work/rule IDs and calculated date. |
+| `work.deadline_overridden` | Practice Management | Effective deadline manually overridden; work ID, prior/calculated date and bounded reason. |
+| `work.deadline_recalculated` | Practice Management | Calculated deadline refreshed; work ID, result and whether an override was preserved. |
+| `task.generated` | Practice Management | Template task instantiated; task/work/template-task IDs and sequence. |
+| `task.completed` | Practice Management | Task completed; task/work IDs and completion actor/time. |
 | `document.uploaded` | Platform Core | Authorized document version stored; document/version IDs, classification, hash, byte size. No storage key in public payloads. |
 | `proposal.accepted` | QuoteBench or owning proposal module | Proposal accepted; proposal/client IDs and accepted version. |
+| `prospect.created` | Practice Management | Prospect created without creating a client; prospect ID and bounded source. |
+| `opportunity.created` | Practice Management | Opportunity and proposed service intent created. |
+| `opportunity.stage_changed` | Practice Management | Configured commercial stage changed; prior/current stage. |
+| `proposal.linked` | Practice Management | Stable QuoteBench proposal/version reference linked to an opportunity. |
+| `prospect.converted` | Practice Management | Accepted prospect linked to its canonical client and conversion provenance. |
+| `client.created_from_prospect` | Practice Management | Canonical client created by controlled acceptance conversion. |
+| `client_service.activated_from_proposal` | Practice Management | Accepted service intent mapped to a canonical client service. |
+| `engagement.activated_from_proposal` | Practice Management | Practice engagement activated for accepted services. |
+| `onboarding.started` | Practice Management | Workflow-backed onboarding case started. |
+| `onboarding.completed` | Practice Management | Mandatory onboarding gates cleared and completion recorded. |
+| `notification.requested` | Platform Core | Provider-neutral notification request queued for durable delivery. |
 | `ledgerly.workspace.created` | Ledgerly | Ledgerly capability initialized for tenant/client context; module workspace and shared reference IDs. |
 | `ledgerly.accounts.started` | Ledgerly | Accounts-production work started; Ledgerly engagement ID, shared job/engagement references, period/framework. |
 | `ledgerly.accounts.completed` | Ledgerly | Accounts work completed/released; engagement and accounts-version IDs. |

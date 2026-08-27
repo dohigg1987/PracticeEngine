@@ -700,6 +700,13 @@ export type TenantSettings = {
   createdAt: string;
   updatedAt: string;
 };
+export type EntitlementDecision = {
+  featureKey: string;
+  enabled: boolean;
+  value: number | null;
+  source: string;
+  decisionId: string | null;
+};
 export type ExportRequest = {
   id: string;
   scope: "TENANT" | "ENGAGEMENT";
@@ -768,6 +775,192 @@ export type NormalizedImportPreview = {
   warnings: string[];
 };
 export type ApiContext = { tenantId: string };
+export type ClientRequestItem = {
+  id: string; client_id: string; client_name?: string; title: string; request_type: string;
+  status: "draft" | "open" | "viewed" | "responded" | "partially_complete" | "completed" | "cancelled" | "overdue";
+  priority: string; due_at?: string | null; engagement_name?: string | null; work_title?: string | null;
+  responsible_member_id?: string | null; response_count?: number; last_response_at?: string | null;
+  description?: string | null; completion_mode?: "manual" | "automatic" | "workflow";
+  response_requirements?: Record<string, unknown>; created_at?: string; updated_at?: string;
+};
+export type PortalDocumentItem = {
+  id: string; display_filename: string; visibility: "internal" | "shared_with_client" | "client_uploaded" | "restricted";
+  client_request_id?: string | null; engagement_id?: string | null; work_item_id?: string | null;
+  current_version: number; original_filename?: string; media_type?: string; byte_size?: number;
+  scan_status?: "pending" | "accepted" | "quarantined" | "rejected"; version_created_at?: string;
+};
+export type PortalMessageItem = {
+  id: string; sender_context: "practice" | "portal"; body: string; sent_at: string;
+  reply_to_message_id?: string | null;
+};
+export type PortalThreadItem = {
+  id: string; client_id: string; client_name?: string; subject: string; status: "open" | "closed" | "archived";
+  last_message_at?: string | null; updated_at: string;
+};
+export type ClientPortalAccess = {
+  tenantId: string; tenantName: string; organisationId: string; organisationName: string;
+  engagementId: string; periodStart: string; periodEnd: string; contactId: string;
+  accessId: string; accessRole: string;
+};
+export type PracticeService = {
+  id: string;
+  name: string;
+  description?: string | null;
+  category?: string | null;
+  status: "active" | "inactive";
+  default_frequency?: string | null;
+  responsible_team_id?: string | null;
+  specialist_module_key?: string | null;
+  entitlement_feature_key?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+export type ClientService = {
+  id: string;
+  client_id: string;
+  service_id: string;
+  service_name?: string;
+  status: "active" | "inactive" | "terminated";
+  start_date?: string | null;
+  end_date?: string | null;
+  frequency?: string | null;
+  responsible_member_id?: string | null;
+  responsible_team_id?: string | null;
+  specialist_module_key?: string | null;
+  delivery_readiness?: "commercially_accepted" | "onboarding" | "ready_for_delivery" | "active";
+};
+export type PracticeEngagement = {
+  id: string;
+  client_id: string;
+  client_name?: string;
+  reference: string;
+  name: string;
+  status: "draft" | "proposed" | "active" | "suspended" | "completed" | "terminated";
+  acceptance_state: "not_required" | "pending" | "accepted" | "declined";
+  start_date?: string | null;
+  end_date?: string | null;
+  responsible_owner_id?: string | null;
+  responsible_team_id?: string | null;
+};
+export type PracticeWorkStatus = "not_started" | "ready" | "in_progress" | "waiting_on_client" | "waiting_internal" | "review" | "completed" | "cancelled";
+export type PracticeWorkItem = {
+  id: string;
+  client_id: string;
+  client_name?: string;
+  client_service_id: string;
+  service_name?: string;
+  engagement_id?: string | null;
+  engagement_name?: string | null;
+  title: string;
+  period_reference?: string | null;
+  status: PracticeWorkStatus;
+  priority: "low" | "normal" | "high" | "urgent";
+  assigned_member_id?: string | null;
+  assigned_member_name?: string | null;
+  assigned_team_id?: string | null;
+  assigned_team_name?: string | null;
+  planned_start_date?: string | null;
+  due_date?: string | null;
+  calculated_due_date?: string | null;
+  due_date_overridden?: boolean;
+  due_date_override_reason?: string | null;
+  due_date_calculation?: Record<string, unknown>;
+  source_template_id?: string | null;
+  source_template_version?: number | null;
+  completed_at?: string | null;
+  specialist_module_key?: string | null;
+  specialist_record_reference?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+export type PracticeTask = {
+  id: string;
+  work_item_id: string;
+  title: string;
+  description?: string | null;
+  status: "not_started" | "in_progress" | "blocked" | "review" | "completed" | "skipped";
+  assignee_member_id?: string | null;
+  assignee_name?: string | null;
+  team_id?: string | null;
+  team_name?: string | null;
+  reviewer_member_id?: string | null;
+  sequence: number;
+  due_date?: string | null;
+  completed_at?: string | null;
+  review_required?: boolean;
+  work_stage_id?: string | null;
+  blockers?: Array<{ predecessorTaskId:string; dependencyType:string; blockingReason?:string|null; resolvedAt?:string|null }>;
+};
+export type PracticeWorkStage={id:string;work_item_id:string;name:string;sequence:number;stage_type:"preparation"|"client_input"|"internal_review"|"approval"|"specialist_execution"|"completion";status:"not_started"|"active"|"blocked"|"waiting"|"review"|"completed"|"skipped";block_reason?:string|null;source_template_version:number;};
+export type PracticeReviewPoint={id:string;description:string;status:"open"|"addressed"|"cleared"|"reopened";resolution?:string|null;};
+export type PracticeReview={id:string;work_item_id:string;work_title?:string;client_name?:string;service_name?:string;stage_name?:string;preparer_name?:string;reviewer_name?:string;due_date?:string|null;status:"requested"|"in_progress"|"changes_requested"|"approved"|"rejected"|"completed"|"reopened";requested_at:string;waiting_hours?:number;review_points?:PracticeReviewPoint[];};
+export type AutomationRule={id:string;name:string;enabled:boolean;trigger_type:string;conditions:Array<Record<string,unknown>>;actions:Array<Record<string,unknown>>;priority:number;last_executed_at?:string|null;last_failure_code?:string|null;recent_executions?:Array<{id:string;status:string;started_at:string}>;};
+export type RecurrenceExecution={id:string;trigger_type:"scheduled"|"manual"|"dry_run"|"replay";status:string;range_from?:string|null;range_to?:string|null;schedules_evaluated:number;work_generated:number;blocked_entitlement:number;skipped_idempotent:number;failures:number;started_at:string;completed_at?:string|null;};
+export type PracticeWorkTemplate = {
+  id: string;
+  name: string;
+  service_id?: string | null;
+  service_name?: string | null;
+  version: number;
+  status: "draft" | "published" | "superseded" | "archived";
+  tasks?: Array<{ id?: string; title: string; description?: string | null; sequence: number; dueDateOffsetDays?: number | null; mandatory: boolean }>;
+  stages?: Array<{id?:string;name:string;sequence:number;stage_type:string;status:string}>;
+};
+export type RecurringWorkSchedule = {
+  id: string; client_id: string; client_name?: string; client_service_id: string; service_name?: string;
+  work_template_id: string; template_name?: string; recurrence_rule: { frequency?: string; interval?: number };
+  next_occurrence_date?: string | null; next_due_date?: string | null; owner_name?: string | null; team_name?: string | null;
+  specialist_module_key?: string | null; status: "active" | "suspended" | "blocked_entitlement" | "archived";
+  generation_block_reason?: string | null;
+};
+export type ResourceProfile = {
+  id:string;display_name:string;team_name?:string|null;role_title?:string|null;
+  status:"active"|"inactive"|"unavailable"|"leave_unavailable"|"future_starter";
+  weekly_capacity_hours:number;assigned_hours:number;available_hours:number;utilisation_percentage:number;overdue_work:number;
+};
+export type CapacityPeriod = {key:string;label:string;available_hours:number;committed_hours:number;forecast_hours:number;unavailable_hours:number;remaining_hours:number};
+export type CapacityRow = {resource_id:string;display_name:string;team_name?:string|null;periods:CapacityPeriod[]};
+export type WorkAllocation = {id:string;work_title:string;client_id:string;client_name:string;client_service_id:string;service_name:string;resource_name?:string|null;team_name?:string|null;planned_start?:string|null;planned_end?:string|null;planned_hours:number;remaining_hours?:number|null;due_date?:string|null;status:string;assignment_state:string};
+export type TimeEntry = {id:string;resource_name:string;date:string;client_name:string;service_name?:string|null;work_title?:string|null;duration_hours:number;billable:boolean;status:string;description?:string|null};
+export type PortfolioEconomicsRow = {id:string;client_name:string;owner_name?:string|null;team_name?:string|null;service_name?:string|null;workload_hours:number;overdue_work:number;capacity_pressure:string;wip_amount?:number|null;revenue_amount?:number|null;cost_amount?:number|null;contribution_amount?:number|null;margin_percentage?:number|null;currency:string;commercial_value_state:"known"|"calculated"|"estimated"|"unavailable"};
+export type PracticeEconomicsOverview = {due_this_week:number;overdue_work:number;waiting_on_client:number;review_queue:number;capacity_utilisation_percentage:number;forecast_capacity_hours:number;wip_amount?:number|null;economic_exceptions:number;currency?:string};
+export type PracticeClientSummary = {
+  client: { id: string; legal_name?: string; name?: string; originating_opportunity_id?: string | null; originating_proposal_reference_id?: string | null; converted_at?: string | null };
+  services: ClientService[];
+  engagements: PracticeEngagement[];
+  workItems: PracticeWorkItem[];
+  upcomingTasks: PracticeTask[];
+  recurringSchedules?: RecurringWorkSchedule[];
+  onboarding?: { id: string; status: string; mandatory_gates_complete: boolean; updated_at: string } | null;
+};
+export type CrmProspect = {
+  id: string; display_name: string; legal_name?: string | null; entity_type: string;
+  status: "prospect" | "qualified" | "converted" | "lost" | "archived";
+  primary_contact_name?: string | null; primary_contact_email?: string | null;
+  responsible_member_name?: string | null; responsible_team_name?: string | null;
+  source?: string | null; last_activity_at?: string | null; open_opportunities?: number;
+};
+export type OpportunityService = { id: string; serviceId?: string; service_id?: string; name?: string; service_name?: string; accepted?: boolean };
+export type CrmOpportunity = {
+  id: string; prospect_id?: string | null; existing_client_id?: string | null; relationship_name?: string;
+  name: string; stage_key: string; stage_name?: string; status: "open" | "won" | "lost" | "cancelled";
+  expected_close_date?: string | null; probability?: number | null; estimated_value?: string | number | null; currency: string;
+  responsible_member_name?: string | null; responsible_team_name?: string | null;
+  services?: OpportunityService[]; proposal_status?: string | null; conversion_state: string;
+  proposals?: Array<Record<string, unknown>>; activities?: Array<Record<string, unknown>>;
+  conversion?: Record<string, unknown> | null;
+};
+export type OnboardingCase = {
+  id: string; client_id: string; client_name?: string; opportunity_id: string; opportunity_name?: string;
+  engagement_id: string; engagement_name?: string; work_item_id?: string | null; work_title?: string | null;
+  status: "not_started" | "in_progress" | "blocked" | "ready_for_delivery" | "completed" | "cancelled";
+  mandatory_gates_complete: boolean; open_blockers?: number; updated_at: string;
+  services?: ClientService[]; tasks?: PracticeTask[]; stages?: PracticeWorkStage[];
+  blockers?: Array<{ id: string; summary: string; status: "open" | "resolved" }>;
+};
+export function practiceClientSummaryItem(response: { item: PracticeClientSummary }): PracticeClientSummary {
+  return response.item;
+}
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -779,7 +972,10 @@ export class ApiError extends Error {
 }
 const apiBase = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 const demoTransport =
-  import.meta.env.DEV && import.meta.env.VITE_DEMO_MODE === "true";
+  (import.meta.env.VITE_PM_PROGRESS_PREVIEW === "true" &&
+    typeof window !== "undefined" &&
+    window.location.hostname === "pm-002-progress.ledgerly-accounts.pages.dev") ||
+  (import.meta.env.DEV && import.meta.env.VITE_DEMO_MODE === "true");
 
 async function request<T>(
   path: string,
@@ -1895,6 +2091,11 @@ export const api = {
       context,
       { method: "POST" },
     ),
+  entitlementDecision: (context: ApiContext, featureKey: string) =>
+    request<{ item: EntitlementDecision }>(
+      `/v1/platform/entitlements/${encodeURIComponent(featureKey)}`,
+      context,
+    ),
   tenantSettings: (context: ApiContext) =>
     request<{ item: TenantSettings }>("/v1/tenant/settings", context),
   updateTenantSettings: (context: ApiContext, name: string) =>
@@ -1928,4 +2129,84 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  practiceServices: (context: ApiContext) =>
+    request<{ items: PracticeService[] }>("/v1/practice/services", context),
+  createPracticeService: (context: ApiContext, body: Record<string, unknown>) =>
+    request<{ item: PracticeService }>("/v1/practice/services", context, { method: "POST", body: JSON.stringify(body) }),
+  updatePracticeService: (context: ApiContext, id: string, body: Record<string, unknown>) =>
+    request<{ item: PracticeService }>(`/v1/practice/services/${encodeURIComponent(id)}`, context, { method: "PATCH", body: JSON.stringify(body) }),
+  clientServices: (context: ApiContext, clientId: string) =>
+    request<{ items: ClientService[] }>(`/v1/clients/${encodeURIComponent(clientId)}/services`, context),
+  practiceEngagements: (context: ApiContext, clientId?: string) =>
+    request<{ items: PracticeEngagement[] }>(`/v1/practice/engagements${clientId ? `?clientId=${encodeURIComponent(clientId)}` : ""}`, context),
+  practiceWork: (context: ApiContext, filters: { clientId?: string; serviceId?: string; status?: string; assignedMemberId?: string; dueBefore?: string } = {}) => {
+    const query = new URLSearchParams(Object.entries(filters).filter((entry): entry is [string, string] => Boolean(entry[1]))).toString();
+    return request<{ items: PracticeWorkItem[] }>(`/v1/practice/work${query ? `?${query}` : ""}`, context);
+  },
+  practiceWorkItem: (context: ApiContext, id: string) =>
+    request<{ item: PracticeWorkItem & {tasks?:PracticeTask[];stages?:PracticeWorkStage[];reviews?:PracticeReview[]} }>(`/v1/practice/work/${encodeURIComponent(id)}`, context),
+  updatePracticeWorkStatus: (context: ApiContext, id: string, status: PracticeWorkStatus) =>
+    request<{ item: PracticeWorkItem }>(`/v1/practice/work/${encodeURIComponent(id)}/status`, context, { method: "POST", body: JSON.stringify({ status }) }),
+  practiceTasks: (context: ApiContext, workId: string) =>
+    request<{ items: PracticeTask[] }>(`/v1/practice/work/${encodeURIComponent(workId)}/tasks`, context),
+  updatePracticeTaskStatus: (context: ApiContext, id: string, status: PracticeTask["status"]) =>
+    request<{ item: PracticeTask }>(`/v1/practice/tasks/${encodeURIComponent(id)}/status`, context, { method: "POST", body: JSON.stringify({ status }) }),
+  practiceWorkTemplates: (context: ApiContext) =>
+    request<{ items: PracticeWorkTemplate[] }>("/v1/practice/work-templates", context),
+  createPracticeWorkTemplate: (context: ApiContext, body: Record<string, unknown>) =>
+    request<{ item: PracticeWorkTemplate }>("/v1/practice/work-templates", context, { method: "POST", body: JSON.stringify(body) }),
+  publishPracticeWorkTemplate: (context: ApiContext, id: string) =>
+    request<{ item: PracticeWorkTemplate }>(`/v1/practice/work-templates/${encodeURIComponent(id)}/publish`, context, { method: "POST", body: "{}" }),
+  recurringSchedules: (context: ApiContext) =>
+    request<{ items: RecurringWorkSchedule[] }>("/v1/practice/recurring-schedules", context),
+  generateRecurringSchedule: (context: ApiContext, id: string) =>
+    request<{ generated: number; workItemIds: string[] }>(`/v1/practice/recurring-schedules/${encodeURIComponent(id)}/generate`, context, { method: "POST", body: "{}" }),
+  practiceWorkflow:(context:ApiContext,workId:string)=>request<{items:PracticeWorkStage[]}>(`/v1/practice/work/${encodeURIComponent(workId)}/workflow`,context),
+  advancePracticeStage:(context:ApiContext,stageId:string,status:PracticeWorkStage["status"],reason?:string)=>request<{item:PracticeWorkStage}>(`/v1/practice/workflow-stages/${encodeURIComponent(stageId)}/advance`,context,{method:"POST",body:JSON.stringify({status,reason})}),
+  practiceReviews:(context:ApiContext,status?:string)=>request<{items:PracticeReview[]}>(`/v1/practice/reviews${status?`?status=${encodeURIComponent(status)}`:""}`,context),
+  decidePracticeReview:(context:ApiContext,id:string,status:PracticeReview["status"],reason?:string)=>request<{item:PracticeReview}>(`/v1/practice/reviews/${encodeURIComponent(id)}/decision`,context,{method:"POST",body:JSON.stringify({status,reason})}),
+  automationRules:(context:ApiContext)=>request<{items:AutomationRule[]}>("/v1/practice/automation-rules",context),
+  createAutomationRule:(context:ApiContext,body:Record<string,unknown>)=>request<{item:AutomationRule}>("/v1/practice/automation-rules",context,{method:"POST",body:JSON.stringify(body)}),
+  updateAutomationRule:(context:ApiContext,id:string,body:Record<string,unknown>)=>request<{item:AutomationRule}>(`/v1/practice/automation-rules/${encodeURIComponent(id)}`,context,{method:"PATCH",body:JSON.stringify(body)}),
+  recurrenceOperations:(context:ApiContext)=>request<{items:RecurrenceExecution[]}>("/v1/practice/recurrence-operations",context),
+  dryRunRecurrence:(context:ApiContext,from:string,to:string)=>request<{item:Record<string,unknown>}>("/v1/practice/recurrence-operations/dry-run",context,{method:"POST",body:JSON.stringify({from,to})}),
+  replayRecurrence:(context:ApiContext,from:string,to:string)=>request<{item:Record<string,unknown>}>("/v1/practice/recurrence-operations/replay",context,{method:"POST",body:JSON.stringify({from,to})}),
+  overridePracticeDeadline: (context: ApiContext, id: string, dueDate: string, reason: string) =>
+    request<{ item: PracticeWorkItem }>(`/v1/practice/work/${encodeURIComponent(id)}/deadline-override`, context, { method: "POST", body: JSON.stringify({ dueDate, reason }) }),
+  recalculatePracticeDeadline: (context: ApiContext, id: string) =>
+    request<{ item: PracticeWorkItem }>(`/v1/practice/work/${encodeURIComponent(id)}/deadline-recalculate`, context, { method: "POST", body: "{}" }),
+  practiceClientSummary: async (context: ApiContext, clientId: string) =>
+    practiceClientSummaryItem(await request<{ item: PracticeClientSummary }>(`/v1/practice/clients/${encodeURIComponent(clientId)}/summary`, context)),
+  resourceProfiles: (context: ApiContext) => request<{items:ResourceProfile[]}>("/v1/practice/resources",context),
+  capacity: (context: ApiContext, range:{from:string;to:string}) => request<{items:CapacityRow[]}>(`/v1/practice/capacity?${new URLSearchParams(range)}`,context),
+  workAllocations: (context: ApiContext, range:{from:string;to:string}) => request<{items:WorkAllocation[]}>(`/v1/practice/work-allocations?${new URLSearchParams(range)}`,context),
+  reassignWork: (context: ApiContext, workId:string, body:{resourceId:string}) => request<{item:WorkAllocation}>(`/v1/practice/work/${encodeURIComponent(workId)}/resource-assignment`,context,{method:"POST",body:JSON.stringify({assignedMemberId:body.resourceId,assignmentState:"confirmed"})}),
+  timeEntries: (context: ApiContext, range:{from:string;to:string}) => request<{items:TimeEntry[]}>(`/v1/practice/time-entries?${new URLSearchParams(range)}`,context),
+  createTimeEntry: (context: ApiContext, body:{resourceId:string;workItemId:string;clientId:string;clientServiceId:string;date:string;durationHours:number;description?:string;billable:boolean}) => request<{item:TimeEntry}>("/v1/practice/time-entries",context,{method:"POST",body:JSON.stringify({tenantMemberId:body.resourceId,workItemId:body.workItemId,clientId:body.clientId,clientServiceId:body.clientServiceId,entryDate:body.date,durationMinutes:Math.round(body.durationHours*60),narrative:body.description,classification:body.billable?"billable":"non_billable"})}),
+  portfolioEconomics: (context: ApiContext) => request<{items:PortfolioEconomicsRow[]}>("/v1/practice/portfolio-economics",context),
+  practiceEconomicsOverview: async (context: ApiContext) => (await request<{item:PracticeEconomicsOverview}>("/v1/practice/economics/overview",context)).item,
+  crmProspects: (context: ApiContext) => request<{ items: CrmProspect[] }>("/v1/crm/prospects", context),
+  createCrmProspect: (context: ApiContext, body: Record<string, unknown>) => request<{ item: CrmProspect }>("/v1/crm/prospects", context, { method: "POST", body: JSON.stringify(body) }),
+  crmOpportunities: (context: ApiContext) => request<{ items: CrmOpportunity[] }>("/v1/crm/opportunities", context),
+  createCrmOpportunity: (context: ApiContext, body: Record<string, unknown>) => request<{ item: CrmOpportunity }>("/v1/crm/opportunities", context, { method: "POST", body: JSON.stringify(body) }),
+  crmOpportunity: (context: ApiContext, id: string) => request<{ item: CrmOpportunity }>(`/v1/crm/opportunities/${encodeURIComponent(id)}`, context),
+  updateOpportunityStage: (context: ApiContext, id: string, stageKey: string, outcomeReason?: string) => request<{ item: CrmOpportunity }>(`/v1/crm/opportunities/${encodeURIComponent(id)}/stage`, context, { method: "POST", body: JSON.stringify({ stageKey, outcomeReason }) }),
+  linkQuoteBenchProposal: (context: ApiContext, id: string, proposalId: string, proposalVersion = "1") => request<{ item: Record<string, unknown> }>(`/v1/crm/opportunities/${encodeURIComponent(id)}/proposals`, context, { method: "POST", body: JSON.stringify({ proposalId, proposalVersion }) }),
+  onboardingCases: (context: ApiContext) => request<{ items: OnboardingCase[] }>("/v1/onboarding", context),
+  onboardingCase: (context: ApiContext, id: string) => request<{ item: OnboardingCase }>(`/v1/onboarding/${encodeURIComponent(id)}`, context),
+  updateOnboardingStatus: (context: ApiContext, id: string, status: OnboardingCase["status"]) => request<{ item: OnboardingCase }>(`/v1/onboarding/${encodeURIComponent(id)}/status`, context, { method: "POST", body: JSON.stringify({ status }) }),
+  clientRequests: (context: ApiContext) => request<{ items: ClientRequestItem[] }>("/v1/client-requests", context),
+  clientRequest: (context: ApiContext, id: string) => request<{ item: ClientRequestItem & { recipients?: Record<string, unknown>[]; responses?: Record<string, unknown>[]; documents?: Record<string, unknown>[] } }>(`/v1/client-requests/${encodeURIComponent(id)}`, context),
+  completeClientRequest: (context: ApiContext, id: string) => request<{ item: ClientRequestItem }>(`/v1/client-requests/${encodeURIComponent(id)}/complete`, context, { method: "POST", body: "{}" }),
+  portalThreads: (context: ApiContext) => request<{ items: PortalThreadItem[] }>("/v1/portal-threads", context),
+  clientPortalAccess: () => request<{ items: ClientPortalAccess[] }>("/v1/me/client-portal/access"),
+  clientPortalRequests: (context: ApiContext) => request<{ items: ClientRequestItem[] }>("/v1/portal/requests", context),
+  clientPortalRequest: (context: ApiContext, id: string) => request<{ item: ClientRequestItem & { responses?: Record<string, unknown>[]; documents?: PortalDocumentItem[] } }>(`/v1/portal/requests/${encodeURIComponent(id)}`, context),
+  clientPortalDocuments: (context: ApiContext) => request<{ items: PortalDocumentItem[] }>("/v1/portal/documents", context),
+  respondToClientRequest: (context: ApiContext, id: string, body: { responseType: "text" | "confirmation" | "structured"; text?: string; value?: boolean; structured?: Record<string, unknown>; idempotencyKey: string }) => request<{ item: Record<string, unknown> }>(`/v1/portal/requests/${encodeURIComponent(id)}/responses`, context, { method: "POST", body: JSON.stringify(body) }),
+  uploadClientRequestDocument: (context: ApiContext, id: string, file: File, idempotencyKey: string) => { const body = new FormData(); body.append("file", file); body.append("idempotencyKey", idempotencyKey); return request<{ item: Record<string, unknown> }>(`/v1/portal/requests/${encodeURIComponent(id)}/documents`, context, { method: "POST", body }); },
+  clientPortalThreads: (context: ApiContext) => request<{ items: PortalThreadItem[] }>("/v1/portal/messages", context),
+  clientPortalThread: (context: ApiContext, id: string) => request<{ item: PortalThreadItem; messages: PortalMessageItem[] }>(`/v1/portal/messages/${encodeURIComponent(id)}`, context),
+  sendClientPortalMessage: (context: ApiContext, id: string, body: string, idempotencyKey: string) => request<{ item: PortalMessageItem }>(`/v1/portal/messages/${encodeURIComponent(id)}`, context, { method: "POST", body: JSON.stringify({ body, idempotencyKey }) }),
+  clientPortalDocumentBlob: (context: ApiContext, id: string) => requestBlob(`/v1/portal/documents/${encodeURIComponent(id)}/content`, context),
 };

@@ -23,6 +23,7 @@ Platform Core owns identity, tenancy, authorization, audit, files, notifications
 
 ## Mandatory engineering rules
 
+- **Any new user-facing capability must declare which PracticeEngine application owns it. Application navigation must be added only to that application's manifest.** No specialist application may contribute primary navigation directly to the global suite shell.
 - Enforce tenant isolation, authorization and entitlements server-side. UI gating is not security.
 - Separate functional permission from commercial entitlement; never branch on package names.
 - Every auditable mutation appends an immutable audit event; use the transactional outbox for external effects requiring reliable publication.
@@ -33,3 +34,5 @@ Platform Core owns identity, tenancy, authorization, audit, files, notifications
 ## Completion
 
 Run `npm run verify:architecture` for documentation/boundary changes and the smallest relevant gates while iterating. Before handoff run `npm run verify` unless the task explicitly limits scope; report any pre-existing failure separately. Completion requires code, tests, docs, tenant/auth/audit/entitlement implications and rollback to be accounted for.
+
+For substantive increments, use staged verification: run the smallest affected `verify:*` command while iterating, `verify:fast` after coherent increments, `verify:integration` after database/API/Worker changes, and `verify:pilot` once as the mandatory final gate. Report failed first attempts and reruns.

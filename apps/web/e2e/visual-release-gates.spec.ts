@@ -6,15 +6,15 @@ type ViewportCase = {
   height: number;
   surface: "clients" | "data" | "accounts";
   heading: string;
-  group?: string;
+  path: string;
 };
 
 const viewportCases: ViewportCase[] = [
-  { name: "desktop-1440", width: 1440, height: 900, surface: "accounts", heading: "Statutory accounts document", group: "Accounts builder" },
-  { name: "desktop-1920", width: 1920, height: 1080, surface: "clients", heading: "Clients" },
-  { name: "tablet-768", width: 768, height: 1024, surface: "data", heading: "Trial balance", group: "Source data" },
-  { name: "mobile-390", width: 390, height: 844, surface: "clients", heading: "Clients" },
-  { name: "reflow-400-percent", width: 320, height: 720, surface: "clients", heading: "Clients" },
+  { name: "desktop-1440", width: 1440, height: 900, surface: "accounts", heading: "Statutory accounts document", path: "/ledgerly/accounts" },
+  { name: "desktop-1920", width: 1920, height: 1080, surface: "clients", heading: "Clients", path: "/practice/clients" },
+  { name: "tablet-768", width: 768, height: 1024, surface: "data", heading: "Trial balance", path: "/ledgerly/trial-balance" },
+  { name: "mobile-390", width: 390, height: 844, surface: "clients", heading: "Clients", path: "/practice/clients" },
+  { name: "reflow-400-percent", width: 320, height: 720, surface: "clients", heading: "Clients", path: "/practice/clients" },
 ];
 
 async function waitForShowcase(page: Page) {
@@ -24,20 +24,14 @@ async function waitForShowcase(page: Page) {
 }
 
 async function openNavigationIfNeeded(page: Page) {
-  const toggle = page.getByRole("button", { name: "Open practice navigation" });
+  const toggle = page.getByRole("button", { name: "Open application navigation" });
   if (await toggle.isVisible()) {
     await toggle.click();
   }
 }
 
 async function openSurface(page: Page, item: ViewportCase) {
-  await openNavigationIfNeeded(page);
-  const target = page.locator(`button[value="${item.surface}"]`).first();
-  if (!(await target.isVisible()) && item.group) {
-    await page.getByRole("button", { name: item.group, exact: true }).click();
-  }
-  await expect(target).toBeVisible();
-  await target.click();
+  await page.goto(item.path);
   await expect(page.getByRole("heading", { name: item.heading }).first()).toBeVisible();
 }
 
@@ -160,10 +154,10 @@ for (const viewport of [
   });
 }
 
-test("repeated production-stage controls align within two pixels", async ({ page }) => {
+test("repeated application navigation controls align within two pixels", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await waitForShowcase(page);
-  const positions = await page.locator(".production-nav-stage-toggle:visible").evaluateAll((buttons) =>
+  const positions = await page.locator(".application-navigation .workspace-nav-item:visible").evaluateAll((buttons) =>
     buttons.map((button) => {
       const box = button.getBoundingClientRect();
       return { left: box.left, right: box.right };
@@ -178,13 +172,11 @@ test("narrow navigation and pane controls meet the 44px touch-target gate", asyn
   await page.setViewportSize({ width: 390, height: 844 });
   await waitForShowcase(page);
 
-  const navigation = page.getByRole("button", { name: "Open practice navigation" });
+  const navigation = page.getByRole("button", { name: "Open application navigation" });
   await assertMinimumTarget(navigation, 44);
   await navigation.click();
-  const builderGroup = page.getByRole("button", { name: "Accounts builder", exact: true });
-  await assertMinimumTarget(builderGroup, 44);
-  await builderGroup.click();
-  const accounts = page.locator('button[value="accounts"]').first();
+  const accounts = page.getByRole("button", { name: "Accounts", exact: true }).first();
+  await expect(accounts).toBeVisible();
   await assertMinimumTarget(accounts, 44);
   await accounts.click();
   await expect(page.getByRole("heading", { name: "Statutory accounts document" })).toBeVisible();
@@ -201,11 +193,7 @@ test("keyboard navigation reaches a section and returns through the engagement b
   await page.setViewportSize({ width: 1440, height: 900 });
   await waitForShowcase(page);
 
-  const journalsGroup = page.getByRole("button", { name: "Adjustments", exact: true });
-  await journalsGroup.focus();
-  await expect(journalsGroup).toBeFocused();
-  await journalsGroup.press("Enter");
-  const journals = page.locator('button[value="journals"]').first();
+  const journals = page.getByRole("button", { name: "Journals", exact: true }).first();
   await journals.focus();
   await expect(journals).toBeFocused();
   await journals.press("Enter");

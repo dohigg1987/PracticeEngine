@@ -1,15 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 
 async function openWorkingPapers(page: Page) {
-  const navigationToggle = page.getByRole("button", {
-    name: "Open practice navigation",
+  await page.goto("/ledgerly/working-papers");
+  await expect(page.getByRole("heading", { name: "Working papers" })).toBeVisible({
+    timeout: 15_000,
   });
-  if (await navigationToggle.isVisible()) await navigationToggle.click();
-  const item = page.locator('button[value="working-papers"]').first();
-  if (!(await item.isVisible()))
-    await page.getByRole("button", { name: "Accounts builder", exact: true }).click();
-  await item.click();
-  await expect(page.getByRole("heading", { name: "Working papers" })).toBeVisible();
 }
 
 test.beforeEach(async ({ page }) => {
@@ -20,6 +15,7 @@ test.beforeEach(async ({ page }) => {
 test("governed library is primary and one-off papers retain governance metadata", async ({
   page,
 }, testInfo) => {
+  test.setTimeout(120_000);
   await page.setViewportSize({ width: 1440, height: 900 });
   await openWorkingPapers(page);
 

@@ -1,13 +1,16 @@
 import postgres, { type Sql, type TransactionSql } from "postgres";
 import { ApiError } from "./core.js";
-type DB = Sql<Record<string, never>>;
-type TX = TransactionSql<Record<string, never>>;
+export type PlatformDB = Sql<Record<string, never>>;
+export type PlatformTX = TransactionSql<Record<string, never>>;
+type DB = PlatformDB;
+type TX = PlatformTX;
 type Meta = Record<string, postgres.JSONValue | undefined>;
-interface Ctx {
+export interface PlatformContext {
   tenantId: string;
   actorId: string;
   correlationId: string;
 }
+type Ctx = PlatformContext;
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const CLIENT_TYPES = new Set([
@@ -32,9 +35,10 @@ const RELATIONSHIP_TYPES = new Set([
 ]);
 const response = (data: unknown, status = 200) =>
   Response.json(data, { status, headers: { "cache-control": "no-store" } });
-const db = (env: Env): DB =>
+export const platformDatabase = (env: Env): DB =>
   postgres(env.HYPERDRIVE.connectionString, { prepare: false, max: 5 });
-function context(request: Request, actorId: string): Ctx {
+const db = platformDatabase;
+export function platformContext(request: Request, actorId: string): Ctx {
   const tenantId = request.headers.get("x-tenant-id");
   if (!tenantId)
     throw new ApiError(
@@ -49,7 +53,8 @@ function context(request: Request, actorId: string): Ctx {
       request.headers.get("x-correlation-id") ?? crypto.randomUUID(),
   };
 }
-async function transaction<T>(
+const context = platformContext;
+export async function platformTransaction<T>(
   sql: DB,
   ctx: Ctx,
   operation: (tx: TX) => Promise<T>,
@@ -60,6 +65,7 @@ async function transaction<T>(
   });
   return result.value;
 }
+const transaction = platformTransaction;
 async function jsonBody(request: Request): Promise<Record<string, unknown>> {
   if (
     !(request.headers.get("content-type") ?? "")
@@ -167,7 +173,7 @@ async function audit(
   await tx`insert into audit_event(event_id,occurred_at_utc,recorded_at_utc,tenant_id,organisation_id,actor_type,actor_id,event_type,object_type,object_id,previous_hash,correlation_id,metadata,event_hash) values(${eventId},${occurredAt},${occurredAt},${ctx.tenantId},${organisationId},'USER',${ctx.actorId},${eventType},${objectType},${objectId},${previousHash},${ctx.correlationId},${tx.json(metadata)},${eventHash})`;
   await tx`insert into outbox_event(id,tenant_id,aggregate_type,aggregate_id,event_type,payload,correlation_id,idempotency_key) values(${crypto.randomUUID()},${ctx.tenantId},${objectType},${objectId},${eventType},${tx.json(metadata)},${ctx.correlationId},${`${ctx.correlationId}:${eventType}:${objectId}`})`;
 }
-async function permission(tx: TX, key: string) {
+export async function assertPlatformPermission(tx: TX, key: string) {
   const rows = await tx`select actor_has_permission(${key}::text) allowed`;
   if (!Boolean(rows[0]?.allowed))
     throw new ApiError(
@@ -176,7 +182,8 @@ async function permission(tx: TX, key: string) {
       "Actor does not have permission for this operation",
     );
 }
-async function decision(tx: TX, featureKey: string) {
+const permission = assertPlatformPermission;
+export async function platformEntitlementDecision(tx: TX, featureKey: string) {
   const rows =
       await tx`select enabled,value,source,decision_id from tenant_feature_decision(${featureKey}::text)`,
     row = rows[0];
@@ -189,7 +196,8 @@ async function decision(tx: TX, featureKey: string) {
       }
     : { enabled: false, value: null, source: "NONE", decisionId: null };
 }
-async function entitled(tx: TX, key: string) {
+const decision = platformEntitlementDecision;
+export async function assertPlatformEntitled(tx: TX, key: string) {
   if (!(await decision(tx, key)).enabled)
     throw new ApiError(
       403,
@@ -197,6 +205,7 @@ async function entitled(tx: TX, key: string) {
       "This tenant is not entitled to the requested feature",
     );
 }
+const entitled = assertPlatformEntitled;
 
 async function getContext(request: Request, env: Env, actorId: string) {
   const ctx = context(request, actorId),
