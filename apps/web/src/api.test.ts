@@ -39,7 +39,13 @@ const call = (index: number) => {
 describe("authenticated API boundary", () => {
   beforeEach(() => {
     clearSessionRequestCache();
-    fetchMock.mockClear();
+    fetchMock.mockReset().mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ items: [], item: {}, created: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+    );
     token.mockClear();
     vi.stubGlobal("fetch", fetchMock);
   });
@@ -60,6 +66,32 @@ describe("authenticated API boundary", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(call(0).headers["x-tenant-id"]).toBe("tenant-1");
     expect(call(1).headers["x-tenant-id"]).toBe("tenant-2");
+  });
+
+  it("does not restore stale protected data after an authorization failure", async () => {
+    const now = vi.spyOn(Date, "now").mockReturnValue(1_000);
+    await api.resourceProfiles({ tenantId: "tenant-1" });
+    now.mockReturnValue(301_001);
+    fetchMock.mockImplementationOnce(async () => new Response(JSON.stringify({ error: { message: "Forbidden" } }), { status: 403 }));
+    await api.resourceProfiles({ tenantId: "tenant-1" });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    fetchMock.mockImplementationOnce(async () => new Response(JSON.stringify({ items: [] }), { status: 200 }));
+    await api.resourceProfiles({ tenantId: "tenant-1" });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    now.mockRestore();
+  });
+
+  it("does not let an in-flight read repopulate cache after a tenant mutation", async () => {
+    let completeRead!: (response: Response) => void;
+    fetchMock.mockImplementationOnce(() => new Promise<Response>((resolve) => { completeRead = resolve; }));
+    const pendingRead = api.resourceProfiles({ tenantId: "tenant-1" });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await api.updateResourceProfile({ tenantId: "tenant-1" }, "resource-1", { jobTitle: "Manager" });
+    completeRead(new Response(JSON.stringify({ items: [{ id: "stale" }] }), { status: 200 }));
+    await pendingRead;
+    await api.resourceProfiles({ tenantId: "tenant-1" });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("discovers tenants with a fresh bearer token and no tenant or actor header", async () => {

@@ -434,6 +434,7 @@ export function App() {
   const [sessionMessage, setSessionMessage] = useState("");
 
   const refreshSession = useCallback(async () => {
+    clearSessionRequestCache();
     if (demoMode) {
       setUser({
         id: "demo-user",

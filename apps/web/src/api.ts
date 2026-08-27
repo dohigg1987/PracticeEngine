@@ -996,9 +996,11 @@ type SessionCacheEntry = {
 };
 
 const sessionRequestCache = new Map<string, SessionCacheEntry>();
+const sessionCacheGenerations = new Map<string, number>();
 
 export function clearSessionRequestCache(): void {
   sessionRequestCache.clear();
+  sessionCacheGenerations.clear();
 }
 
 export function sessionCacheTtlForPath(path: string): number {
@@ -1027,6 +1029,7 @@ function sessionCacheKey(path: string, context?: ApiContext): string {
 
 function invalidateSessionCache(context?: ApiContext): void {
   const prefix = `${context?.tenantId || "identity"}:`;
+  sessionCacheGenerations.set(prefix, (sessionCacheGenerations.get(prefix) ?? 0) + 1);
   for (const key of sessionRequestCache.keys()) {
     if (key.startsWith(prefix)) sessionRequestCache.delete(key);
   }
@@ -1100,15 +1103,23 @@ async function request<T>(
   }
 
   const key = sessionCacheKey(path, context);
+  const generationKey = `${context?.tenantId || "identity"}:`;
+  const generation = sessionCacheGenerations.get(generationKey) ?? 0;
   const cached = sessionRequestCache.get(key);
   if (cached?.value !== undefined && cached.expiresAt > Date.now()) return cached.value as T;
   if (cached?.inFlight) return cached.inFlight as Promise<T>;
 
   const inFlight = requestFromNetwork<T>(path, context, init).then((value) => {
-    sessionRequestCache.set(key, { value, expiresAt: Date.now() + ttl });
+    if ((sessionCacheGenerations.get(generationKey) ?? 0) === generation)
+      sessionRequestCache.set(key, { value, expiresAt: Date.now() + ttl });
     return value;
   }).catch((error) => {
-    if (cached?.value !== undefined) {
+    if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+      sessionRequestCache.delete(key);
+      if (cached?.value !== undefined) return cached.value as T;
+      throw error;
+    }
+    if (cached?.value !== undefined && (sessionCacheGenerations.get(generationKey) ?? 0) === generation) {
       sessionRequestCache.set(key, { value: cached.value, expiresAt: Date.now() + Math.min(ttl, 5_000) });
       return cached.value as T;
     }
