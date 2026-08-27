@@ -1320,7 +1320,7 @@ function practiceDemoRead(path: string): unknown | undefined {
   const messageMatch = path.match(/^\/v1\/portal\/messages\/([^/]+)$/);
   if (messageMatch) return { item: structuredClone(demoPortalThreads.find((item) => item.id === messageMatch[1])), messages: structuredClone(demoPortalMessages) };
   if (path === "/v1/crm/prospects") return {items:structuredClone(demoProspects)};
-  const prospectMatch=path.match(/^\/v1\/crm\/prospects\/([^/]+)$/);if(prospectMatch)return {item:structuredClone({...demoProspects.find(item=>item.id===prospectMatch[1]),contacts:[],activities:[]})};
+  const prospectMatch=path.match(/^\/v1\/crm\/prospects\/([^/]+)$/);if(prospectMatch)return {item:structuredClone({...demoProspects.find(item=>item.id===prospectMatch[1]),contacts:[],activities:[{id:"prospect-activity-1",summary:"Referral received",occurred_at:now}]})};
   if (path === "/v1/platform/teams") return {items:[{id:"team-accounts",name:"Accounts",status:"ACTIVE",member_count:1},{id:"team-advisory",name:"Advisory",status:"ACTIVE",member_count:1},{id:"team-business-services",name:"Business services",status:"ACTIVE",member_count:1}]};
   if (path === "/v1/crm/opportunities") return {items:structuredClone(demoOpportunities)};
   const opportunityMatch=path.match(/^\/v1\/crm\/opportunities\/([^/]+)$/);if(opportunityMatch)return {item:structuredClone(demoOpportunities.find(item=>item.id===opportunityMatch[1]))};

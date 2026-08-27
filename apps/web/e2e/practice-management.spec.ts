@@ -50,6 +50,7 @@ test("prospects can be opened and edited through the product UI", async ({ page 
   await page.getByLabel("Status").selectOption("qualified");
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByRole("textbox", { name: "Legal name" })).toHaveValue("Cedar Advisory Group Limited");
+  await expect(page.getByRole("table", { name: "Prospect activity" })).toContainText("Referral received");
   await page.getByRole("button", { name: "Back to prospects" }).click();
   await expect(page.getByRole("table", { name: "CRM prospects" })).toContainText("Cedar Advisory Group Limited");
 });
