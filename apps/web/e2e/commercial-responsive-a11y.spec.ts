@@ -9,10 +9,10 @@ type Surface = {
 
 const surfaces: Surface[] = [
   { value: "clients", heading: "Clients", path: "/practice/clients" },
-  { value: "team", heading: "Team", path: "/settings/teams" },
+  { value: "team", heading: "Users", path: "/settings/users" },
   { value: "integrations", heading: "Imports and integrations", path: "/ledgerly/integrations" },
-  { value: "inbox", heading: "Inbox", path: "/settings/notifications" },
-  { value: "settings", heading: "Workspace settings", path: "/settings/organisation" },
+  { value: "inbox", heading: "Notifications", path: "/settings/notifications" },
+  { value: "settings", heading: "Organisation", path: "/settings/organisation" },
 ];
 
 const viewports = [

@@ -1061,8 +1061,8 @@ function Inbox({ context }: Props) {
   return (
     <section className="commercial-page">
       <PageHead
-        title="Inbox"
-        body="Workspace events that need attention or confirm a completed action."
+        title="Notifications"
+        body="In-app workspace notifications and delivery capability."
       >
         <Field label="Status">
           <Select
@@ -1076,6 +1076,7 @@ function Inbox({ context }: Props) {
         </Field>
       </PageHead>
       {error && <Failure message={error} retry={load} />}
+      <MessageBar className="commercial-message" intent="info"><MessageBarBody>In-app notifications and read status are supported. User delivery preferences are not implemented.</MessageBarBody></MessageBar>
       <div
         className="inbox-list"
         role="feed"
@@ -1173,6 +1174,7 @@ function WorkspaceSettings({ context, engagements }: Props) {
   const [engagementId, setEngagementId] = useState(engagements[0]?.id || "");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [feedback, setFeedback] = useState("");
   const [busy, setBusy] = useState("");
   const load = useCallback(async () => {
     setLoading(true);
@@ -1195,11 +1197,13 @@ function WorkspaceSettings({ context, engagements }: Props) {
   useEffect(() => {
     load();
   }, [load]);
-  async function act(key: string, action: () => Promise<unknown>) {
+  async function act(key: string, action: () => Promise<unknown>, success?: string) {
     setBusy(key);
     setError("");
+    setFeedback("");
     try {
       await action();
+      if (success) setFeedback(success);
       await load();
     } catch (e) {
       setError(errorText(e));
@@ -1215,7 +1219,7 @@ function WorkspaceSettings({ context, engagements }: Props) {
   return (
     <section className="commercial-page">
       <PageHead
-        title="Workspace settings"
+        title="Organisation"
         body="Workspace identity, controlled exports and lifecycle requests."
       >
         <Badge {...statusBadgeProps(settings.lifecycleStatus)}>
@@ -1223,6 +1227,7 @@ function WorkspaceSettings({ context, engagements }: Props) {
         </Badge>
       </PageHead>
       {error && <Failure message={error} retry={load} />}
+      {feedback && <MessageBar className="commercial-message" intent="success"><MessageBarBody>{feedback}</MessageBarBody></MessageBar>}
       <section className="commercial-section">
         <header>
           <div>
@@ -1234,7 +1239,7 @@ function WorkspaceSettings({ context, engagements }: Props) {
           className="commercial-form"
           onSubmit={(event) => {
             event.preventDefault();
-            act("name", () => api.updateTenantSettings(context, name));
+            act("name", () => api.updateTenantSettings(context, name), "Organisation name saved.");
           }}
         >
           <Field label="Workspace name">
@@ -1249,8 +1254,9 @@ function WorkspaceSettings({ context, engagements }: Props) {
             type="submit"
             disabled={!name.trim() || name === settings.name || busy === "name"}
           >
-            Save name
+            Save
           </Button>
+          <Button type="button" disabled={name === settings.name || busy === "name"} onClick={() => setName(settings.name)}>Cancel</Button>
         </form>
       </section>
       <section className="commercial-section">

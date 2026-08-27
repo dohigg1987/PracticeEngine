@@ -1327,6 +1327,35 @@ tfoot td {
   max-width: 720px;
 }
 
+.settings-page {
+  display: grid;
+  gap: var(--spacingVerticalL);
+  min-width: 0;
+}
+
+.settings-head {
+  display: grid;
+  gap: var(--spacingVerticalXS);
+}
+
+.settings-head h1,
+.settings-head p {
+  margin: 0;
+}
+
+.settings-inline-form {
+  display: grid;
+  grid-template-columns: minmax(220px, 420px) max-content max-content;
+  align-items: end;
+  gap: var(--spacingHorizontalS);
+}
+
+@media (max-width: 620px) {
+  .settings-inline-form {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 620px) {
   .app-launcher-button {
     min-width: 44px;

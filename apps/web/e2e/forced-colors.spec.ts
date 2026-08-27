@@ -4,7 +4,7 @@ import { expect, test, type Page } from "@playwright/test";
 const surfaces = [
   { value: "clients", heading: "Clients", path: "/practice/clients" },
   { value: "accounts", heading: "Statutory accounts document", path: "/ledgerly/accounts" },
-  { value: "settings", heading: "Workspace settings", path: "/settings/organisation" },
+  { value: "settings", heading: "Organisation", path: "/settings/organisation" },
 ] as const;
 
 // Cold Vite transformation plus forced-colors style evaluation can dominate

@@ -1305,6 +1305,12 @@ const reads: Array<[RegExp, unknown]> = [
   ],
 ];
 
+let demoPlatformTeams = [
+  { id: "team-accounts", name: "Accounts", status: "ACTIVE", member_count: 1 },
+  { id: "team-advisory", name: "Advisory", status: "ACTIVE", member_count: 1 },
+  { id: "team-business-services", name: "Business services", status: "ACTIVE", member_count: 1 },
+];
+
 function practiceDemoRead(path: string): unknown | undefined {
   if (path === "/v1/practice/resources") return { items: structuredClone(demoResources) };
   if (path.startsWith("/v1/practice/capacity?")) return { items: structuredClone(demoCapacity) };
@@ -1321,7 +1327,7 @@ function practiceDemoRead(path: string): unknown | undefined {
   if (messageMatch) return { item: structuredClone(demoPortalThreads.find((item) => item.id === messageMatch[1])), messages: structuredClone(demoPortalMessages) };
   if (path === "/v1/crm/prospects") return {items:structuredClone(demoProspects)};
   const prospectMatch=path.match(/^\/v1\/crm\/prospects\/([^/]+)$/);if(prospectMatch)return {item:structuredClone({...demoProspects.find(item=>item.id===prospectMatch[1]),contacts:[],activities:[{id:"prospect-activity-1",summary:"Referral received",occurred_at:now}]})};
-  if (path === "/v1/platform/teams") return {items:[{id:"team-accounts",name:"Accounts",status:"ACTIVE",member_count:1},{id:"team-advisory",name:"Advisory",status:"ACTIVE",member_count:1},{id:"team-business-services",name:"Business services",status:"ACTIVE",member_count:1}]};
+  if (path === "/v1/platform/teams") return { items: structuredClone(demoPlatformTeams) };
   if (path === "/v1/crm/opportunities") return {items:structuredClone(demoOpportunities)};
   const opportunityMatch=path.match(/^\/v1\/crm\/opportunities\/([^/]+)$/);if(opportunityMatch)return {item:structuredClone(demoOpportunities.find(item=>item.id===opportunityMatch[1]))};
   if (path === "/v1/onboarding") return {items:structuredClone(demoOnboarding)};
@@ -1363,6 +1369,22 @@ export function demoRequest(path: string, init?: RequestInit): unknown {
     const body = JSON.parse(String(init?.body || "{}")) as Partial<PracticeService>;
     const item: PracticeService = { id: `service-${Date.now()}`, name: body.name || "New service", description: body.description, category: body.category, status: body.status || "active", default_frequency: body.default_frequency, specialist_module_key: body.specialist_module_key };
     demoPracticeServices = [...demoPracticeServices, item];
+    return { item: structuredClone(item) };
+  }
+  if (method === "POST" && path === "/v1/platform/teams") {
+    const body = JSON.parse(String(init?.body || "{}")) as { name?: string };
+    const item = { id: `team-${Date.now()}`, name: body.name?.trim() || "New team", status: "ACTIVE", member_count: 0 };
+    demoPlatformTeams = [...demoPlatformTeams, item];
+    return { item: structuredClone(item) };
+  }
+  const resourceSettingsMatch = path.match(/^\/v1\/practice\/resources\/([^/]+)$/);
+  if (method === "PATCH" && resourceSettingsMatch) {
+    const body = JSON.parse(String(init?.body || "{}")) as { jobTitle?: string | null; status?: ResourceProfile["status"]; standardCapacityMinutesWeek?: number };
+    const item = demoResources.find((resource) => resource.id === resourceSettingsMatch[1]);
+    if (!item) throw new Error("Resource not found");
+    if ("jobTitle" in body) item.role_title = body.jobTitle || null;
+    if (body.status) item.status = body.status;
+    if (body.standardCapacityMinutesWeek !== undefined) item.weekly_capacity_hours = body.standardCapacityMinutesWeek / 60;
     return { item: structuredClone(item) };
   }
   if (method === "POST" && path === "/v1/clients") {

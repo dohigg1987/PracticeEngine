@@ -12,7 +12,7 @@ type Surface = {
 // editable accounting data, the statutory document, submission and admin.
 const surfaces: Surface[] = [
   { name: "Clients", value: "clients", heading: "Clients", path: "/practice/clients" },
-  { name: "Team", value: "team", heading: "Team", path: "/settings/teams" },
+  { name: "Users", value: "team", heading: "Users", path: "/settings/users" },
   { name: "Overview", value: "overview", heading: "Preparation overview", path: "/ledgerly/overview" },
   { name: "Imports and integrations", value: "integrations", heading: "Imports and integrations", path: "/ledgerly/integrations" },
   { name: "Source data", value: "data", heading: "Trial balance", path: "/ledgerly/trial-balance" },
@@ -28,8 +28,8 @@ const surfaces: Surface[] = [
   { name: "History", value: "history", heading: "History", path: "/ledgerly/history" },
   { name: "Filing evidence", value: "filing", heading: "Regulator filing record", path: "/ledgerly/filing" },
   { name: "Client portal", value: "portal", heading: "Client portal", path: "/ledgerly/portal" },
-  { name: "Inbox", value: "inbox", heading: "Inbox", path: "/settings/notifications" },
-  { name: "Workspace settings", value: "settings", heading: "Workspace settings", path: "/settings/organisation" },
+  { name: "Notifications", value: "inbox", heading: "Notifications", path: "/settings/notifications" },
+  { name: "Organisation", value: "settings", heading: "Organisation", path: "/settings/organisation" },
 ];
 
 type KnownViolationNode = {

@@ -67,12 +67,12 @@ test("clients are created through the canonical Practice client command", async 
 
 test("practice settings exposes service and template configuration at narrow width", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 720 });
-  await start(page);
-  await openNav(page);
-  await page.locator('button[value="practice-settings"]').click();
+  await page.goto("/practice/settings/services");
   await expect(page.getByRole("heading", { name: "Practice Management settings" })).toBeVisible();
   await expect(page.getByRole("table", { name: "Service catalogue" })).toBeVisible();
-  await page.getByRole("tab", { name: "Work templates" }).click();
+  await openNav(page);
+  await page.getByRole("button", { name: "Work templates", exact: true }).click();
+  await expect(page).toHaveURL(/\/practice\/settings\/work-templates$/);
   await expect(page.getByRole("table", { name: "Work templates" })).toBeVisible();
   const widths = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, root: document.documentElement.scrollWidth, body: document.body.scrollWidth }));
   expect(widths.root).toBeLessThanOrEqual(widths.viewport + 1);
@@ -105,6 +105,6 @@ test("review queue and recurrence operations provide practical controls",async({
 });
 
 test("automation settings use constrained table controls",async({page})=>{
-  await start(page);await openNav(page);await page.locator('button[value="practice-settings"]').click();
-  await page.getByRole("tab",{name:"Automation"}).click();const table=page.getByRole("table",{name:"Practice automation rules"});await expect(table).toContainText("Assign urgent work to service team");await expect(table).toContainText("Assign Team");
+  await page.goto("/practice/settings/automation");
+  const table=page.getByRole("table",{name:"Practice automation rules"});await expect(table).toContainText("Assign urgent work to service team");await expect(table).toContainText("Assign Team");
 });

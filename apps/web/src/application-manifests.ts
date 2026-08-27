@@ -59,6 +59,19 @@ export type ApplicationSetting = {
   path: string;
 };
 
+export type GlobalSetting = ApplicationSetting & {
+  contentKey:
+    | "organisation"
+    | "users"
+    | "teams"
+    | "security"
+    | "branding"
+    | "integrations"
+    | "subscription"
+    | "apps-entitlements"
+    | "notifications";
+};
+
 export type ContextualAction = {
   id: string;
   label: string;
@@ -189,16 +202,24 @@ export const applicationManifests: readonly ApplicationManifest[] = [
 ] as const;
 
 export const globalSettings = [
-  "Organisation",
-  "Users",
-  "Teams",
-  "Security",
-  "Branding",
-  "Integrations",
-  "Subscription",
-  "Apps & entitlements",
-  "Notifications",
-] as const;
+  { id: "global-organisation", label: "Organisation", path: "/settings/organisation", contentKey: "organisation" },
+  { id: "global-users", label: "Users", path: "/settings/users", contentKey: "users" },
+  { id: "global-teams", label: "Teams", path: "/settings/teams", contentKey: "teams" },
+  { id: "global-security", label: "Security", path: "/settings/security", contentKey: "security" },
+  { id: "global-branding", label: "Branding", path: "/settings/branding", contentKey: "branding" },
+  { id: "global-integrations", label: "Integrations", path: "/settings/integrations", contentKey: "integrations" },
+  { id: "global-subscription", label: "Subscription", path: "/settings/subscription", contentKey: "subscription" },
+  { id: "global-apps-entitlements", label: "Apps & entitlements", path: "/settings/apps-entitlements", contentKey: "apps-entitlements" },
+  { id: "global-notifications", label: "Notifications", path: "/settings/notifications", contentKey: "notifications" },
+] as const satisfies readonly GlobalSetting[];
+
+export function globalSettingForPath(pathname: string): GlobalSetting | undefined {
+  return globalSettings.find((setting) => setting.path === pathname);
+}
+
+export function canManageSettings(role: string): boolean {
+  return role === "OWNER" || role === "ADMIN";
+}
 
 export function manifestForPath(pathname: string): ApplicationManifest | undefined {
   return applicationManifests.find(
@@ -252,6 +273,24 @@ export function assertUniqueRouteOwnership(manifests: readonly ApplicationManife
   return owners;
 }
 
+export function assertSettingsRouteIntegrity(
+  manifests: readonly ApplicationManifest[] = applicationManifests,
+  settings: readonly GlobalSetting[] = globalSettings,
+) {
+  const routes = new Map<string, string>();
+  for (const setting of settings) {
+    if (routes.has(setting.path)) throw new Error(`Settings route ${setting.path} has more than one content owner`);
+    routes.set(setting.path, setting.contentKey);
+  }
+  for (const manifest of manifests) {
+    for (const setting of manifest.settings) {
+      if (routes.has(setting.path)) throw new Error(`Settings route ${setting.path} has more than one content owner`);
+      routes.set(setting.path, setting.id);
+    }
+  }
+  return routes;
+}
+
 export const legacyRouteRedirects: Readonly<Record<string, string>> = {
   "/": "/ledgerly/overview",
   "/clients": "/practice/clients",
@@ -273,7 +312,7 @@ export const legacyRouteRedirects: Readonly<Record<string, string>> = {
   "/working-papers": "/ledgerly/working-papers",
   "/accounts": "/ledgerly/accounts",
   "/filing": "/ledgerly/filing",
-  "/settings": "/settings",
+  "/settings": "/settings/organisation",
 };
 
 export function canonicalPath(pathname: string): string {

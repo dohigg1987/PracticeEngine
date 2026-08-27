@@ -3,10 +3,13 @@ import {
   applicationManifests,
   applicationAccessAllowed,
   assertUniqueRouteOwnership,
+  assertSettingsRouteIntegrity,
   availableApplications,
   canonicalPath,
+  canManageSettings,
   contextualApplicationPath,
   globalSettings,
+  globalSettingForPath,
   manifestForPath,
   navigationItemForPath,
   suiteIdentity,
@@ -27,6 +30,7 @@ describe("PracticeEngine application manifests", () => {
 
   it("has no duplicate route ownership", () => {
     expect(() => assertUniqueRouteOwnership()).not.toThrow();
+    expect(() => assertSettingsRouteIntegrity()).not.toThrow();
   });
 
   it("never contaminates specialist navigation", () => {
@@ -72,9 +76,22 @@ describe("PracticeEngine application manifests", () => {
   });
 
   it("separates global and application settings ownership", () => {
-    expect(globalSettings).toEqual(expect.arrayContaining(["Organisation", "Users", "Security", "Subscription", "Apps & entitlements"]));
+    expect(globalSettings.map((item) => item.label)).toEqual(expect.arrayContaining(["Organisation", "Users", "Security", "Subscription", "Apps & entitlements"]));
     expect(applicationManifests.find((app) => app.id === "practice")!.settings.map((item) => item.label)).toContain("Service catalogue");
     expect(applicationManifests.find((app) => app.id === "ledgerly")!.settings.map((item) => item.label)).toEqual(["Accounting configuration", "Accounts & filing"]);
-    expect(globalSettings).not.toContain("Service catalogue");
+    expect(globalSettings.map((item) => item.label)).not.toContain("Service catalogue");
+  });
+
+  it("gives every advertised global settings route one distinct semantic content owner", () => {
+    expect(new Set(globalSettings.map((item) => item.path)).size).toBe(globalSettings.length);
+    expect(new Set(globalSettings.map((item) => item.contentKey)).size).toBe(globalSettings.length);
+    for (const setting of globalSettings) expect(globalSettingForPath(setting.path)).toEqual(setting);
+  });
+
+  it("keeps Settings mutation authority separate from ordinary membership", () => {
+    expect(canManageSettings("OWNER")).toBe(true);
+    expect(canManageSettings("ADMIN")).toBe(true);
+    expect(canManageSettings("MEMBER")).toBe(false);
+    expect(canManageSettings("")).toBe(false);
   });
 });

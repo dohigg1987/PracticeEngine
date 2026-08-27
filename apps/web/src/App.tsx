@@ -159,12 +159,15 @@ import {
   applicationManifests,
   applicationAccessAllowed,
   availableApplications,
+  canManageSettings,
   canonicalPath,
   globalSettings,
+  globalSettingForPath,
   manifestForPath,
   navigationItemForPath,
   type ApplicationManifest,
   type ApplicationNavigationItem,
+  type ApplicationSetting,
   type PracticeView,
   type WorkspacePage,
   suiteIdentity,
@@ -191,6 +194,12 @@ type ProductionNavStage =
   | "builder"
   | "review"
   | "submission";
+
+function isApplicationNavigationItem(
+  item: ApplicationNavigationItem | ApplicationSetting,
+): item is ApplicationNavigationItem {
+  return "page" in item && "icon" in item;
+}
 
 const productionNavStageForView: Partial<Record<View, ProductionNavStage>> = {
   data: "source",
@@ -663,8 +672,10 @@ function AccountsWorkspace({
       setWorkspacePage(item.page);
       if (item.ledgerlyView) setView(item.ledgerlyView);
       if (item.practiceView) setPracticeSection(item.practiceView);
-    } else if (pathname === "/settings/teams" || pathname === "/settings/users") {
+    } else if (pathname === "/settings/users") {
       setWorkspacePage("team");
+    } else if (pathname === "/settings/integrations") {
+      setWorkspacePage("integrations");
     } else if (pathname === "/settings/notifications") {
       setWorkspacePage("inbox");
     } else if (pathname === "/settings" || pathname.startsWith("/settings/")) {
@@ -675,8 +686,9 @@ function AccountsWorkspace({
   }, [pathname]);
 
   useEffect(() => {
-    document.title = `${activeApplication?.name ?? "Home"} · ${suiteIdentity.name}`;
-  }, [activeApplication]);
+    const settingsLabel = globalSettingForPath(pathname)?.label;
+    document.title = `${settingsLabel ? `${settingsLabel} settings` : activeApplication?.name ?? "Home"} · ${suiteIdentity.name}`;
+  }, [activeApplication, pathname]);
 
   useEffect(() => {
     if (!configured || demoMode) return;
@@ -1568,23 +1580,23 @@ function AccountsWorkspace({
               )}
               {activeApplication ? (
                 <nav className="application-navigation" aria-label={`${activeApplication.name} navigation`}>
-                  {activeApplication.navigation.filter((item) => item.primary !== false).map((item) => (
+                  {(pathname.startsWith(`${activeApplication.routePrefix}/settings`)
+                    ? activeApplication.settings
+                    : activeApplication.navigation.filter((item) => item.primary !== false)
+                  ).map((item) => (
                     <NavItem
                       key={item.id}
                       className="workspace-nav-item"
-                      value={applicationNavigationValue(item)}
-                      icon={
-                        item.icon === "clients" || item.icon === "home" ? <BuildingRegular /> :
-                        item.icon === "people" ? <PeopleTeamRegular /> :
-                        item.icon === "open" ? <OpenRegular /> :
-                        <DocumentRegular />
-                      }
-                      onClick={() => activateNavigationItem(item)}
+                      value={isApplicationNavigationItem(item) ? applicationNavigationValue(item) : pathname === item.path ? `${activeApplication.id}-settings` : item.id}
+                      icon={"icon" in item && (item.icon === "clients" || item.icon === "home") ? <BuildingRegular /> :
+                        "icon" in item && item.icon === "people" ? <PeopleTeamRegular /> :
+                        "icon" in item && item.icon === "open" ? <OpenRegular /> : <DocumentRegular />}
+                      onClick={() => isApplicationNavigationItem(item) ? activateNavigationItem(item) : navigate(item.path)}
                     >
                       {item.label}
                     </NavItem>
                   ))}
-                  {["OWNER", "ADMIN"].includes(selectedMembership?.role_code || "") && activeApplication.settings.length > 0 && (
+                  {!pathname.startsWith(`${activeApplication.routePrefix}/settings`) && ["OWNER", "ADMIN"].includes(selectedMembership?.role_code || "") && activeApplication.settings.length > 0 && (
                     <NavItem
                       className="workspace-nav-item application-settings-link"
                       value={`${activeApplication.id}-settings`}
@@ -1604,20 +1616,19 @@ function AccountsWorkspace({
                 </nav>
               ) : pathname.startsWith("/settings") ? (
                 <nav className="application-navigation" aria-label="PracticeEngine global settings">
-                  {globalSettings.map((label) => {
-                    const path = `/settings/${label.toLowerCase().replace(/[^a-z]+/g, "-").replace(/(^-|-$)/g, "")}`;
+                  {globalSettings.map((setting) => {
                     return (
                       <NavItem
-                        key={label}
+                        key={setting.id}
                         className="workspace-nav-item"
-                        value={pathname === path ? "global-settings" : label}
-                        icon={label === "Users" || label === "Teams" ? <PeopleTeamRegular /> : <DocumentRegular />}
+                        value={pathname === setting.path ? "global-settings" : setting.id}
+                        icon={setting.contentKey === "users" || setting.contentKey === "teams" ? <PeopleTeamRegular /> : <DocumentRegular />}
                         onClick={() => {
-                          setWorkspacePage(label === "Teams" || label === "Users" ? "team" : label === "Notifications" ? "inbox" : "settings");
-                          navigate(path);
+                          setWorkspacePage(setting.contentKey === "users" ? "team" : setting.contentKey === "integrations" ? "integrations" : setting.contentKey === "notifications" ? "inbox" : "settings");
+                          navigate(setting.path);
                         }}
                       >
-                        {label}
+                        {setting.label}
                       </NavItem>
                     );
                   })}
@@ -1632,7 +1643,7 @@ function AccountsWorkspace({
           ) : activeApplication?.id === "quotebench" ? (
             <SpecialistApplicationBoundary application={activeApplication} />
           ) : activeApplication?.id === "ledgerly" && pathname.startsWith("/ledgerly/settings") ? (
-            <ApplicationSettingsBoundary application={activeApplication} />
+            <ApplicationSettingsBoundary application={activeApplication} pathname={pathname} />
           ) : inviteToken ? (
             <InviteAcceptance
               token={inviteToken}
@@ -1661,6 +1672,16 @@ function AccountsWorkspace({
               memberships={memberships}
               onSelect={selectWorkspace}
             />
+          ) : pathname.startsWith("/settings/") ? (
+            <GlobalSettingsRoute
+              pathname={pathname}
+              context={context}
+              currentRole={selectedMembership?.role_code || ""}
+              engagements={engagements}
+              onOpenWorkspace={() => navigate("/practice/home")}
+              entitlementDecisions={entitlementDecisions}
+              entitlementsLoaded={entitlementsLoaded}
+            />
           ) : workspacePage === "work" ||
             workspacePage === "practice-settings" ? (
             <RoutePanelBoundary resetKey={workspacePage}>
@@ -1672,7 +1693,9 @@ function AccountsWorkspace({
                   context={context}
                   workItemId={practiceWorkItemId}
                     clientId={practiceClientId}
-                    initialTab={practiceSection}
+                  initialTab={practiceSection}
+                  settingsSection={practiceSettingsSection(pathname)}
+                  canManageSettings={canManageSettings(selectedMembership?.role_code || "")}
                     onOpenLedgerly={entitlementDecisions["ledgerly.enabled"] ? (engagementId, clientId) => {
                       setSelectedId(engagementId);
                       navigate(`/ledgerly/overview?client=${encodeURIComponent(clientId)}&engagement=${encodeURIComponent(engagementId)}`);
@@ -2162,10 +2185,12 @@ function TeamView({
   context,
   currentRole,
   onOpenWorkspace,
+  heading = "Users",
 }: {
   context: ApiContext;
   currentRole: string;
   onOpenWorkspace: () => void;
+  heading?: string;
 }) {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [invitations, setInvitations] = useState<TeamInvitation[]>([]);
@@ -2181,6 +2206,7 @@ function TeamView({
   const [memberRoles, setMemberRoles] = useState<
     Record<string, "OWNER" | "ADMIN" | "MEMBER">
   >({});
+  const canManage = canManageSettings(currentRole);
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -2296,19 +2322,19 @@ function TeamView({
     <>
       <section className="page-head client-head">
         <div>
-          <Breadcrumb className="page-breadcrumb" aria-label="Team location">
+          <Breadcrumb className="page-breadcrumb" aria-label={`${heading} location`}>
             <BreadcrumbItem>
               <BreadcrumbButton onClick={onOpenWorkspace}>Workspace</BreadcrumbButton>
             </BreadcrumbItem>
             <BreadcrumbDivider />
             <BreadcrumbItem>
-              <BreadcrumbButton current>Team</BreadcrumbButton>
+              <BreadcrumbButton current>{heading}</BreadcrumbButton>
             </BreadcrumbItem>
           </Breadcrumb>
           <div>
-            <h1>Team</h1>
+            <h1>{heading}</h1>
           </div>
-          <small>{members.length} members · Manage workspace access and invitations.</small>
+          <small>{members.length} users · Workspace access, roles and invitations.</small>
         </div>
       </section>
       <section className="team-section" aria-labelledby="team-members-heading">
@@ -2334,7 +2360,7 @@ function TeamView({
                   <b>{member.isCurrentActor ? "You" : "Team member"}</b>
                 </TableCell>
                 <TableCell>
-                  {member.isCurrentActor ? (
+                  {member.isCurrentActor || !canManage ? (
                     title(member.role)
                   ) : (
                     <Select
@@ -2358,7 +2384,7 @@ function TeamView({
                   {fullDate.format(new Date(member.createdAt))}
                 </TableCell>
                 <TableCell>
-                  {!member.isCurrentActor && (
+                  {!member.isCurrentActor && canManage && (
                     <div className="team-member-actions">
                       <FluentButton
                         size="small"
@@ -2369,6 +2395,13 @@ function TeamView({
                         onClick={() => updateMember(member)}
                       >
                         Save role
+                      </FluentButton>
+                      <FluentButton
+                        size="small"
+                        disabled={busy === `member-${member.id}` || (memberRoles[member.id] || member.role) === member.role}
+                        onClick={() => setMemberRoles((current) => ({ ...current, [member.id]: member.role }))}
+                      >
+                        Cancel
                       </FluentButton>
                       <ConfirmAction
                         label="Remove access"
@@ -2386,6 +2419,8 @@ function TeamView({
           </TableBody>
         </Table>
       </section>
+      {!canManage && <MessageBar intent="info"><MessageBarBody>Owner or administrator access is required to invite users or change workspace roles.</MessageBarBody></MessageBar>}
+      {canManage && (
       <section className="team-section" aria-labelledby="team-invite-heading">
         <header className="team-section-head">
           <div>
@@ -2502,6 +2537,7 @@ function TeamView({
           )}
         </div>
       </section>
+      )}
     </>
   );
 }
@@ -4591,17 +4627,139 @@ function SpecialistApplicationBoundary({ application }: { application: Applicati
   );
 }
 
-function ApplicationSettingsBoundary({ application }: { application: ApplicationManifest }) {
+function practiceSettingsSection(pathname: string): "services" | "work-templates" | "automation" | "resources" | "collaboration" {
+  if (pathname.endsWith("/work-templates")) return "work-templates";
+  if (pathname.endsWith("/automation")) return "automation";
+  if (pathname.endsWith("/resources")) return "resources";
+  if (pathname.endsWith("/collaboration")) return "collaboration";
+  return "services";
+}
+
+function SettingsUnavailable({
+  title,
+  description,
+  detail,
+}: {
+  title: string;
+  description: string;
+  detail: string;
+}) {
   return (
-    <section className="setup application-boundary">
+    <section className="settings-page">
+      <header className="settings-head">
+        <p className="eyebrow">Settings</p>
+        <h1>{title}</h1>
+        <p>{description}</p>
+      </header>
+      <MessageBar intent="info">
+        <MessageBarBody><b>Not available in PracticeEngine yet.</b> {detail}</MessageBarBody>
+      </MessageBar>
+    </section>
+  );
+}
+
+function SettingsAccessDenied({ title, description }: { title: string; description: string }) {
+  return (
+    <section className="settings-page">
+      <header className="settings-head"><p className="eyebrow">Settings</p><h1>{title}</h1><p>{description}</p></header>
+      <MessageBar intent="info"><MessageBarBody><b>Read-only for your current role.</b> Owner or administrator access is required to manage this section.</MessageBarBody></MessageBar>
+    </section>
+  );
+}
+
+function PlatformTeamsSettings({ context, canManage }: { context: ApiContext; canManage: boolean }) {
+  const [teams, setTeams] = useState<Array<{ id: string; name: string; status: string; member_count: number }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try { setTeams((await api.platformTeams(context)).items); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : "Teams could not be loaded."); }
+    finally { setLoading(false); }
+  }, [context]);
+  useEffect(() => { void load(); }, [load]);
+  async function create(event: React.FormEvent) {
+    event.preventDefault();
+    if (!canManage || !name.trim()) return;
+    setBusy(true);
+    setError(""); setFeedback("");
+    try { await api.createPlatformTeam(context, name.trim()); setName(""); setFeedback("Team created."); await load(); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : "The team could not be created."); }
+    finally { setBusy(false); }
+  }
+  if (loading) return <Skeleton />;
+  return (
+    <section className="settings-page">
+      <header className="settings-head"><p className="eyebrow">Settings</p><h1>Teams</h1><p>Group workspace users for assignment, capacity and responsibility.</p></header>
+      {error && <MessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></MessageBar>}
+      {feedback && <MessageBar intent="success"><MessageBarBody>{feedback}</MessageBarBody></MessageBar>}
+      {!canManage && <MessageBar intent="info"><MessageBarBody>Owner or administrator access is required to create or change teams.</MessageBarBody></MessageBar>}
+      {canManage && <form className="settings-inline-form" onSubmit={create}><Field label="Team name" required><Input value={name} maxLength={160} onChange={(_, data) => setName(data.value)} /></Field><FluentButton appearance="primary" type="submit" disabled={!name.trim() || busy}>{busy ? "Creating…" : "Create team"}</FluentButton><FluentButton type="button" disabled={!name || busy} onClick={() => setName("")}>Cancel</FluentButton></form>}
+      <Table aria-label="Workspace teams"><TableHeader><TableRow><TableHeaderCell>Team</TableHeaderCell><TableHeaderCell>Members</TableHeaderCell><TableHeaderCell>Status</TableHeaderCell></TableRow></TableHeader><TableBody>{teams.map((team) => <TableRow key={team.id}><TableCell>{team.name}</TableCell><TableCell>{team.member_count}</TableCell><TableCell><Badge {...statusBadgeProps(team.status)}>{title(team.status)}</Badge></TableCell></TableRow>)}</TableBody></Table>
+    </section>
+  );
+}
+
+function AppsEntitlementsSettings({ decisions, loaded }: { decisions: Record<string, boolean>; loaded: boolean }) {
+  const applications = applicationManifests.filter((application) => application.status !== "future");
+  return (
+    <section className="settings-page">
+      <header className="settings-head"><p className="eyebrow">Settings</p><h1>Apps &amp; entitlements</h1><p>Effective commercial access for this practice. Functional permissions are managed separately through user roles.</p></header>
+      {!loaded ? <Skeleton /> : <Table aria-label="Application entitlements"><TableHeader><TableRow><TableHeaderCell>Application</TableHeaderCell><TableHeaderCell>Commercial access</TableHeaderCell><TableHeaderCell>Configuration</TableHeaderCell></TableRow></TableHeader><TableBody>{applications.map((application) => { const enabled = decisions[application.entitlement] === true; return <TableRow key={application.id}><TableCell>{application.name}</TableCell><TableCell><Badge {...statusBadgeProps(enabled ? "AVAILABLE" : "NOT_AVAILABLE")}>{enabled ? "Enabled" : "Not enabled"}</Badge></TableCell><TableCell>{enabled ? "Available to users with the required functional permission." : "Subscription and entitlement changes are not self-service."}</TableCell></TableRow>; })}</TableBody></Table>}
+    </section>
+  );
+}
+
+function GlobalSettingsRoute({
+  pathname,
+  context,
+  currentRole,
+  engagements,
+  onOpenWorkspace,
+  entitlementDecisions,
+  entitlementsLoaded,
+}: {
+  pathname: string;
+  context: ApiContext;
+  currentRole: string;
+  engagements: Engagement[];
+  onOpenWorkspace: () => void;
+  entitlementDecisions: Record<string, boolean>;
+  entitlementsLoaded: boolean;
+}) {
+  const setting = globalSettingForPath(pathname);
+  const canManage = canManageSettings(currentRole);
+  if (setting?.contentKey === "organisation") {
+    if (!canManage) return <SettingsAccessDenied title="Organisation" description="Workspace identity, exports and lifecycle." />;
+    return <RoutePanelBoundary resetKey={pathname}><Suspense fallback={<Skeleton />}><CommercialWorkspace view="settings" context={context} engagements={engagements} /></Suspense></RoutePanelBoundary>;
+  }
+  if (setting?.contentKey === "users") return <TeamView context={context} currentRole={currentRole} onOpenWorkspace={onOpenWorkspace} heading="Users" />;
+  if (setting?.contentKey === "teams") return <PlatformTeamsSettings context={context} canManage={canManage} />;
+  if (setting?.contentKey === "integrations") {
+    if (!canManage) return <SettingsAccessDenied title="Integrations" description="Connections and controlled data synchronisation." />;
+    return <RoutePanelBoundary resetKey={pathname}><Suspense fallback={<Skeleton />}><CommercialWorkspace view="integrations" context={context} engagementId={engagements[0]?.id} engagements={engagements} /></Suspense></RoutePanelBoundary>;
+  }
+  if (setting?.contentKey === "notifications") return <RoutePanelBoundary resetKey={pathname}><Suspense fallback={<Skeleton />}><CommercialWorkspace view="inbox" context={context} engagements={engagements} /></Suspense></RoutePanelBoundary>;
+  if (setting?.contentKey === "apps-entitlements") return <AppsEntitlementsSettings decisions={entitlementDecisions} loaded={entitlementsLoaded} />;
+  if (setting?.contentKey === "security") return <SettingsUnavailable title="Security" description="Workspace authentication, session and security policy." detail="Authentication is provided by the configured identity service, but tenant security policy controls are not implemented." />;
+  if (setting?.contentKey === "branding") return <SettingsUnavailable title="Branding" description="Practice identity and client-facing presentation." detail="Tenant branding and white-labelling controls are not implemented." />;
+  if (setting?.contentKey === "subscription") return <SettingsUnavailable title="Subscription" description="Plan, billing and subscription lifecycle." detail="Entitlement decisions exist, but subscription and billing management are not implemented." />;
+  return <SettingsUnavailable title="Settings" description="PracticeEngine configuration." detail="This settings destination is not implemented." />;
+}
+
+function ApplicationSettingsBoundary({ application, pathname }: { application: ApplicationManifest; pathname: string }) {
+  const setting = application.settings.find((item) => item.path === pathname);
+  const accounting = setting?.id === "ledgerly-accounting";
+  return (
+    <section className="settings-page">
       <p className="eyebrow">{application.name}</p>
-      <h1>Application settings</h1>
-      <p>Only accounting-specific configuration belongs here. Organisation, users, security, subscription and app access remain in PracticeEngine global settings.</p>
-      <Table aria-label={`${application.name} settings sections`}>
-        <TableBody>
-          {application.settings.map((setting) => <TableRow key={setting.id}><TableCell>{setting.label}</TableCell></TableRow>)}
-        </TableBody>
-      </Table>
+      <h1>{setting?.label ?? "Application settings"}</h1>
+      <p>{accounting ? "Accounting-specific defaults and engagement policies." : "Accounts production, output and filing configuration."}</p>
+      <MessageBar intent="info"><MessageBarBody><b>Not available in Ledgerly yet.</b> {accounting ? "Accounting behaviour is currently configured within each engagement and governed reporting pack; no application-wide controls are implemented." : "Accounts presentation and filing behaviour is governed per engagement and reporting pack; no application-wide controls are implemented."}</MessageBarBody></MessageBar>
     </section>
   );
 }

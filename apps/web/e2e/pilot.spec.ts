@@ -229,12 +229,12 @@ test("pilot workspace administration reaches clients and team without actor iden
   ).toContainText("31 Dec 2026");
   await page.getByRole("main").getByRole("button", { name: "Clients" }).click();
 
-  await page.goto("/settings/teams");
-  await expect(page.getByRole("heading", { name: "Team" })).toBeVisible();
+  await page.goto("/settings/users");
+  await expect(page.getByRole("heading", { name: "Users" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Members" })).toBeVisible();
   await expect(page.getByText("Actor ID", { exact: false })).toHaveCount(0);
   await page
-    .getByRole("navigation", { name: "Team location" })
+    .getByRole("navigation", { name: "Users location" })
     .getByRole("button", { name: "Workspace" })
     .click();
   await expect(
@@ -335,7 +335,7 @@ test("commercial workspace exposes imports", async ({ page }) => {
 
 test("commercial workspace exposes notification delivery state", async ({ page }) => {
   await page.goto("/settings/notifications");
-  await expect(page.getByRole("heading", { name: "Inbox" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Notifications" })).toBeVisible();
   await expect(page.getByText("Bank statement received")).toBeVisible();
   await page.getByRole("button", { name: /Delivery capabilities/ }).click();
   await expect(
@@ -346,7 +346,7 @@ test("commercial workspace exposes notification delivery state", async ({ page }
 test("commercial workspace exposes controlled exports", async ({ page }) => {
   await page.goto("/settings/organisation");
   await expect(
-    page.getByRole("heading", { name: "Workspace settings" }),
+    page.getByRole("heading", { name: "Organisation" }),
   ).toBeVisible();
   await expect(
     page.getByRole("table", { name: "Data export requests" }),
@@ -406,8 +406,8 @@ test("accounts versions expose comparative presentation", async ({ page }) => {
 });
 
 test("team role changes and access removal persist in the workspace", async ({ page }) => {
-  await page.goto("/settings/teams");
-  await expect(page.getByRole("heading", { name: "Team" })).toBeVisible();
+  await page.goto("/settings/users");
+  await expect(page.getByRole("heading", { name: "Users" })).toBeVisible();
   const members = page.getByRole("table", { name: "Workspace members" });
   const colleague = members.getByRole("row").filter({ hasText: "Team member" });
   const role = colleague.getByRole("combobox", { name: "Workspace role" });

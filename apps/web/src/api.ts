@@ -2193,6 +2193,7 @@ export const api = {
   practiceClientSummary: async (context: ApiContext, clientId: string) =>
     practiceClientSummaryItem(await request<{ item: PracticeClientSummary }>(`/v1/practice/clients/${encodeURIComponent(clientId)}/summary`, context)),
   resourceProfiles: (context: ApiContext) => request<{items:ResourceProfile[]}>("/v1/practice/resources",context),
+  updateResourceProfile: (context: ApiContext, id: string, body: { jobTitle?: string | null; status?: string; standardCapacityMinutesWeek?: number }) => request<{item:ResourceProfile}>(`/v1/practice/resources/${encodeURIComponent(id)}`,context,{method:"PATCH",body:JSON.stringify(body)}),
   capacity: (context: ApiContext, range:{from:string;to:string}) => request<{items:CapacityRow[]}>(`/v1/practice/capacity?${new URLSearchParams(range)}`,context),
   workAllocations: (context: ApiContext, range:{from:string;to:string}) => request<{items:WorkAllocation[]}>(`/v1/practice/work-allocations?${new URLSearchParams(range)}`,context),
   reassignWork: (context: ApiContext, workId:string, body:{resourceId:string}) => request<{item:WorkAllocation}>(`/v1/practice/work/${encodeURIComponent(workId)}/resource-assignment`,context,{method:"POST",body:JSON.stringify({assignedMemberId:body.resourceId,assignmentState:"confirmed"})}),
@@ -2205,6 +2206,7 @@ export const api = {
   crmProspect: (context: ApiContext, id: string) => request<{ item: CrmProspect }>(`/v1/crm/prospects/${encodeURIComponent(id)}`, context),
   updateCrmProspect: (context: ApiContext, id: string, body: Record<string, unknown>) => request<{ item: CrmProspect }>(`/v1/crm/prospects/${encodeURIComponent(id)}`, context, { method: "PATCH", body: JSON.stringify(body) }),
   platformTeams: (context: ApiContext) => request<{ items: PlatformTeam[] }>("/v1/platform/teams", context),
+  createPlatformTeam: (context: ApiContext, name: string) => request<{ item: PlatformTeam }>("/v1/platform/teams", context, { method: "POST", body: JSON.stringify({ name }) }),
   crmOpportunities: (context: ApiContext) => request<{ items: CrmOpportunity[] }>("/v1/crm/opportunities", context),
   createCrmOpportunity: (context: ApiContext, body: Record<string, unknown>) => request<{ item: CrmOpportunity }>("/v1/crm/opportunities", context, { method: "POST", body: JSON.stringify(body) }),
   crmOpportunity: (context: ApiContext, id: string) => request<{ item: CrmOpportunity }>(`/v1/crm/opportunities/${encodeURIComponent(id)}`, context),
