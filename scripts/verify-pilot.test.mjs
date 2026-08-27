@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { planBrowserJobs } from "./verify-pilot-plan.mjs";
+import { planBrowserBatches, planBrowserJobs } from "./verify-pilot-plan.mjs";
 
 test("pilot browser plan covers Chromium and Edge with isolated resources", () => {
   const jobs = planBrowserJobs({
@@ -48,4 +48,26 @@ test("pilot browser plan rejects a worker budget smaller than the job matrix", (
       }),
     /must cover all 4 browser shard jobs/,
   );
+});
+
+test("pilot browser jobs are bounded into stable execution batches", () => {
+  const jobs = planBrowserJobs({
+    hasEdge: true,
+    shardsPerBrowser: 2,
+    totalWorkers: 4,
+    artifactRoot: "pilot-artifacts",
+  });
+  const batches = planBrowserBatches(jobs, 2);
+
+  assert.deepEqual(
+    batches.map((batch) => batch.map((job) => job.id)),
+    [
+      ["chromium-1-of-2", "chromium-2-of-2"],
+      ["edge-1-of-2", "edge-2-of-2"],
+    ],
+  );
+});
+
+test("pilot browser batch concurrency must be positive", () => {
+  assert.throws(() => planBrowserBatches([], 0), /positive integer/);
 });

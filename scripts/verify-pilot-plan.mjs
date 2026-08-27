@@ -32,3 +32,14 @@ export function planBrowserJobs({
     };
   });
 }
+
+export function planBrowserBatches(jobs, maxConcurrentJobs = 2) {
+  if (!Number.isSafeInteger(maxConcurrentJobs) || maxConcurrentJobs < 1) {
+    throw new Error("Browser job concurrency must be a positive integer.");
+  }
+  const batches = [];
+  for (let index = 0; index < jobs.length; index += maxConcurrentJobs) {
+    batches.push(jobs.slice(index, index + maxConcurrentJobs));
+  }
+  return batches;
+}

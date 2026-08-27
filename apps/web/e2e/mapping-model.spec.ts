@@ -9,27 +9,9 @@ const viewports = [
 ];
 
 async function openMappingModel(page: Page) {
-  await page.goto("/");
+  await page.goto("/ledgerly/mapping");
   await expect(page.getByText(/Showcase mode.*seeded data/)).toHaveCount(1);
-  const navigationToggle = page.getByRole("button", {
-    name: "Open practice navigation",
-  });
-  if (await navigationToggle.isVisible()) await navigationToggle.click();
-  const mapping = page
-    .getByRole("navigation", { name: "Engagement sections" })
-    .locator('button[value="mapping"]');
-  if (!(await mapping.isVisible())) {
-    await page
-      .locator(".production-nav-stage-toggle")
-      .filter({ hasText: "Source data" })
-      .click();
-  }
-  await expect(async () => {
-    await mapping.click();
-    await expect(
-      page.getByRole("heading", { name: "Account mapping" }),
-    ).toBeVisible({ timeout: 2_000 });
-  }).toPass({ timeout: 10_000 });
+  await expect(page.getByRole("heading", { name: "Account mapping" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Canonical model" })).toBeVisible();
 }
 
@@ -87,16 +69,7 @@ test("pointer drag assigns an unmapped source through the existing save flow", a
   await expect(page.getByText(/1000.*Current account was mapped/)).toBeVisible();
   await expect(page.getByText("All source accounts are mapped.")).toBeVisible();
 
-  const filing = page
-    .getByRole("navigation", { name: "Engagement sections" })
-    .locator('button[value="filing"]');
-  if (!(await filing.isVisible())) {
-    await page
-      .locator(".production-nav-stage-toggle")
-      .filter({ hasText: "Submission" })
-      .click();
-  }
-  await filing.click();
+  await page.goto("/ledgerly/filing");
   await expect(page.getByRole("heading", { name: "Regulator filing record" })).toBeVisible();
   await expect(page.getByText(/1000.*Current account was mapped/)).toHaveCount(0);
 });

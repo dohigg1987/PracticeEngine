@@ -1,5 +1,7 @@
 # Entitlement implementation
 
+The application launcher evaluates the parent application keys `practice.enabled`, `ledgerly.enabled` and `quotebench.enabled` through the authenticated Platform entitlement-decision route. Only effectively enabled applications appear in the licensed launcher. `clarity-ie.enabled` is structurally reserved but its future manifest is not launcher-available. A launcher decision never substitutes for server-side entitlement and permission enforcement on application APIs.
+
 ## Model
 
 The commercial kernel contains read-only product, module and feature catalogues plus tenant-owned entitlements and overrides. Application logic evaluates stable feature keys and never package names. Effective records support start/end dates, boolean enablement, optional structured values and provenance.

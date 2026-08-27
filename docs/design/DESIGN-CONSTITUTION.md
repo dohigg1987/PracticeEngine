@@ -50,6 +50,7 @@ Fluent UI React v9 is the application design system, not visual inspiration. Reu
 
 ## Product consistency
 
+- PracticeEngine suite chrome is compact, neutral and stable. The app launcher uses standard Fluent menu/navigation treatments; application identity is restrained to the app name and Fluent icon.
 - Shared Platform, Practice Management and specialist modules use one shell, vocabulary and component recipe for equivalent interactions.
 - Module branding may identify a product but must not fork the application control language.
 - Marketing-page conventions do not enter operational application surfaces.

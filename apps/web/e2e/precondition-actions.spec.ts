@@ -2,19 +2,14 @@ import { expect, test, type Page } from "@playwright/test";
 
 async function openEngagementSection(
   page: Page,
-  stage: string,
+  _stage: string,
   value: string,
 ) {
-  const item = page
-    .getByRole("navigation", { name: "Engagement sections" })
-    .locator(`button[value="${value}"]`);
-  if (!(await item.isVisible())) {
-    await page
-      .locator(".production-nav-stage-toggle")
-      .filter({ hasText: stage })
-      .click();
-  }
-  await item.click();
+  const paths: Record<string, string> = {
+    integrations: "/ledgerly/integrations",
+    filing: "/ledgerly/filing",
+  };
+  await page.goto(paths[value]);
 }
 
 test.beforeEach(async ({ page }) => {

@@ -7,7 +7,7 @@
   "workers_dev": true,
   "preview_urls": false,
   "vars": {
-    "APP_VERSION": "e32e295c482f8eaa13ef50410b88212681be964d",
+    "APP_VERSION": "a288e35ed6d89b9b2a3d92197f92053e4572c042",
     "WEB_ORIGIN": "https://practiceengine-dev.pages.dev",
     "NEON_AUTH_URL": "https://ep-royal-dawn-axwaqz1u.neonauth.c-4.us-east-2.aws.neon.tech/neondb/auth",
     "RECURRENCE_EXECUTION_CONTEXTS": "[]"

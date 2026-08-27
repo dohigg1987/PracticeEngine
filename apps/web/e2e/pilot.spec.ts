@@ -2,38 +2,19 @@ import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
 async function openEngagementSection(page: Page, label: string) {
-  const values: Record<string, string> = {
-    "Source data": "data",
-    Mapping: "mapping",
-    Journals: "journals",
-    Reconciliations: "reconciliations",
-    "Draft accounts": "accounts",
-    "Accounts versions": "versions",
-    "Filing evidence": "filing",
-    "Client portal": "portal",
+  const paths: Record<string, string> = {
+    "Source data": "/ledgerly/trial-balance",
+    Mapping: "/ledgerly/mapping",
+    Journals: "/ledgerly/journals",
+    Reconciliations: "/ledgerly/reconciliations",
+    "Draft accounts": "/ledgerly/accounts",
+    "Accounts versions": "/ledgerly/artefacts",
+    "Filing evidence": "/ledgerly/filing",
+    "Client portal": "/ledgerly/portal",
   };
-  const stages: Record<string, string> = {
-    "Source data": "Source data",
-    Mapping: "Source data",
-    Journals: "Adjustments",
-    Reconciliations: "Adjustments",
-    "Draft accounts": "Accounts builder",
-    "Accounts versions": "Review & approval",
-    "Filing evidence": "Submission",
-    "Client portal": "Submission",
-  };
-  const value = values[label];
-  if (!value) throw new Error(`No engagement navigation value for ${label}`);
-  const item = page
-    .getByRole("navigation", { name: "Engagement sections" })
-    .locator(`button[value="${value}"]`);
-  if (!(await item.isVisible())) {
-    await page
-      .locator(".production-nav-stage-toggle")
-      .filter({ hasText: stages[label] })
-      .click();
-  }
-  await item.click();
+  const path = paths[label];
+  if (!path) throw new Error(`No engagement route for ${label}`);
+  await page.goto(path);
 }
 
 test.beforeEach(async ({ page }, testInfo) => {
@@ -42,7 +23,7 @@ test.beforeEach(async ({ page }, testInfo) => {
     "production boundary gives actionable auth configuration recovery"
   )
     return;
-  await page.goto("/");
+  await page.goto("/ledgerly/overview");
   await expect(page.getByText("Showcase mode · seeded data")).toBeVisible();
   await expect(page.getByLabel("Engagement", { exact: true })).toHaveValue(
     "demo-engagement",
@@ -80,16 +61,17 @@ test("engagement setup prevents incompatible framework, sector and client combin
   await expect(sector.locator("option")).toHaveText(["None"]);
 });
 
-test("pilot preparation journey exposes source, mapping and adjustment evidence", async ({
-  page,
-}) => {
+test("pilot preparation opens the statutory accounts context", async ({ page }) => {
+  await openEngagementSection(page, "Draft accounts");
   await expect(
     page.getByRole("heading", { name: "Statutory accounts document" }),
   ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Northstar Community Foundation" }),
   ).toBeVisible();
+});
 
+test("pilot preparation exposes source data evidence", async ({ page }) => {
   await openEngagementSection(page, "Source data");
   await expect(
     page.getByRole("heading", { name: "Trial balance" }),
@@ -97,18 +79,24 @@ test("pilot preparation journey exposes source, mapping and adjustment evidence"
   await expect(
     page.getByText("Current account", { exact: true }),
   ).toBeVisible();
+});
 
+test("pilot preparation exposes mapping evidence", async ({ page }) => {
   await openEngagementSection(page, "Mapping");
   await expect(
     page.getByRole("heading", { name: "Account mapping" }),
   ).toBeVisible();
   await expect(page.getByText("7 mapped", { exact: true })).toBeVisible();
   await expect(page.getByText("0 unmapped", { exact: true })).toBeVisible();
+});
 
+test("pilot preparation exposes journal evidence", async ({ page }) => {
   await openEngagementSection(page, "Journals");
   await expect(page.getByRole("heading", { name: "Journals" })).toBeVisible();
   await expect(page.getByText("Accrued professional fees")).toBeVisible();
+});
 
+test("pilot preparation exposes reconciliation evidence", async ({ page }) => {
   await openEngagementSection(page, "Reconciliations");
   await expect(
     page.getByRole("heading", { name: "Reconciliations" }),
@@ -215,8 +203,8 @@ test("accounts preview opens versioned editors for narrative and disclosures", a
 test("pilot workspace administration reaches clients and team without actor identifiers", async ({
   page,
 }) => {
-  await page.locator('button[value="clients"]').click();
-  await expect(page.getByRole("heading", { name: "Clients" })).toBeVisible();
+  await page.goto("/practice/clients");
+  await expect(page.getByRole("heading", { name: "Clients", exact: true })).toBeVisible();
   const clientsGrid = page.getByRole("grid", { name: "Clients" });
   await expect(clientsGrid).toContainText(
     "Northstar Community Foundation",
@@ -241,7 +229,7 @@ test("pilot workspace administration reaches clients and team without actor iden
   ).toContainText("31 Dec 2026");
   await page.getByRole("main").getByRole("button", { name: "Clients" }).click();
 
-  await page.locator('button[value="team"]').click();
+  await page.goto("/settings/teams");
   await expect(page.getByRole("heading", { name: "Team" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Members" })).toBeVisible();
   await expect(page.getByText("Actor ID", { exact: false })).toHaveCount(0);
@@ -275,7 +263,7 @@ test("narrow workspace keeps navigation and source controls operable", async ({
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const navigationToggle = page.getByRole("button", {
-    name: "Open practice navigation",
+    name: "Open application navigation",
   });
   await expect(navigationToggle).toBeVisible();
   await navigationToggle.click();
@@ -317,70 +305,20 @@ test("global search focuses from the command shortcut and opens a real section",
   await expect(results).toBeHidden();
 });
 
-test("sidebar follows the accounts-production stages and exposes one workflow group at a time", async ({
+test("Ledgerly navigation remains specialist and drives the production workspace", async ({
   page,
 }) => {
-  await expect(
-    page.getByRole("button", { name: "Practice", exact: true }),
-  ).toHaveAttribute("aria-expanded", "true");
-  await expect(
-    page.getByRole("button", { name: "Accounts production", exact: true }),
-  ).toHaveAttribute("aria-expanded", "true");
-  await expect(
-    page.getByRole("button", { name: "Administration", exact: true }),
-  ).toHaveAttribute("aria-expanded", "false");
+  const navigation = page.getByRole("navigation", { name: "Ledgerly navigation" });
+  await expect(navigation.getByRole("button", { name: "Trial balance", exact: true })).toBeVisible();
+  await expect(navigation.getByRole("button", { name: "Journals", exact: true })).toBeVisible();
+  await expect(navigation.getByRole("button", { name: "Resources", exact: true })).toHaveCount(0);
 
-  const stageNames = [
-    "Source data",
-    "Adjustments",
-    "Accounts builder",
-    "Review & approval",
-    "Submission",
-  ];
-  const stageButtons = page.locator(".production-nav-stage-toggle");
-  await expect(stageButtons).toHaveCount(stageNames.length);
-  await expect(stageButtons).toHaveText(
-    stageNames.map((name) => new RegExp(name)),
-  );
-  await page
-    .locator(".production-nav-stage-toggle")
-    .filter({ hasText: "Submission" })
-    .click();
-  await expect(
-    page.locator('.production-nav-stage-toggle[aria-expanded="true"]'),
-  ).toHaveCount(1);
-  const engagementNavigation = page.getByRole("navigation", {
-    name: "Engagement sections",
-  });
-  await expect(
-    engagementNavigation.locator('button[value="filing"]'),
-  ).toBeVisible();
-  await expect(
-    engagementNavigation.locator('button[value="accounts"]'),
-  ).toHaveCount(0);
-
-  await page
-    .locator(".production-spine")
-    .getByRole("tab", { name: /Adjustments/ })
-    .click();
-  const adjustmentsMenu = page.getByRole("tablist", {
-    name: "Adjustments sections",
-  });
-  await expect(adjustmentsMenu.getByRole("tab", { name: "Journals" })).toBeVisible();
-  await adjustmentsMenu.getByRole("tab", { name: "Reconciliations" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Reconciliations", exact: true }),
-  ).toBeVisible();
+  await navigation.getByRole("button", { name: "Reconciliations", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Reconciliations", exact: true })).toBeVisible();
+  await expect(page.locator(".production-spine").getByRole("tab", { name: /Adjustments/ })).toHaveAttribute("aria-selected", "true");
 });
-
-test("commercial workspaces expose portal, imports, inbox, settings and comparatives", async ({
-  page,
-}) => {
-  await page
-    .locator(".production-nav-stage-toggle")
-    .filter({ hasText: "Source data" })
-    .click();
-  await page.locator('button[value="integrations"]').click();
+test("commercial workspace exposes imports", async ({ page }) => {
+  await page.goto("/ledgerly/integrations");
   await expect(
     page.getByRole("heading", { name: "Imports and integrations" }),
   ).toBeVisible();
@@ -393,24 +331,29 @@ test("commercial workspaces expose portal, imports, inbox, settings and comparat
       { exact: false },
     ),
   ).toBeVisible();
+});
 
-  await page.getByRole("button", { name: "Administration" }).click();
-  await page.locator('button[value="inbox"]').click();
+test("commercial workspace exposes notification delivery state", async ({ page }) => {
+  await page.goto("/settings/notifications");
   await expect(page.getByRole("heading", { name: "Inbox" })).toBeVisible();
   await expect(page.getByText("Bank statement received")).toBeVisible();
   await page.getByRole("button", { name: /Delivery capabilities/ }).click();
   await expect(
     page.getByRole("table", { name: "Notification delivery capabilities" }),
   ).toContainText("No public retry or DLQ action is exposed.");
+});
 
-  await page.locator('button[value="settings"]').click();
+test("commercial workspace exposes controlled exports", async ({ page }) => {
+  await page.goto("/settings/organisation");
   await expect(
     page.getByRole("heading", { name: "Workspace settings" }),
   ).toBeVisible();
   await expect(
     page.getByRole("table", { name: "Data export requests" }),
   ).toContainText("Requested");
+});
 
+test("client portal evidence uses an application-owned rejection flow", async ({ page }) => {
   await openEngagementSection(page, "Client portal");
   await expect(
     page.getByRole("heading", { name: "Client portal" }),
@@ -446,7 +389,9 @@ test("commercial workspaces expose portal, imports, inbox, settings and comparat
     .click();
   await expect(rejectionDialog).not.toBeVisible();
   expect(nativeDialogOpened).toBe(false);
+});
 
+test("accounts versions expose comparative presentation", async ({ page }) => {
   await openEngagementSection(page, "Accounts versions");
   await page
     .getByRole("button", { name: /Version 3 · Final Generated/ })
@@ -461,7 +406,8 @@ test("commercial workspaces expose portal, imports, inbox, settings and comparat
 });
 
 test("team role changes and access removal persist in the workspace", async ({ page }) => {
-  await page.locator('button[value="team"]').click();
+  await page.goto("/settings/teams");
+  await expect(page.getByRole("heading", { name: "Team" })).toBeVisible();
   const members = page.getByRole("table", { name: "Workspace members" });
   const colleague = members.getByRole("row").filter({ hasText: "Team member" });
   const role = colleague.getByRole("combobox", { name: "Workspace role" });
@@ -478,11 +424,7 @@ test("team role changes and access removal persist in the workspace", async ({ p
 });
 
 test("CSV preview imports the selected file and opens source data", async ({ page }) => {
-  await page
-    .locator(".production-nav-stage-toggle")
-    .filter({ hasText: "Source data" })
-    .click();
-  await page.locator('button[value="integrations"]').click();
+  await page.goto("/ledgerly/integrations");
   await expect(page.locator("#engagement")).not.toHaveValue("");
   await page.locator('input[type="file"]').setInputFiles({
     name: "balanced-trial-balance.csv",
@@ -496,11 +438,7 @@ test("CSV preview imports the selected file and opens source data", async ({ pag
 });
 
 test("CSV preview maps arbitrary headings before trial-balance import", async ({ page }) => {
-  await page
-    .locator(".production-nav-stage-toggle")
-    .filter({ hasText: "Source data" })
-    .click();
-  await page.locator('button[value="integrations"]').click();
+  await page.goto("/ledgerly/integrations");
   await expect(page.locator("#engagement")).not.toHaveValue("");
   await page.locator('input[type="file"]').setInputFiles({
     name: "arbitrary-headings.csv",

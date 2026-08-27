@@ -700,6 +700,13 @@ export type TenantSettings = {
   createdAt: string;
   updatedAt: string;
 };
+export type EntitlementDecision = {
+  featureKey: string;
+  enabled: boolean;
+  value: number | null;
+  source: string;
+  decisionId: string | null;
+};
 export type ExportRequest = {
   id: string;
   scope: "TENANT" | "ENGAGEMENT";
@@ -2083,6 +2090,11 @@ export const api = {
       `/v1/notifications/${encodeURIComponent(notificationId)}/read`,
       context,
       { method: "POST" },
+    ),
+  entitlementDecision: (context: ApiContext, featureKey: string) =>
+    request<{ item: EntitlementDecision }>(
+      `/v1/platform/entitlements/${encodeURIComponent(featureKey)}`,
+      context,
     ),
   tenantSettings: (context: ApiContext) =>
     request<{ item: TenantSettings }>("/v1/tenant/settings", context),

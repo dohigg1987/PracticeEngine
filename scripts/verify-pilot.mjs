@@ -2,7 +2,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
-import { planBrowserJobs } from "./verify-pilot-plan.mjs";
+import { planBrowserBatches, planBrowserJobs } from "./verify-pilot-plan.mjs";
 
 const production = process.argv.includes("--production");
 const skipE2e = process.argv.includes("--skip-e2e");
@@ -46,12 +46,28 @@ async function runBrowserMatrix() {
     totalWorkers,
     artifactRoot: fromRoot("apps/web/test-results/pilot"),
   });
+  const jobConcurrency = positiveInteger(
+    process.env.PLAYWRIGHT_BROWSER_JOB_CONCURRENCY,
+    Math.min(2, jobs.length),
+    "PLAYWRIGHT_BROWSER_JOB_CONCURRENCY",
+  );
+  const jobTimeoutMs = positiveInteger(
+    process.env.PLAYWRIGHT_BROWSER_JOB_TIMEOUT_MS,
+    30 * 60 * 1000,
+    "PLAYWRIGHT_BROWSER_JOB_TIMEOUT_MS",
+  );
+  const batches = planBrowserBatches(jobs, jobConcurrency);
 
   console.log(
-    `Running ${jobs.length} isolated Playwright jobs (${shardsPerBrowser} shard(s) per browser, ${totalWorkers} total worker budget).`,
+    `Running ${jobs.length} isolated Playwright jobs in ${batches.length} batch(es) ` +
+      `(${shardsPerBrowser} shard(s) per browser, ${totalWorkers} total worker budget, ` +
+      `${jobConcurrency} concurrent job(s), ${Math.round(jobTimeoutMs / 60_000)} minute watchdog).`,
   );
-  const results = await Promise.all(
-    jobs.map((job) =>
+  const results = [];
+  for (const [batchIndex, batch] of batches.entries()) {
+    console.log(`--- browser batch ${batchIndex + 1}/${batches.length}: ${batch.map((job) => job.id).join(", ")} ---`);
+    const batchResults = await Promise.all(
+      batch.map((job) =>
       new Promise((resolveJob) => {
         console.log(`--- ${job.id}: port ${job.portBase}, ${job.workers} worker(s) ---`);
         const jobStarted = Date.now();
@@ -75,25 +91,48 @@ async function runBrowserMatrix() {
               PLAYWRIGHT_OUTPUT_DIR: job.outputDir,
               PLAYWRIGHT_HTML_OUTPUT_DIR: job.htmlOutputDir,
             },
+            detached: process.platform !== "win32",
+            windowsHide: true,
           },
         );
         let spawnError;
+        let timedOut = false;
+        const watchdog = setTimeout(() => {
+          timedOut = true;
+          console.error(`--- ${job.id}: watchdog expired after ${Math.round(jobTimeoutMs / 60_000)} minutes; terminating process tree ---`);
+          if (!child.pid) return;
+          if (process.platform === "win32") {
+            spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], {
+              stdio: "ignore",
+              windowsHide: true,
+            });
+          } else {
+            try {
+              process.kill(-child.pid, "SIGKILL");
+            } catch {
+              child.kill("SIGKILL");
+            }
+          }
+        }, jobTimeoutMs);
         child.once("error", (error) => {
           spawnError = error;
         });
         child.once("close", (status) => {
+          clearTimeout(watchdog);
           resolveJob({
             id: job.id,
             browser: job.browser,
             shard: job.shard,
             seconds: Number(((Date.now() - jobStarted) / 1000).toFixed(1)),
-            status: status ?? 1,
-            error: spawnError?.message,
+            status: timedOut ? 124 : status ?? 1,
+            error: timedOut ? "browser job watchdog expired" : spawnError?.message,
           });
         });
       }),
-    ),
-  );
+      ),
+    );
+    results.push(...batchResults);
+  }
 
   for (const result of results) {
     console.log(
@@ -101,7 +140,7 @@ async function runBrowserMatrix() {
     );
     if (result.error) console.error(result.error);
   }
-  return results;
+  return { results, jobConcurrency, jobTimeoutMs };
 }
 
 const checks = [
@@ -129,9 +168,10 @@ for (const [label, cwd, args] of checks) {
   console.log(`\n=== ${label} ===`);
   const suiteStarted=Date.now();
   if (label === "Controlled-pilot browser journeys") {
-    const browserJobs = await runBrowserMatrix();
+    const browserMatrix = await runBrowserMatrix();
+    const browserJobs = browserMatrix.results;
     const seconds=Number(((Date.now()-suiteStarted)/1000).toFixed(1));
-    timings.push({label,seconds,jobs:browserJobs});
+    timings.push({label,seconds,jobs:browserJobs,jobConcurrency:browserMatrix.jobConcurrency,jobTimeoutMs:browserMatrix.jobTimeoutMs});
     if (browserJobs.some((job) => job.status !== 0)) {
       console.error(`Pilot verification stopped at: ${label}`);
       process.exit(1);

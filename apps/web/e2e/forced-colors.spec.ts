@@ -2,9 +2,9 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
 const surfaces = [
-  { value: "clients", heading: "Clients" },
-  { value: "accounts", heading: "Statutory accounts document", group: "Accounts builder" },
-  { value: "settings", heading: "Workspace settings", group: "Administration" },
+  { value: "clients", heading: "Clients", path: "/practice/clients" },
+  { value: "accounts", heading: "Statutory accounts document", path: "/ledgerly/accounts" },
+  { value: "settings", heading: "Workspace settings", path: "/settings/organisation" },
 ] as const;
 
 // Cold Vite transformation plus forced-colors style evaluation can dominate
@@ -13,11 +13,7 @@ const surfaces = [
 test.describe.configure({ timeout: 60_000 });
 
 async function openSurface(page: Page, surface: (typeof surfaces)[number]) {
-  const target = page.locator(`button[value="${surface.value}"]`).first();
-  if (!(await target.isVisible()) && "group" in surface) {
-    await page.getByRole("button", { name: surface.group, exact: true }).click();
-  }
-  await target.click();
+  await page.goto(surface.path);
   await expect(page.getByRole("heading", { name: surface.heading }).first()).toBeVisible();
 }
 
