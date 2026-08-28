@@ -11,8 +11,8 @@ development environment:
 
 ```text
 ENVIRONMENT=dev
-NEON_AUTH_URL=https://ep-royal-dawn-axwaqz1u.neonauth.c-4.us-east-2.aws.neon.tech/neondb/auth
-VITE_NEON_AUTH_URL=https://ep-royal-dawn-axwaqz1u.neonauth.c-4.us-east-2.aws.neon.tech/neondb/auth
+NEON_AUTH_URL=https://ep-broad-firefly-zahbgsmb.neonauth.c-2.eu-west-2.aws.neon.tech/neondb/auth
+VITE_NEON_AUTH_URL=https://ep-broad-firefly-zahbgsmb.neonauth.c-2.eu-west-2.aws.neon.tech/neondb/auth
 VITE_API_URL=https://practiceengine-api-dev.<account-subdomain>.workers.dev
 VITE_DEMO_MODE=false
 ```

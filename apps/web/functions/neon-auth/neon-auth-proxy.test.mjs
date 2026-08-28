@@ -6,7 +6,7 @@ import { onRequest, resolveNeonAuthBase } from "./[[path]].js";
 const productionAuthUrl =
   "https://ep-wispy-thunder-zatp3scz.neonauth.c-2.eu-west-2.aws.neon.tech/neondb/auth";
 const developmentAuthUrl =
-  "https://ep-royal-dawn-axwaqz1u.neonauth.c-4.us-east-2.aws.neon.tech/neondb/auth";
+  "https://dev-auth.example.test/neondb/auth";
 
 test("uses the environment-scoped Neon Auth URL", () => {
   assert.equal(resolveNeonAuthBase({
@@ -85,6 +85,6 @@ test("forwards Google social sign-in POST requests to Neon Auth", async (t) => {
   });
   assert.equal(
     response.headers.get("x-practiceengine-auth-host"),
-    "ep-royal-dawn-axwaqz1u.neonauth.c-4.us-east-2.aws.neon.tech",
+    "dev-auth.example.test",
   );
 });

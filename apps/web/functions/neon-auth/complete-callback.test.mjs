@@ -4,7 +4,7 @@ import test from "node:test";
 import { onRequestPost } from "./complete-callback.js";
 
 const developmentAuthUrl =
-  "https://ep-royal-dawn-axwaqz1u.neonauth.c-4.us-east-2.aws.neon.tech/neondb/auth";
+  "https://dev-auth.example.test/neondb/auth";
 
 test("exchanges a verifier through the environment-selected Auth endpoint and issues the app cookie", async (t) => {
   const originalFetch = globalThis.fetch;

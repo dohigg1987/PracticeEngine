@@ -8,9 +8,9 @@
   "preview_urls": false,
   "placement": { "mode": "smart" },
   "vars": {
-    "APP_VERSION": "a288e35ed6d89b9b2a3d92197f92053e4572c042",
+    "APP_VERSION": "6fe19a0eb935ba3b2c7b29763dd18423f800cf1e",
     "WEB_ORIGIN": "https://practiceengine-dev.pages.dev",
-    "NEON_AUTH_URL": "https://ep-royal-dawn-axwaqz1u.neonauth.c-4.us-east-2.aws.neon.tech/neondb/auth",
+    "NEON_AUTH_URL": "https://ep-broad-firefly-zahbgsmb.neonauth.c-2.eu-west-2.aws.neon.tech/neondb/auth",
     "RECURRENCE_EXECUTION_CONTEXTS": "[]"
   },
   "observability": {
@@ -27,7 +27,7 @@
   "hyperdrive": [
     {
       "binding": "HYPERDRIVE",
-      "id": "642a6a36a3074b5e8875990bfa1485c9"
+      "id": "f155446f8013477db4bf22d597a0ec38"
     }
   ]
 }
