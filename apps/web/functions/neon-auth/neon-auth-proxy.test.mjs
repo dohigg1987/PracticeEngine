@@ -83,4 +83,8 @@ test("forwards Google social sign-in POST requests to Neon Auth", async (t) => {
     provider: "google",
     callbackURL: "https://practiceengine-dev.pages.dev",
   });
+  assert.equal(
+    response.headers.get("x-practiceengine-auth-host"),
+    "ep-royal-dawn-axwaqz1u.neonauth.c-4.us-east-2.aws.neon.tech",
+  );
 });

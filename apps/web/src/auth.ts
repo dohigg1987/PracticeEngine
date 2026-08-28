@@ -16,6 +16,33 @@ const browserOrigin = typeof window === "undefined" ? "http://127.0.0.1" : windo
 // the application origin; Vite provides the equivalent development proxy.
 export const authTransportUrl = `${browserOrigin}/neon-auth`;
 export const authClient = !demoMode && authUrl ? createAuthClient(authTransportUrl) : null;
+const socialVerifierParameter = "neon_auth_session_verifier";
+let socialCallbackCompletion: Promise<boolean> | null = null;
+
+export function completeSocialCallback(): Promise<boolean> {
+  if (typeof window === "undefined") return Promise.resolve(false);
+  const current = new URL(window.location.href);
+  const verifier = current.searchParams.get(socialVerifierParameter);
+  if (!verifier) return socialCallbackCompletion ?? Promise.resolve(false);
+
+  current.searchParams.delete(socialVerifierParameter);
+  window.history.replaceState(window.history.state, "", current.href);
+  socialCallbackCompletion = (async () => {
+    const response = await fetch(`${authTransportUrl}/complete-callback`, {
+      method: "POST",
+      credentials: "include",
+      cache: "no-store",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ verifier }),
+    });
+    const result = await response.json().catch(() => null) as { authenticated?: boolean } | null;
+    if (!response.ok || result?.authenticated !== true) {
+      throw new AuthRequiredError("Google sign-in could not establish a session. Try again.");
+    }
+    return true;
+  })();
+  return socialCallbackCompletion;
+}
 
 export function authFailureMessage(error: unknown, development = import.meta.env.DEV): string {
   const actionable = authActionErrorMessage(error);

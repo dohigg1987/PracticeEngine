@@ -52,4 +52,35 @@ describe("Neon Auth session boundary", () => {
     const { AuthRequiredError, freshAuthToken } = await import("./auth");
     await expect(freshAuthToken()).rejects.toBeInstanceOf(AuthRequiredError);
   });
+
+  it("completes a returned social verifier once and removes it from browser history", async () => {
+    const testWindow = {
+      location: {
+        origin: "https://practiceengine-dev.pages.dev",
+        href: "https://practiceengine-dev.pages.dev/?keep=yes&neon_auth_session_verifier=redacted-test-value",
+      },
+      history: { state: null, replaceState: vi.fn() },
+    };
+    testWindow.history.replaceState.mockImplementation((_, __, href) => {
+      testWindow.location.href = String(href);
+    });
+    vi.stubGlobal("window", testWindow);
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ authenticated: true }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { completeSocialCallback } = await import("./auth");
+    await expect(completeSocialCallback()).resolves.toBe(true);
+    await expect(completeSocialCallback()).resolves.toBe(true);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://practiceengine-dev.pages.dev/neon-auth/complete-callback",
+      expect.objectContaining({ method: "POST", credentials: "include", cache: "no-store" }),
+    );
+    expect(testWindow.history.replaceState).toHaveBeenCalledWith(
+      null,
+      "",
+      "https://practiceengine-dev.pages.dev/?keep=yes",
+    );
+  });
 });

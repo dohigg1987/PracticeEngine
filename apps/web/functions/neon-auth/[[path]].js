@@ -95,6 +95,7 @@ export async function onRequest(context) {
   responseHeaders.delete("access-control-allow-origin");
   responseHeaders.delete("access-control-allow-credentials");
   responseHeaders.set("cache-control", "no-store");
+  responseHeaders.set("x-practiceengine-auth-host", new URL(authBase).host);
   responseHeaders.set("x-content-type-options", "nosniff");
 
   return new Response(upstream.body, {

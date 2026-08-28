@@ -135,6 +135,7 @@ import {
 import {
   authClient,
   authConfigured,
+  completeSocialCallback,
   authFailureDiagnostic,
   authFailureMessage,
   AuthUser,
@@ -469,7 +470,18 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    refreshSession();
+    let active = true;
+    void completeSocialCallback()
+      .then(async () => {
+        if (active) await refreshSession();
+      })
+      .catch(() => {
+        if (!active) return;
+        setUser(null);
+        setCheckingSession(false);
+        setSessionMessage("Google sign-in could not establish a session. Try again.");
+      });
+    return () => { active = false; };
   }, [refreshSession]);
   useEffect(() => {
     onUnauthorized(() => {
