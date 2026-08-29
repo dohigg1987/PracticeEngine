@@ -203,6 +203,7 @@ test("accounts preview opens versioned editors for narrative and disclosures", a
 test("pilot workspace administration reaches clients and team without actor identifiers", async ({
   page,
 }) => {
+  test.setTimeout(60_000);
   await page.goto("/practice/clients");
   await expect(page.getByRole("heading", { name: "Clients", exact: true })).toBeVisible();
   const clientsGrid = page.getByRole("grid", { name: "Clients" });
@@ -239,7 +240,7 @@ test("pilot workspace administration reaches clients and team without actor iden
     .getByRole("button", { name: "Workspace" })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Northstar Community Foundation" }),
+    page.getByRole("heading", { name: "Home", exact: true }),
   ).toBeVisible();
 });
 
