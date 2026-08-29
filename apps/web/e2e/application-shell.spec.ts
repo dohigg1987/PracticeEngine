@@ -58,7 +58,7 @@ test("representative sidebar routes keep the shell and expose destination contex
 
 test("contextual Ledgerly switch retains canonical client and linked engagement", async ({ page }) => {
   await page.goto("/practice/work");
-  await page.getByRole("button", { name: /2026 Annual Accounts/ }).click();
+  await page.getByRole("link", { name: /2026 Annual Accounts/ }).click();
   await page.getByRole("button", { name: "Open in Ledgerly" }).click();
   await expect(page).toHaveURL(/\/ledgerly\/overview\?client=demo-org&engagement=demo-engagement$/);
   await expect(page.getByRole("heading", { name: "Northstar Community Foundation" })).toBeVisible();

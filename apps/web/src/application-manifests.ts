@@ -51,6 +51,7 @@ export type ApplicationNavigationItem = {
   practiceView?: PracticeView;
   requiredEntitlement?: string;
   primary?: boolean;
+  parentId?: string;
   group?: "Relationships" | "Delivery" | "Collaboration" | "People & planning" | "Insight";
 };
 
@@ -103,16 +104,19 @@ const practiceNavigation = [
   { id: "practice-resources", label: "Team", path: "/practice/resources", icon: "people", page: "resources" },
   { id: "practice-collaboration", label: "Collaboration", path: "/practice/collaboration", icon: "people", page: "collaboration" },
   { id: "practice-portfolio", label: "Insights", path: "/practice/portfolio-economics", icon: "clients", page: "portfolio" },
-  { id: "practice-prospects", label: "Prospects", path: "/practice/crm/prospects", icon: "people", page: "crm-prospects", primary: false, group: "Relationships" },
-  { id: "practice-opportunities", label: "Opportunities", path: "/practice/crm/opportunities", icon: "document", page: "crm-opportunities", primary: false, group: "Relationships" },
-  { id: "practice-onboarding", label: "Onboarding", path: "/practice/onboarding", icon: "document", page: "onboarding", primary: false, group: "Relationships" },
+  { id: "practice-client-list", label: "Clients", path: "/practice/clients", icon: "clients", page: "clients", primary: false, parentId: "practice-clients", group: "Relationships" },
+  { id: "practice-prospects", label: "Prospects", path: "/practice/crm/prospects", icon: "people", page: "crm-prospects", primary: false, parentId: "practice-clients", group: "Relationships" },
+  { id: "practice-opportunities", label: "Opportunities", path: "/practice/crm/opportunities", icon: "document", page: "crm-opportunities", primary: false, parentId: "practice-clients", group: "Relationships" },
+  { id: "practice-onboarding", label: "Onboarding", path: "/practice/onboarding", icon: "document", page: "onboarding", primary: false, parentId: "practice-clients", group: "Relationships" },
   { id: "practice-review", label: "Review", path: "/practice/review", icon: "document", page: "work", practiceView: "reviews", primary: false, group: "Delivery" },
   { id: "practice-recurring", label: "Recurring work", path: "/practice/recurring-work", icon: "document", page: "work", practiceView: "recurring", primary: false, group: "Delivery" },
   { id: "practice-operations", label: "Automation", path: "/practice/automation", icon: "document", page: "work", practiceView: "operations", primary: false, group: "Delivery" },
   { id: "practice-client-portal", label: "Client portal", path: "/practice/client-portal", icon: "open", page: "client-portal", primary: false, group: "Collaboration" },
-  { id: "practice-capacity", label: "Capacity", path: "/practice/capacity", icon: "document", page: "capacity", primary: false, group: "People & planning" },
-  { id: "practice-allocation", label: "Work allocation", path: "/practice/work-allocation", icon: "document", page: "allocation", primary: false, group: "People & planning" },
-  { id: "practice-time", label: "Time", path: "/practice/time", icon: "document", page: "time", primary: false, group: "People & planning" },
+  { id: "practice-resource-list", label: "Resources", path: "/practice/resources", icon: "people", page: "resources", primary: false, parentId: "practice-resources", group: "People & planning" },
+  { id: "practice-capacity", label: "Capacity", path: "/practice/capacity", icon: "document", page: "capacity", primary: false, parentId: "practice-resources", group: "People & planning" },
+  { id: "practice-allocation", label: "Work allocation", path: "/practice/work-allocation", icon: "document", page: "allocation", primary: false, parentId: "practice-resources", group: "People & planning" },
+  { id: "practice-time", label: "Time", path: "/practice/time", icon: "document", page: "time", primary: false, parentId: "practice-resources", group: "People & planning" },
+  { id: "practice-portfolio-economics", label: "Portfolio economics", path: "/practice/portfolio-economics", icon: "clients", page: "portfolio", primary: false, parentId: "practice-portfolio", group: "Insight" },
 ] as const satisfies readonly ApplicationNavigationItem[];
 
 const ledgerlyNavigation = [
@@ -232,7 +236,9 @@ export function navigationItemForPath(pathname: string): ApplicationNavigationIt
   const manifest = manifestForPath(pathname);
   if (!manifest) return undefined;
   return [...manifest.navigation]
-    .sort((left, right) => right.path.length - left.path.length)
+    .sort((left, right) =>
+      right.path.length - left.path.length || Number(Boolean(right.parentId)) - Number(Boolean(left.parentId)),
+    )
     .find((item) => pathname === item.path || pathname.startsWith(`${item.path}/`));
 }
 
