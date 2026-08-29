@@ -38,6 +38,7 @@ export function PageHeader({
   title,
   description,
   back,
+  backLabel = "Back",
   primaryAction,
   secondaryActions,
   meta,
@@ -45,12 +46,13 @@ export function PageHeader({
   title: string;
   description?: string;
   back?: () => void;
+  backLabel?: string;
   primaryAction?: Action;
   secondaryActions?: Action;
   meta?: React.ReactNode;
 }) {
   return <header className="pe-page-header">
-    {back && <Button appearance="subtle" icon={<ArrowLeftRegular />} aria-label="Back" onClick={back} />}
+    {back && <Button appearance="subtle" icon={<ArrowLeftRegular />} aria-label={backLabel} onClick={back} />}
     <div className="pe-page-heading">
       <h1>{title}</h1>
       {description && <p>{description}</p>}
@@ -70,9 +72,9 @@ export function CommandBar({ children, contextualActions }: React.PropsWithChild
   </div>;
 }
 
-export function FilterBar({ children, summary, reset }: React.PropsWithChildren<{ summary?: React.ReactNode; reset?: () => void }>) {
-  return <div className="pe-filter-region">
-    <div className="pe-filter-bar" role="search" aria-label="Filters">{children}</div>
+export function FilterBar({ children, summary, reset, label = "Filters" }: React.PropsWithChildren<{ summary?: React.ReactNode; reset?: () => void; label?: string }>) {
+  return <div className="pe-filter-region" role="region" aria-label={label}>
+    <div className="pe-filter-bar" role="search" aria-label={`${label} fields`}>{children}</div>
     {(summary || reset) && <div className="pe-filter-summary">
       <span aria-live="polite">{summary}</span>
       {reset && <Button appearance="subtle" size="small" onClick={reset}>Clear filters</Button>}
@@ -123,6 +125,7 @@ export function DetailHeader({
   title,
   description,
   back,
+  backLabel,
   status,
   facts,
   primaryAction,
@@ -131,13 +134,14 @@ export function DetailHeader({
   title: string;
   description?: string;
   back?: () => void;
+  backLabel?: string;
   status?: React.ReactNode;
   facts?: Array<{ label: string; value: React.ReactNode }>;
   primaryAction?: Action;
   secondaryActions?: Action;
 }) {
   return <div className="pe-detail-header">
-    <PageHeader title={title} description={description} back={back} meta={status} primaryAction={primaryAction} secondaryActions={secondaryActions} />
+    <PageHeader title={title} description={description} back={back} backLabel={backLabel} meta={status} primaryAction={primaryAction} secondaryActions={secondaryActions} />
     {facts?.length ? <dl className="pe-detail-facts">{facts.map((fact) => <div key={fact.label}><dt>{fact.label}</dt><dd>{fact.value}</dd></div>)}</dl> : null}
   </div>;
 }

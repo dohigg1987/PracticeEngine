@@ -27,11 +27,11 @@ test("CRM pipeline and onboarding stay operational at narrow width", async ({ pa
   await openNav(page);
   await page.locator('button[value="crm-prospects"]').click();
   await expect(page.getByRole("heading", { name: "Prospects", exact: true })).toBeVisible();
-  await expect(page.getByRole("table", { name: "CRM prospects" })).toContainText("Cedar Advisory Group");
+  await expect(page.getByRole("grid", { name: "CRM prospects" })).toContainText("Cedar Advisory Group");
   await openNav(page);
   await page.locator('button[value="crm-opportunities"]').click();
   await expect(page.getByRole("grid", { name: "CRM opportunities" })).toBeVisible();
-  await page.getByRole("button", { name: "Finance function and annual accounts" }).click();
+  await page.getByRole("link", { name: /Finance function and annual accounts/ }).click();
   await expect(page.getByRole("table", { name: "Opportunity proposed services" })).toBeVisible();
   await openNav(page);
   await page.locator('button[value="onboarding"]').click();
@@ -44,7 +44,7 @@ test("prospects can be opened and edited through the product UI", async ({ page 
   await start(page);
   await openNav(page);
   await page.locator('button[value="crm-prospects"]').click();
-  await page.getByRole("button", { name: "Cedar Advisory Group" }).click();
+  await page.getByRole("link", { name: /Cedar Advisory Group/ }).click();
   await expect(page.getByRole("heading", { name: "Prospect details" })).toBeVisible();
   await page.getByRole("textbox", { name: "Legal name" }).fill("Cedar Advisory Group Limited");
   await page.getByLabel("Status").selectOption("qualified");
@@ -52,7 +52,7 @@ test("prospects can be opened and edited through the product UI", async ({ page 
   await expect(page.getByRole("textbox", { name: "Legal name" })).toHaveValue("Cedar Advisory Group Limited");
   await expect(page.getByRole("table", { name: "Prospect activity" })).toContainText("Referral received");
   await page.getByRole("button", { name: "Back to prospects" }).click();
-  await expect(page.getByRole("table", { name: "CRM prospects" })).toContainText("Cedar Advisory Group Limited");
+  await expect(page.getByRole("grid", { name: "CRM prospects" })).toContainText("Cedar Advisory Group Limited");
 });
 
 test("clients are created through the canonical Practice client command", async ({ page }) => {

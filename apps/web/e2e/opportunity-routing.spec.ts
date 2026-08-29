@@ -48,7 +48,7 @@ test("opportunity list supports search, stage, owner and lifecycle recovery", as
   await page.getByRole("searchbox", { name: "Search", exact: true }).fill("no matching relationship");
   await expect(page.getByRole("heading", { name: "No matching opportunities" })).toBeVisible();
   await filters.getByRole("button", { name: "Clear filters" }).click();
-  await expect(page.getByRole("button", { name: "Finance function and annual accounts" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Finance function and annual accounts/ })).toBeVisible();
   await page.getByLabel("Stage").selectOption("proposal");
   await page.getByLabel("Owner or team").selectOption("unassigned");
   await expect(page.getByRole("heading", { name: "No matching opportunities" })).toBeVisible();
