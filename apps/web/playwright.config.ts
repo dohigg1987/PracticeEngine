@@ -28,6 +28,19 @@ export default defineConfig({
   },
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    {
+      name: "chromium-functional",
+      use: { ...devices["Desktop Chrome"] },
+      // accessibility-audit.spec.ts reloads and axe-scans ~20 surfaces; it is
+      // the dominant cost in the CI browser gate, so it runs as the separate
+      // chromium-a11y project/job instead of sharing this project's budget.
+      testIgnore: ["**/accessibility-audit.spec.ts"],
+    },
+    {
+      name: "chromium-a11y",
+      use: { ...devices["Desktop Chrome"] },
+      testMatch: ["**/accessibility-audit.spec.ts"],
+    },
     ...(edgeInstalled
       ? [
           {
