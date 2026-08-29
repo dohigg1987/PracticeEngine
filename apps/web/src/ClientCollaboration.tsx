@@ -116,8 +116,9 @@ function DocumentsList({ items, context, allowDownload }: { items: PortalDocumen
   return <div className="collaboration-table-scroll"><table className="collaboration-table"><thead><tr><th>Name</th><th>Type</th><th>Context</th><th>Version</th><th>Provided</th>{allowDownload && <th>Action</th>}</tr></thead><tbody>{items.map((item) => <tr key={item.id}><td><strong>{item.display_filename}</strong></td><td>{item.media_type || "Document"}</td><td>{item.client_request_id ? "Client request" : "General"}</td><td>{item.current_version}</td><td>{item.version_created_at ? formatDateTime(item.version_created_at) : "Not available"}</td>{allowDownload && <td><Button size="small" icon={<ArrowDownloadRegular />} onClick={() => void download(item)}>Download</Button></td>}</tr>)}</tbody></table></div>;
 }
 
-function StaffWorkspace({ context, clientId, engagementIds = [] }: { context: ApiContext; clientId?: string; engagementIds?: string[] }) {
-  const [tab, setTab] = useState<StaffTab>("requests");
+function StaffWorkspace({ context, clientId, engagementIds = [], initialTab = "requests", embedded = false }: { context: ApiContext; clientId?: string; engagementIds?: string[]; initialTab?: StaffTab; embedded?: boolean }) {
+  const [tab, setTab] = useState<StaffTab>(initialTab);
+  useEffect(() => setTab(initialTab), [initialTab]);
   const [requests, setRequests] = useState<ClientRequestItem[]>([]);
   const [details, setDetails] = useState<RequestDetail[]>([]);
   const [threads, setThreads] = useState<PortalThreadItem[]>([]);
@@ -145,7 +146,8 @@ function StaffWorkspace({ context, clientId, engagementIds = [] }: { context: Ap
   async function complete() { if (!selected) return; setBusy(true); try { await api.completeClientRequest(context, selected.id); setSelected(null); await load(); } catch (error) { setError(errorText(error)); } finally { setBusy(false); } }
   if (loading) return <Loading label="Loading client collaboration" />;
   const documents = documentsFromRequests(details);
-  return <section className="collaboration-page"><header className="collaboration-head"><div><h1>{clientId ? "Client collaboration" : "Client requests"}</h1><p>{clientId ? "Portal access, requests, documents and secure communications for this client." : "Track information, evidence and actions requested from clients."}</p></div></header>{error && <Failure message={error} retry={load} />}<TabList selectedValue={tab} onTabSelect={(_, data) => setTab(data.value as StaffTab)}><Tab value="requests">Requests</Tab><Tab value="documents">Documents</Tab><Tab value="messages">Messages</Tab><Tab value="access">Portal access</Tab></TabList>
+  return <section className={`collaboration-page ${embedded ? "collaboration-page--embedded" : ""}`}>
+    {!embedded && <header className="collaboration-head"><div><h1>{clientId ? "Client collaboration" : "Client requests"}</h1><p>{clientId ? "Portal access, requests, documents and secure communications for this client." : "Track information, evidence and actions requested from clients."}</p></div></header>}{error && <Failure message={error} retry={load} />}{!embedded && <TabList selectedValue={tab} onTabSelect={(_, data) => setTab(data.value as StaffTab)}><Tab value="requests">Requests</Tab><Tab value="documents">Documents</Tab><Tab value="messages">Messages</Tab><Tab value="access">Portal access</Tab></TabList>}
     {tab === "requests" && <RequestsGrid items={requests} onOpen={(item) => setSelected(details.find((detail) => detail.id === item.id) ?? item)} />}
     {tab === "documents" && <DocumentsList items={documents} context={context} allowDownload={false} />}
     {tab === "messages" && (threads.length ? <ul className="thread-list">{threads.map((thread) => <li key={thread.id}><span><strong>{thread.subject}</strong><small>{thread.client_name || "Client"} · {thread.last_message_at ? formatDateTime(thread.last_message_at) : "No messages yet"}</small></span><Status value={thread.status} /></li>)}</ul> : <Empty title="No secure messages" body="Secure client conversations will appear here when a thread is opened." />)}
@@ -186,6 +188,6 @@ function PortalWorkspace({ context }: { context: ApiContext }) {
   </section>;
 }
 
-export default function ClientCollaboration({ context, mode = "staff", clientId, engagementIds }: { context: ApiContext; mode?: "staff" | "portal"; clientId?: string; engagementIds?: string[] }) {
-  return mode === "portal" ? <PortalWorkspace context={context} /> : <StaffWorkspace context={context} clientId={clientId} engagementIds={engagementIds} />;
+export default function ClientCollaboration({ context, mode = "staff", clientId, engagementIds, initialTab, embedded }: { context: ApiContext; mode?: "staff" | "portal"; clientId?: string; engagementIds?: string[]; initialTab?: StaffTab; embedded?: boolean }) {
+  return mode === "portal" ? <PortalWorkspace context={context} /> : <StaffWorkspace context={context} clientId={clientId} engagementIds={engagementIds} initialTab={initialTab} embedded={embedded} />;
 }

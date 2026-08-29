@@ -53,6 +53,13 @@
 .re-home-section dl div:last-child { border-inline-end: 0; }
 .re-home-section dl dt { color: var(--colorNeutralForeground3); font-size: var(--fontSizeBase200); }
 .re-home-section dl dd { margin: 0; font-size: var(--fontSizeBase400); line-height: var(--lineHeightBase400); font-weight: var(--fontWeightSemibold); }
+.re-home-command-centre { display: grid; gap: var(--spacingVerticalM); padding-right: var(--spacingHorizontalM); }
+.re-home-workspace .pe-master-region { overflow: visible; }
+.re-home-workspace .pe-operational-grid [role="grid"] { min-width: 680px; }
+.re-home-exceptions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--spacingHorizontalM); }
+.re-home-records { display: grid; margin: 0; padding: 0; list-style: none; border-bottom: 1px solid var(--colorNeutralStroke1); }
+.re-home-records li { display: flex; align-items: center; justify-content: space-between; gap: var(--spacingHorizontalS); min-height: 42px; padding: var(--spacingVerticalXS) var(--spacingHorizontalS); border-top: 1px solid var(--colorNeutralStroke2); }
+.re-home-records li span { display: grid; gap: 1px; }
 @media (max-width: 800px) {
   .re-filters, .re-time-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .re-time-narrative { grid-column: span 2; }
@@ -62,6 +69,8 @@
   .re-measures div:nth-last-child(-n + 4) { border-block-end: 1px solid var(--colorNeutralStroke1); }
   .re-measures div:nth-last-child(-n + 2) { border-block-end: 0; }
   .re-home-layout { grid-template-columns: 1fr; }
+  .re-home-command-centre { padding-right: 0; }
+  .re-home-exceptions { grid-template-columns: 1fr; }
 }
 @media (max-width: 480px) {
   .re-filters, .re-time-form, .re-measures { grid-template-columns: 1fr; }
@@ -73,6 +82,9 @@
   .re-home-section dl { grid-template-columns: 1fr; }
   .re-home-section dl div { border-inline-end: 0; border-block-end: 1px solid var(--colorNeutralStroke2); }
   .re-home-section dl div:last-child { border-block-end: 0; }
+  .re-home-workspace .pe-operational-grid [role="grid"] { min-width: 0; }
+  .re-home-workspace .pe-operational-grid [role="row"] > *:nth-child(3),
+  .re-home-workspace .pe-operational-grid [role="row"] > *:nth-child(4) { display: none; }
 }
 @media (forced-colors: active) {
   .re-head, .re-table-scroll, .re-empty, .re-time-form, .re-measures, .re-measures div, .re-capacity, .re-home-section, .re-home-section ul, .re-home-queue, .re-home-section dl, .re-home-section dl div { border-color: CanvasText; }

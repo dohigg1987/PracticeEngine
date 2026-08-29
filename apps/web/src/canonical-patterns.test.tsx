@@ -21,6 +21,11 @@ import {
   PageHeader,
   PageShell,
   StatusTreatment,
+  SavedViewBar,
+  CompactFilterBar,
+  MasterDetailWorkspace,
+  WorkingInspector,
+  PersistentClientFrame,
 } from "./CanonicalPatterns";
 
 describe("canonical commercial UI patterns", () => {
@@ -67,5 +72,17 @@ describe("canonical commercial UI patterns", () => {
     expect(empty).toContain("Create work");
     expect(error).toContain("Try again");
     expect(error).toContain("Contact support");
+  });
+
+  it("composes saved views, progressive filters and persistent master/detail context", () => {
+    const html = renderToStaticMarkup(<PersistentClientFrame identity={<h1>Northstar</h1>} navigation={<Button>Overview</Button>} commands={<Button appearance="primary">Add work</Button>} contextPane={<WorkingInspector title="Annual accounts">Actions</WorkingInspector>}>
+      <SavedViewBar views={[{ value: "my", label: "My work", count: 3 }]} selectedValue="my" onSelect={() => undefined} />
+      <CompactFilterBar advanced={<Field label="Client"><Input /></Field>} advancedOpen summary="3 work items"><Field label="Search"><Input /></Field></CompactFilterBar>
+      <MasterDetailWorkspace selected inspector={<span>Inspector</span>}>Queue</MasterDetailWorkspace>
+    </PersistentClientFrame>);
+    expect(html).toContain('aria-label="Saved views"');
+    expect(html).toContain("More filters");
+    expect(html).toContain('aria-label="Selected record inspector"');
+    expect(html).toContain("pe-client-identity");
   });
 });

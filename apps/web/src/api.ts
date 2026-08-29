@@ -783,6 +783,20 @@ export type ClientRequestItem = {
   description?: string | null; completion_mode?: "manual" | "automatic" | "workflow";
   response_requirements?: Record<string, unknown>; created_at?: string; updated_at?: string;
 };
+export type CreateClientRequestInput = {
+  clientId: string;
+  engagementId?: string;
+  workItemId?: string;
+  taskId?: string;
+  recipientAccessIds: string[];
+  requestType: "document" | "information" | "confirmation" | "approval";
+  title: string;
+  description?: string;
+  dueAt?: string;
+  priority?: "low" | "normal" | "high" | "urgent";
+  send: boolean;
+  waitingOnClient?: boolean;
+};
 export type PortalDocumentItem = {
   id: string; display_filename: string; visibility: "internal" | "shared_with_client" | "client_uploaded" | "restricted";
   client_request_id?: string | null; engagement_id?: string | null; work_item_id?: string | null;
@@ -2276,6 +2290,8 @@ export const api = {
     const query = new URLSearchParams(Object.entries(filters).filter((entry): entry is [string, string] => Boolean(entry[1]))).toString();
     return request<{ items: PracticeWorkItem[] }>(`/v1/practice/work${query ? `?${query}` : ""}`, context);
   },
+  createPracticeWork: (context: ApiContext, body: { clientId: string; clientServiceId: string; engagementId?: string; title: string; periodReference?: string; status?: PracticeWorkStatus; priority?: PracticeWorkItem["priority"]; dueDate?: string; assignedMemberId?: string; assignedTeamId?: string }) =>
+    request<{ item: PracticeWorkItem }>("/v1/practice/work", context, { method: "POST", body: JSON.stringify(body) }),
   practiceWorkItem: (context: ApiContext, id: string) =>
     request<{ item: PracticeWorkItem & {tasks?:PracticeTask[];stages?:PracticeWorkStage[];reviews?:PracticeReview[]} }>(`/v1/practice/work/${encodeURIComponent(id)}`, context),
   updatePracticeWorkStatus: (context: ApiContext, id: string, status: PracticeWorkStatus) =>
@@ -2335,6 +2351,7 @@ export const api = {
   onboardingCase: (context: ApiContext, id: string) => request<{ item: OnboardingCase }>(`/v1/onboarding/${encodeURIComponent(id)}`, context),
   updateOnboardingStatus: (context: ApiContext, id: string, status: OnboardingCase["status"]) => request<{ item: OnboardingCase }>(`/v1/onboarding/${encodeURIComponent(id)}/status`, context, { method: "POST", body: JSON.stringify({ status }) }),
   clientRequests: (context: ApiContext) => request<{ items: ClientRequestItem[] }>("/v1/client-requests", context),
+  createClientRequest: (context: ApiContext, body: CreateClientRequestInput) => request<{ item: ClientRequestItem }>("/v1/client-requests", context, { method: "POST", body: JSON.stringify(body) }),
   clientRequest: (context: ApiContext, id: string) => request<{ item: ClientRequestItem & { recipients?: Record<string, unknown>[]; responses?: Record<string, unknown>[]; documents?: Record<string, unknown>[] } }>(`/v1/client-requests/${encodeURIComponent(id)}`, context),
   completeClientRequest: (context: ApiContext, id: string) => request<{ item: ClientRequestItem }>(`/v1/client-requests/${encodeURIComponent(id)}/complete`, context, { method: "POST", body: "{}" }),
   portalThreads: (context: ApiContext) => request<{ items: PortalThreadItem[] }>("/v1/portal-threads", context),

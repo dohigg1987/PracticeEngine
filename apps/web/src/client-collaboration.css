@@ -53,3 +53,4 @@
   .collaboration-overdue { color: LinkText; }
   .message-thread ol li, .message-thread ol li.from-client { border-inline-start-color: CanvasText; }
 }
+.collaboration-page--embedded { padding: 0; }

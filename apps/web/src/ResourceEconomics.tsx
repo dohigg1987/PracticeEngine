@@ -33,6 +33,7 @@ import {
   type CapacityRow,
   type PortfolioEconomicsRow,
   type PracticeEconomicsOverview,
+  type PracticeWorkItem,
   type ResourceProfile,
   type TimeEntry,
   type WorkAllocation,
@@ -40,7 +41,8 @@ import {
 import { formatDate } from "./displayFormat";
 import { statutoryLabel } from "./format";
 import { statusBadgeProps } from "./statusBadge";
-import { ErrorState, LoadingState, PageHeader, PageShell } from "./CanonicalPatterns";
+import { EmptyState, ErrorState, LoadingState, MasterDetailWorkspace, OperationalDataGrid, PageHeader, PageShell, StatusTreatment } from "./CanonicalPatterns";
+import { WorkInspector, type WorkDetail } from "./PracticeWorkWorkspace";
 import "./resource-economics.css";
 
 export type ResourceEconomicsView = "resources" | "capacity" | "allocation" | "time" | "portfolio" | "management";
@@ -240,34 +242,40 @@ export function practiceHomeNextAction(overview: PracticeEconomicsOverview): str
   return next ? `${next.label}: ${next.value} item${next.value === 1 ? "" : "s"} need attention.` : "No delivery exceptions need immediate attention.";
 }
 
-function ManagementView({ context, onNavigate }: Omit<Props, "view">) {
-  const [overview, setOverview] = useState<PracticeEconomicsOverview | null>(null), [loading, setLoading] = useState(true), [error, setError] = useState("");
-  const load = useCallback(async () => { setLoading(true); setError(""); try { setOverview(await api.practiceEconomicsOverview(context)); } catch (reason) { setError(errorText(reason)); } finally { setLoading(false); } }, [context]);
+function ManagementView({ context, onNavigate, routeSearch, onOpenWork }: Omit<Props, "view">) {
+  const [overview, setOverview] = useState<PracticeEconomicsOverview | null>(null), [work, setWork] = useState<PracticeWorkItem[]>([]), [resources, setResources] = useState<ResourceProfile[]>([]), [portfolio, setPortfolio] = useState<PortfolioEconomicsRow[]>([]), [selected, setSelected] = useState<WorkDetail | null>(null), [loading, setLoading] = useState(true), [error, setError] = useState("");
+  const selectedId = useMemo(() => new URLSearchParams(routeSearch || "").get("selected") || "", [routeSearch]);
+  const load = useCallback(async () => { setLoading(true); setError(""); try { const [nextOverview, nextWork, nextResources, nextPortfolio] = await Promise.all([api.practiceEconomicsOverview(context), api.practiceWork(context), api.resourceProfiles(context), api.portfolioEconomics(context)]); setOverview(nextOverview); setWork(nextWork.items); setResources(nextResources.items); setPortfolio(nextPortfolio.items); } catch (reason) { setError(errorText(reason)); } finally { setLoading(false); } }, [context]);
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => { let live = true; if (!selectedId) { setSelected(null); return () => { live = false; }; } void api.practiceWorkItem(context, selectedId).then((result) => { if (live) setSelected(result.item); }).catch((reason) => { if (live) setError(errorText(reason)); }); return () => { live = false; }; }, [context, selectedId]);
   if (loading) return <LoadingState title="Home" description="Delivery exceptions, review demand and capacity across the practice." kind="grid" />;
   if (!overview) return <PageShell><PageHeader title="Home" description="Delivery exceptions, review demand and capacity across the practice." /><ErrorState message={error || "The operational overview is unavailable."} retry={load} secondaryAction={<Link href="/practice/work" onClick={onNavigate ? (event) => { event.preventDefault(); onNavigate("/practice/work"); } : undefined}>Open work</Link>} /></PageShell>;
-  const queues = practiceHomeQueues(overview);
   const navigateLink = (path: string) => onNavigate ? (event: React.MouseEvent<HTMLAnchorElement>) => { event.preventDefault(); onNavigate(path); } : undefined;
+  const openSelected = (id: string) => onNavigate?.(`/practice/home?selected=${encodeURIComponent(id)}`);
+  const urgent = [...work].filter((item) => !["completed", "cancelled"].includes(item.status)).sort((a, b) => {
+    const rank = (item: PracticeWorkItem) => item.status === "waiting_on_client" ? 1 : item.status === "review" ? 2 : item.priority === "urgent" ? 3 : 4;
+    return rank(a) - rank(b) || (a.due_date || "9999").localeCompare(b.due_date || "9999");
+  }).slice(0, 8);
+  const priorityColumns: TableColumnDefinition<PracticeWorkItem>[] = [
+    createTableColumn({ columnId: "work", renderHeaderCell: () => "Priority work", renderCell: (item) => <span className="re-primary-cell"><strong>{item.title}</strong><small>{item.client_name || "Client"} · {item.service_name || "Service"}</small></span> }),
+    createTableColumn({ columnId: "due", renderHeaderCell: () => "Due", renderCell: (item) => date(item.due_date) }),
+    createTableColumn({ columnId: "owner", renderHeaderCell: () => "Owner", renderCell: (item) => item.assigned_member_name || item.assigned_team_name || "Unassigned" }),
+    createTableColumn({ columnId: "state", renderHeaderCell: () => "State", renderCell: (item) => <StatusTreatment value={item.status} /> }),
+  ];
+  const capacityExceptions = resources.filter((item) => item.utilisation_percentage >= 80 || item.overdue_work > 0);
+  const economicExceptions = portfolio.filter((item) => item.commercial_value_state === "unavailable" || item.overdue_work > 0);
+  const inspector = selected ? <WorkInspector context={context} item={selected} resources={resources} onChanged={async () => { await load(); const result = await api.practiceWorkItem(context, selected.id); setSelected(result.item); }} onClose={() => onNavigate?.("/practice/home")} onOpenClient={(id) => onNavigate?.(`/practice/clients?client=${encodeURIComponent(id)}&return=${encodeURIComponent(`/practice/home?selected=${selected.id}`)}`)} onOpenWork={onOpenWork} /> : undefined;
   return <PageShell className="re-home">
-    <PageHeader title="Home" description="Delivery exceptions, review demand and capacity across the practice." meta={<span className="re-home-next">{practiceHomeNextAction(overview)}</span>} />
+    <PageHeader title="Home" description="What needs attention now." meta={<span className="re-home-next">{practiceHomeNextAction(overview)}</span>} />
     {error && <ErrorState title="Some home data may be out of date" message={error} retry={load} />}
-    <div className="re-home-layout">
-      <section className="re-home-section re-home-attention" aria-labelledby="home-attention-title">
-        <header><h2 id="home-attention-title">Attention required</h2><p>Open a queue to act on the underlying work.</p></header>
-        <ul>{queues.map((item) => <li key={item.label} className={`re-home-queue re-home-queue--${item.priority}`}>
-          <Link href={item.path} onClick={navigateLink(item.path)}><span><strong>{item.label}</strong><small>{item.description}</small></span><b aria-label={`${item.value} ${item.label.toLowerCase()}`}>{item.value}</b></Link>
-        </li>)}</ul>
-      </section>
-      <div className="re-home-signals">
-        <section className="re-home-section" aria-labelledby="home-capacity-title">
-          <header><h2 id="home-capacity-title">Capacity</h2><Link href="/practice/capacity" onClick={navigateLink("/practice/capacity")}>Open capacity plan</Link></header>
-          <dl><div><dt>Current utilisation</dt><dd>{Math.round(overview.capacity_utilisation_percentage)}%</dd><span>Across available practice capacity</span></div><div><dt>Forecast capacity</dt><dd>{hours(overview.forecast_capacity_hours)}</dd><span>Remaining in the planning horizon</span></div></dl>
-        </section>
-        <section className="re-home-section" aria-labelledby="home-economics-title">
-          <header><h2 id="home-economics-title">Economics</h2><Link href="/practice/portfolio-economics" onClick={navigateLink("/practice/portfolio-economics")}>Open portfolio</Link></header>
-          <dl><div><dt>Operational WIP</dt><dd>{overview.wip_amount == null ? "Unavailable" : formatEconomicValue(overview.wip_amount, overview.currency, "known")}</dd><span>{overview.wip_amount == null ? "No reliable billing source" : "Known or calculated"}</span></div><div><dt>Data exceptions</dt><dd>{overview.economic_exceptions}</dd><span>Records requiring source review</span></div></dl>
-        </section>
+    <MasterDetailWorkspace selected={Boolean(inspector)} inspector={inspector} className="re-home-workspace">
+      <div className="re-home-command-centre">
+        <section className="re-home-section" aria-labelledby="home-priority-title"><header><h2 id="home-priority-title">Priority work</h2><Link href="/practice/work" onClick={navigateLink("/practice/work")}>Open Work</Link></header><OperationalDataGrid items={urgent} columns={priorityColumns} label="Home priority work" getRowId={(item) => item.id} primaryColumnId="work" getItemHref={(item) => `/practice/home?selected=${item.id}`} onOpenItem={(item) => openSelected(item.id)} empty={<EmptyState title="No work needs attention" description="There are no current delivery exceptions." />} /></section>
+        <div className="re-home-exceptions">
+          <section className="re-home-section" aria-labelledby="home-capacity-title"><header><h2 id="home-capacity-title">Capacity exceptions</h2><Link href="/practice/capacity" onClick={navigateLink("/practice/capacity")}>Open Team</Link></header><ul className="re-home-records">{capacityExceptions.map((item) => <li key={item.id}><span><strong>{item.display_name}</strong><small>{item.team_name || "No team"} · {hours(item.available_hours)} available</small></span><b>{Math.round(item.utilisation_percentage)}%</b></li>)}</ul></section>
+          <section className="re-home-section" aria-labelledby="home-economics-title"><header><h2 id="home-economics-title">Economic exceptions</h2><Link href="/practice/portfolio-economics" onClick={navigateLink("/practice/portfolio-economics")}>Open Insights</Link></header><ul className="re-home-records">{economicExceptions.map((item) => <li key={item.id}><span><strong>{item.client_name}</strong><small>{item.service_name || "Portfolio"}</small></span><StatusTreatment value={item.commercial_value_state} /></li>)}</ul></section>
+        </div>
       </div>
-    </div>
+    </MasterDetailWorkspace>
   </PageShell>;
 }

@@ -72,6 +72,68 @@ export function CommandBar({ children, contextualActions }: React.PropsWithChild
   </div>;
 }
 
+export function SavedViewBar({ views, selectedValue, onSelect, label = "Saved views" }: {
+  views: ReadonlyArray<{ value: string; label: string; count?: number }>;
+  selectedValue: string;
+  onSelect: (value: string) => void;
+  label?: string;
+}) {
+  return <nav className="pe-saved-views" aria-label={label}>
+    {views.map((view) => <Button key={view.value} appearance={selectedValue === view.value ? "primary" : "subtle"} aria-current={selectedValue === view.value ? "page" : undefined} onClick={() => onSelect(view.value)}>
+      {view.label}{view.count === undefined ? null : <span className="pe-view-count">{view.count}</span>}
+    </Button>)}
+  </nav>;
+}
+
+export function CompactFilterBar({ children, advanced, advancedOpen, onAdvancedToggle, summary, reset, label = "Filters" }: React.PropsWithChildren<{
+  advanced?: React.ReactNode;
+  advancedOpen?: boolean;
+  onAdvancedToggle?: () => void;
+  summary?: React.ReactNode;
+  reset?: () => void;
+  label?: string;
+}>) {
+  return <div className="pe-compact-filter-region" role="region" aria-label={label}>
+    <div className="pe-compact-filter-row" role="search" aria-label={`${label} fields`}>
+      {children}
+      {advanced && <Button appearance="subtle" size="small" aria-expanded={advancedOpen} onClick={onAdvancedToggle}>More filters</Button>}
+    </div>
+    {advancedOpen && advanced ? <div className="pe-advanced-filters">{advanced}</div> : null}
+    {(summary || reset) && <div className="pe-filter-summary"><span aria-live="polite">{summary}</span>{reset && <Button appearance="subtle" size="small" onClick={reset}>Clear</Button>}</div>}
+  </div>;
+}
+
+export function MasterDetailWorkspace({ children, inspector, selected = false, className = "" }: React.PropsWithChildren<{ inspector?: React.ReactNode; selected?: boolean; className?: string }>) {
+  return <div className={`pe-master-detail ${selected ? "pe-master-detail--selected" : ""} ${className}`.trim()}>
+    <div className="pe-master-region">{children}</div>
+    {inspector && <aside className="pe-inspector-region" aria-label="Selected record inspector">{inspector}</aside>}
+  </div>;
+}
+
+export function WorkingInspector({ title, subtitle, status, onClose, children, footer }: React.PropsWithChildren<{ title: string; subtitle?: string; status?: React.ReactNode; onClose?: () => void; footer?: React.ReactNode }>) {
+  return <section className="pe-working-inspector">
+    <header><div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div><div className="pe-inspector-head-actions">{status}{onClose && <Button appearance="subtle" size="small" onClick={onClose}>Close</Button>}</div></header>
+    <div className="pe-inspector-body">{children}</div>
+    {footer && <footer>{footer}</footer>}
+  </section>;
+}
+
+export function PersistentClientFrame({ identity, commands, navigation, children, contextPane }: React.PropsWithChildren<{ identity: React.ReactNode; commands?: React.ReactNode; navigation: React.ReactNode; contextPane?: React.ReactNode }>) {
+  return <section className="pe-client-frame">
+    <header className="pe-client-identity">{identity}</header>
+    {commands && <div className="pe-client-commands">{commands}</div>}
+    <div className="pe-client-workspace">
+      <aside className="pe-client-local-nav">{navigation}</aside>
+      <div className="pe-client-main">{children}</div>
+      {contextPane && <aside className="pe-client-context" aria-label="Client context">{contextPane}</aside>}
+    </div>
+  </section>;
+}
+
+export function ContextualPane({ title, children }: React.PropsWithChildren<{ title: string }>) {
+  return <section className="pe-contextual-pane"><h2>{title}</h2>{children}</section>;
+}
+
 export function FilterBar({ children, summary, reset, label = "Filters" }: React.PropsWithChildren<{ summary?: React.ReactNode; reset?: () => void; label?: string }>) {
   return <div className="pe-filter-region" role="region" aria-label={label}>
     <div className="pe-filter-bar" role="search" aria-label={`${label} fields`}>{children}</div>

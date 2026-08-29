@@ -13,8 +13,9 @@ import {
 } from "./api";
 import { formatDate } from "./displayFormat";
 import { statutoryLabel } from "./format";
-import { ErrorState, PageHeader, StatusTreatment } from "./CanonicalPatterns";
+import { CommandBar, ErrorState, PageHeader, PersistentClientFrame, StatusTreatment } from "./CanonicalPatterns";
 import ClientCollaboration from "./ClientCollaboration";
+import PracticeWorkWorkspace, { WorkInspector, type WorkDetail } from "./PracticeWorkWorkspace";
 import "./practice-management.css";
 
 export type PracticeManagementView = "work" | "work-detail" | "client-summary" | "settings";
@@ -31,6 +32,7 @@ type Props = {
   onOpenLedgerly?: (engagementId: string, clientId: string) => void;
   onBack?: () => void;
   routeSearch?: string;
+  onNavigate?: (path: string) => void;
 };
 
 const label = statutoryLabel;
@@ -97,7 +99,8 @@ export default function PracticeManagement(props: Props) {
 function WorkOperations(props: Props) {
   const [tab, setTab] = useState<"work" | "reviews" | "recurring" | "operations">(props.initialTab ?? "work");
   useEffect(() => setTab(props.initialTab ?? "work"), [props.initialTab]);
-  return <><TabList selectedValue={tab} onTabSelect={(_, data) => setTab(data.value as typeof tab)}><Tab value="work">Work items</Tab><Tab value="reviews">Review queue</Tab><Tab value="recurring">Recurring work</Tab><Tab value="operations">Generation operations</Tab></TabList>{tab === "work" ? <WorkList {...props} /> : tab === "reviews" ? <ReviewQueue {...props}/> : tab === "recurring" ? <RecurringWork {...props} /> : <RecurrenceOperations {...props}/>}</>;
+  if (tab === "work") return <PracticeWorkWorkspace {...props} />;
+  return <><TabList selectedValue={tab} onTabSelect={(_, data) => setTab(data.value as typeof tab)}><Tab value="work">Work</Tab><Tab value="reviews">Review</Tab><Tab value="recurring">Recurring work</Tab><Tab value="operations">Automation operations</Tab></TabList>{tab === "reviews" ? <ReviewQueue {...props}/> : tab === "recurring" ? <RecurringWork {...props} /> : <RecurrenceOperations {...props}/>}</>;
 }
 
 function ReviewQueue({context}:Props){
@@ -193,7 +196,74 @@ function WorkDetail({ context, workItemId = "", onBack, onOpenClient, onOpenLedg
   </section>;
 }
 
-function ClientSummary({ context, clientId = "", onOpenWork, onBack }: Props) {
+type ClientArea = "overview" | "delivery" | "services" | "collaboration" | "documents" | "economics" | "activity" | "details";
+export function clientWorkspaceState(search = "") {
+  const parameters = new URLSearchParams(search);
+  const requested = parameters.get("area") || "overview";
+  return {
+    area: (["overview", "delivery", "services", "collaboration", "documents", "economics", "activity", "details"].includes(requested) ? requested : "overview") as ClientArea,
+    selected: parameters.get("selected") || "",
+    returnPath: parameters.get("return") || "",
+  };
+}
+
+function ClientSummary({ context, clientId = "", onOpenWork, onOpenLedgerly, onBack, routeSearch, onNavigate }: Props) {
+  const workspace = useMemo(() => clientWorkspaceState(routeSearch), [routeSearch]);
+  const [summary, setSummary] = useState<PracticeClientSummary | null>(null);
+  const [resources, setResources] = useState<ResourceProfile[]>([]);
+  const [selectedWork, setSelectedWork] = useState<WorkDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [addingWork, setAddingWork] = useState(false);
+  const load = useCallback(async () => { if (!clientId) return; setLoading(true); setError(""); try { const [nextSummary, people] = await Promise.all([api.practiceClientSummary(context, clientId), api.resourceProfiles(context)]); setSummary(nextSummary); setResources(people.items); } catch (e) { setError(errorText(e)); } finally { setLoading(false); } }, [context, clientId]);
+  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { let live = true; if (!workspace.selected) { setSelectedWork(null); return () => { live = false; }; } void api.practiceWorkItem(context, workspace.selected).then((result) => { if (live) setSelectedWork(result.item); }).catch((reason) => { if (live) setError(errorText(reason)); }); return () => { live = false; }; }, [context, workspace.selected]);
+  if (loading) return <Loading text="Loading client workspace" />;
+  if (!summary) return <Failure message={error || "Client workspace is unavailable."} retry={load} />;
+  const clientName = summary.client.legal_name || summary.client.name || "Client";
+  const parameters = new URLSearchParams(routeSearch || "");
+  const update = (changes: Record<string, string>) => { for (const [key, value] of Object.entries(changes)) value ? parameters.set(key, value) : parameters.delete(key); onNavigate?.(`/practice/clients?${parameters}`); };
+  const areas: Array<{ value: ClientArea; label: string }> = [
+    { value: "overview", label: "Overview" }, { value: "delivery", label: "Delivery" }, { value: "services", label: "Services" }, { value: "collaboration", label: "Collaboration" },
+    { value: "documents", label: "Documents" }, { value: "economics", label: "Economics" }, { value: "activity", label: "Activity" }, { value: "details", label: "Details" },
+  ];
+  const openWork = summary.workItems.filter((item) => !["completed", "cancelled"].includes(item.status));
+  const overdue = openWork.filter((item) => isOverdue(item.due_date, item.status));
+  const inspector = selectedWork ? <WorkInspector context={context} item={selectedWork} resources={resources} onChanged={async () => { await load(); const result = await api.practiceWorkItem(context, selectedWork.id); setSelectedWork(result.item); }} onClose={() => update({ selected: "" })} onOpenClient={() => undefined} onOpenLedgerly={onOpenLedgerly} onOpenWork={onOpenWork} /> : undefined;
+  return <PersistentClientFrame
+    identity={<div className="pm-client-identity"><Button appearance="subtle" size="small" onClick={workspace.returnPath ? () => onNavigate?.(workspace.returnPath) : onBack}>{workspace.returnPath ? "Back to work" : "All clients"}</Button><div><span>Client</span><h1>{clientName}</h1><p>{openWork.length} open work · {summary.services.filter((service) => service.status === "active").length} active services</p></div><span className="pm-client-status"><Status value={summary.onboarding?.status || "active"} /></span></div>}
+    commands={<CommandBar contextualActions={<><Button appearance="subtle" onClick={() => update({ area: "collaboration" })}>Request from client</Button><Button appearance="subtle" onClick={() => update({ area: "collaboration" })}>Message</Button></>}><Button appearance="primary" onClick={() => setAddingWork(true)}>Add work</Button></CommandBar>}
+    navigation={<nav aria-label="Client workspace areas">{areas.map((area) => <Button key={area.value} appearance={workspace.area === area.value ? "primary" : "subtle"} aria-current={workspace.area === area.value ? "page" : undefined} onClick={() => update({ area: area.value, selected: "" })}>{area.label}</Button>)}</nav>}
+    contextPane={inspector}
+  >
+    {error && <Failure message={error} retry={load} />}
+    {workspace.area === "overview" && <div className="pm-client-overview">
+      <section className="pm-client-attention"><header><h2>Attention</h2><span>{overdue.length + openWork.filter((item) => item.status === "waiting_on_client" || item.status === "review").length}</span></header>{openWork.slice(0, 5).map((work) => <Button key={work.id} appearance="transparent" className="pm-client-attention-row" onClick={() => update({ selected: work.id })}><span><strong>{work.title}</strong><small>{work.service_name || "Service"} · {date(work.due_date)}</small></span><Status value={work.status} /></Button>)}</section>
+      <section className="pm-client-commitments"><header><h2>Current commitments</h2><Button appearance="subtle" size="small" onClick={() => update({ area: "delivery" })}>View delivery</Button></header><dl><div><dt>Open work</dt><dd>{openWork.length}</dd></div><div><dt>Overdue</dt><dd>{overdue.length}</dd></div><div><dt>Waiting on client</dt><dd>{openWork.filter((item) => item.status === "waiting_on_client").length}</dd></div><div><dt>Review</dt><dd>{openWork.filter((item) => item.status === "review").length}</dd></div></dl></section>
+    </div>}
+    {workspace.area === "delivery" && <ClientDelivery work={summary.workItems} onSelect={(id) => update({ selected: id })} />}
+    {workspace.area === "services" && <section className="pm-client-section"><header><h2>Services</h2></header><Table aria-label="Client services"><TableHeader><TableRow><TableHeaderCell>Service</TableHeaderCell><TableHeaderCell>Frequency</TableHeaderCell><TableHeaderCell>Team</TableHeaderCell><TableHeaderCell>Status</TableHeaderCell></TableRow></TableHeader><TableBody>{summary.services.map((service) => <TableRow key={service.id}><TableCell><strong>{service.service_name || "Service"}</strong></TableCell><TableCell>{service.frequency ? label(service.frequency) : "Not set"}</TableCell><TableCell>{service.responsible_team_id ? "Assigned" : "Unassigned"}</TableCell><TableCell><Status value={service.status} /></TableCell></TableRow>)}</TableBody></Table></section>}
+    {workspace.area === "collaboration" && <ClientCollaboration context={context} clientId={clientId} engagementIds={summary.engagements.map((item) => item.id)} embedded initialTab="requests" />}
+    {workspace.area === "documents" && <ClientCollaboration context={context} clientId={clientId} engagementIds={summary.engagements.map((item) => item.id)} embedded initialTab="documents" />}
+    {workspace.area === "economics" && <section className="pm-client-section"><header><h2>Economics</h2></header><div className="pm-client-muted"><strong>Service economics remain source-led.</strong><span>Open Insights for portfolio values and data exceptions.</span><Button onClick={() => onNavigate?.("/practice/portfolio-economics")}>Open Insights</Button></div></section>}
+    {workspace.area === "activity" && <section className="pm-client-section"><header><h2>Recent activity</h2></header><ol className="pm-client-activity">{[...summary.workItems].sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || "")).map((item) => <li key={item.id}><span><strong>{item.title}</strong><small>{item.updated_at ? date(item.updated_at) : "Current"}</small></span><Status value={item.status} /></li>)}</ol></section>}
+    {workspace.area === "details" && <section className="pm-client-section"><header><h2>Client details</h2></header><dl className="pm-facts"><div><dt>Legal name</dt><dd>{clientName}</dd></div><div><dt>Active services</dt><dd>{summary.services.filter((item) => item.status === "active").length}</dd></div><div><dt>Onboarding</dt><dd>{summary.onboarding ? label(summary.onboarding.status) : "Complete"}</dd></div><div><dt>Portal access</dt><dd>Managed in Collaboration</dd></div></dl></section>}
+    {addingWork && <AddClientWorkDialog context={context} summary={summary} onClose={() => setAddingWork(false)} onCreated={async (id) => { setAddingWork(false); await load(); update({ area: "delivery", selected: id }); }} />}
+  </PersistentClientFrame>;
+}
+
+function ClientDelivery({ work, onSelect }: { work: PracticeWorkItem[]; onSelect: (id: string) => void }) {
+  return <section className="pm-client-section"><header><h2>Delivery</h2><span>{work.length} items</span></header>{work.length ? <Table aria-label="Client work"><TableHeader><TableRow><TableHeaderCell>Work</TableHeaderCell><TableHeaderCell>Service</TableHeaderCell><TableHeaderCell>Owner</TableHeaderCell><TableHeaderCell>Due</TableHeaderCell><TableHeaderCell>State</TableHeaderCell></TableRow></TableHeader><TableBody>{work.map((item) => <TableRow key={item.id}><TableCell><Button appearance="transparent" className="pm-inline-link" onClick={() => onSelect(item.id)}>{item.title}</Button></TableCell><TableCell>{item.service_name || "Service"}</TableCell><TableCell>{assignmentDisplay(item)}</TableCell><TableCell className={isOverdue(item.due_date, item.status) ? "pm-overdue" : ""}>{date(item.due_date)}</TableCell><TableCell><Status value={item.status} /></TableCell></TableRow>)}</TableBody></Table> : <p>No work has been added for this client.</p>}</section>;
+}
+
+function AddClientWorkDialog({ context, summary, onClose, onCreated }: { context: ApiContext; summary: PracticeClientSummary; onClose: () => void; onCreated: (id: string) => Promise<void> }) {
+  const [serviceId, setServiceId] = useState(summary.services.find((item) => item.status === "active")?.id || "");
+  const [title, setTitle] = useState(""); const [dueDate, setDueDate] = useState(""); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
+  async function create() { setBusy(true); setError(""); try { const result = await api.createPracticeWork(context, { clientId: summary.client.id, clientServiceId: serviceId, engagementId: summary.engagements.find((item) => item.status === "active")?.id, title: title.trim(), dueDate: dueDate || undefined, status: "not_started", priority: "normal" }); await onCreated(result.item.id); } catch (reason) { setError(errorText(reason)); } finally { setBusy(false); } }
+  return <Dialog open><DialogSurface><DialogBody><DialogTitle>Add work</DialogTitle><DialogContent className="pm-client-dialog">{error && <MessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></MessageBar>}<Field label="Service"><Select value={serviceId} onChange={(_, data) => setServiceId(data.value)}>{summary.services.filter((item) => item.status === "active").map((item) => <option key={item.id} value={item.id}>{item.service_name || "Service"}</option>)}</Select></Field><Field label="Work title"><Input value={title} onChange={(_, data) => setTitle(data.value)} /></Field><Field label="Due date"><Input type="date" value={dueDate} onChange={(_, data) => setDueDate(data.value)} /></Field></DialogContent><DialogActions><Button onClick={onClose}>Cancel</Button><Button appearance="primary" disabled={busy || !serviceId || !title.trim()} onClick={() => void create()}>{busy ? "Adding…" : "Add work"}</Button></DialogActions></DialogBody></DialogSurface></Dialog>;
+}
+
+function LegacyClientSummary({ context, clientId = "", onOpenWork, onBack }: Props) {
   const [summary, setSummary] = useState<PracticeClientSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");

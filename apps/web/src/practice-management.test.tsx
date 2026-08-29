@@ -11,7 +11,8 @@ vi.mock("@fluentui/react-components", async () => {
   return createRequire(import.meta.url)("@fluentui/react-components");
 });
 
-import PracticeManagement, { assignmentDisplay, filterPracticeWork, initialWorkFilters, isOverdue, practiceServiceCategories, practiceServiceCreateInput, safeAssignmentName, taskAssignmentDisplay } from "./PracticeManagement";
+import PracticeManagement, { assignmentDisplay, clientWorkspaceState, filterPracticeWork, initialWorkFilters, isOverdue, practiceServiceCategories, practiceServiceCreateInput, safeAssignmentName, taskAssignmentDisplay } from "./PracticeManagement";
+import { workViewItems, workWorkspaceState } from "./PracticeWorkWorkspace";
 import { practiceClientSummaryItem, type PracticeClientSummary, type PracticeWorkItem } from "./api";
 
 const items: PracticeWorkItem[] = [
@@ -30,6 +31,18 @@ describe("Practice Management UI contracts", () => {
     expect(initialWorkFilters("?status=waiting_on_client")).toEqual({ status: "waiting_on_client", due: "" });
     expect(initialWorkFilters("?due=overdue")).toEqual({ status: "", due: "overdue" });
     expect(initialWorkFilters("?status=unknown&due=all")).toEqual({ status: "", due: "" });
+  });
+
+  it("restores saved views, filters, selections and client areas from direct URLs", () => {
+    expect(workWorkspaceState("?view=waiting-client&q=vat&selected=w2&sort=client")).toMatchObject({ view: "waiting-client", query: "vat", selected: "w2", sort: "client" });
+    expect(clientWorkspaceState("?client=c1&area=delivery&selected=w1&return=%2Fpractice%2Fwork%3Fview%3Dmy")).toEqual({ area: "delivery", selected: "w1", returnPath: "/practice/work?view=my" });
+  });
+
+  it("treats delivery saved views as filters over one work capability", () => {
+    const today = new Date("2027-05-03T12:00:00Z");
+    expect(workViewItems(items, "all", today)).toHaveLength(2);
+    expect(workViewItems(items, "waiting-client", today).map((item) => item.id)).toEqual(["w2"]);
+    expect(workViewItems(items, "due-soon", today).map((item) => item.id)).toEqual(["w2"]);
   });
 
   it("filters overdue and due-this-week work without treating completed work as overdue", () => {

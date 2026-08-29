@@ -45,15 +45,12 @@ describe("PracticeEngine application manifests", () => {
     );
   });
 
-  it("groups Practice navigation around commercial workflows", () => {
+  it("exposes six intent-led Practice destinations and keeps operational detail local", () => {
     const practice = applicationManifests.find((app) => app.id === "practice")!;
-    expect([...new Set(practice.navigation.map((item) => item.group).filter(Boolean))]).toEqual([
-      "Relationships",
-      "Delivery",
-      "Collaboration",
-      "People & planning",
-      "Insight",
+    expect(practice.navigation.filter((item) => item.primary !== false).map((item) => item.label)).toEqual([
+      "Home", "Clients & CRM", "Work", "Team", "Collaboration", "Insights",
     ]);
+    expect(practice.navigation.find((item) => item.id === "practice-operations")?.primary).toBe(false);
   });
 
   it("returns only effectively entitled, implemented applications", () => {

@@ -141,7 +141,6 @@ import {
   AuthUser,
   demoMode,
 } from "./auth";
-import ClientPermanentFile from "./ClientPermanentFile";
 import { DetailTabs } from "./CanonicalPatterns";
 import { ConfirmAction } from "./ConfirmAction";
 import {
@@ -1762,6 +1761,11 @@ function AccountsWorkspace({
                     </NavItem>
                     </React.Fragment>;
                   })}
+                  {!pathname.startsWith(`${activeApplication.routePrefix}/settings`) && activeApplication.id === "practice" && (
+                    <NavItem className="workspace-nav-item application-settings-link" value="practice-automation-utility" icon={<DocumentRegular />} onClick={() => navigate("/practice/automation")}>
+                      Automation
+                    </NavItem>
+                  )}
                   {!pathname.startsWith(`${activeApplication.routePrefix}/settings`) && ["OWNER", "ADMIN"].includes(selectedMembership?.role_code || "") && activeApplication.settings.length > 0 && (
                     <NavItem
                       className="workspace-nav-item application-settings-link"
@@ -1861,6 +1865,7 @@ function AccountsWorkspace({
                     clientId={practiceClientId}
                   initialTab={practiceSection}
                   routeSearch={locationSearch}
+                  onNavigate={navigate}
                   settingsSection={practiceSettingsSection(pathname)}
                   canManageSettings={canManageSettings(selectedMembership?.role_code || "")}
                     onOpenLedgerly={entitlementDecisions["ledgerly.enabled"] ? (engagementId, clientId) => {
@@ -1872,8 +1877,7 @@ function AccountsWorkspace({
                     setPracticeView("work-detail");
                   }}
                   onOpenClient={(clientId) => {
-                    setPracticeClientId(clientId);
-                    setPracticeView("client-summary");
+                    navigate(`/practice/clients?client=${encodeURIComponent(clientId)}&return=${encodeURIComponent(`/practice/work${locationSearch}`)}`);
                   }}
                   onBack={() => setPracticeView("work")}
                 />
@@ -1958,6 +1962,8 @@ function AccountsWorkspace({
                 setWorkspacePage("engagement");
                 navigate("/ledgerly/overview");
               }}
+              routeSearch={locationSearch}
+              onNavigate={navigate}
             />
           ) : workspacePage === "team" ? (
             <TeamView
@@ -2809,6 +2815,8 @@ function ClientsView({
   onOpenEngagement,
   onOpenWork,
   onOpenWorkspace,
+  routeSearch,
+  onNavigate,
 }: {
   context: ApiContext;
   items: Organisation[];
@@ -2823,11 +2831,12 @@ function ClientsView({
   onOpenEngagement: (engagementId: string) => void;
   onOpenWork: (workItemId: string) => void;
   onOpenWorkspace: () => void;
+  routeSearch?: string;
+  onNavigate: (path: string) => void;
 }) {
   const [creating, setCreating] = useState(false);
   const [selectedOrganisationId, setSelectedOrganisationId] = useState("");
-  const [clientView, setClientView] = useState<"overview" | "records">("overview");
-  useEffect(() => { setSelectedOrganisationId(requestedClientId); setClientView("overview"); }, [requestedClientId]);
+  useEffect(() => { setSelectedOrganisationId(requestedClientId); }, [requestedClientId]);
   const [form, setForm] = useState({
     legalName: "",
     legalForm: "PRIVATE_LIMITED_COMPANY",
@@ -2946,20 +2955,16 @@ function ClientsView({
   if (selectedOrganisationId)
     return (
       <section className="pm-page">
-        <DetailTabs label="Client record sections" selectedValue={clientView} onTabSelect={(_, data) => setClientView(data.value as "overview" | "records")} tabs={[{ value: "overview", label: "Overview & delivery" }, { value: "records", label: "Contacts & permanent file" }]} />
-        {clientView === "overview" ? <PracticeManagement
+        <PracticeManagement
           view="client-summary"
           context={context}
           clientId={selectedOrganisationId}
+          routeSearch={routeSearch}
+          onNavigate={onNavigate}
           onOpenWork={onOpenWork}
           onOpenLedgerly={(engagementId) => onOpenEngagement(engagementId)}
           onBack={() => { setSelectedOrganisationId(""); onSelectClient(""); }}
-        /> : <ClientPermanentFile
-          context={context}
-          organisationId={selectedOrganisationId}
-          onBack={() => { setSelectedOrganisationId(""); onSelectClient(""); }}
-          onOpenEngagement={onOpenEngagement}
-        />}
+        />
       </section>
     );
   return (
@@ -2990,6 +2995,7 @@ function ClientsView({
           )}
         </div>
       </section>
+      <DetailTabs label="Clients and CRM areas" selectedValue="clients" onTabSelect={(_, data) => onNavigate(data.value === "clients" ? "/practice/clients" : `/practice/${data.value}`)} tabs={[{ value: "crm/prospects", label: "Prospects" }, { value: "crm/opportunities", label: "Opportunities" }, { value: "clients", label: "Clients" }, { value: "onboarding", label: "Onboarding" }]} />
       {creating && (
         <section className="panel client-form">
           <header className="client-form-header">

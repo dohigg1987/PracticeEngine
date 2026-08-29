@@ -1402,12 +1402,60 @@ export function demoRequest(path: string, init?: RequestInit): unknown {
     if (organisations) organisations.items = [...organisations.items, item];
     return { item: structuredClone(item) };
   }
+  if (method === "POST" && path === "/v1/practice/work") {
+    const body = JSON.parse(String(init?.body || "{}")) as Record<string, unknown>;
+    const service = demoPracticeServices.find((entry) => `client-${entry.id}` === body.clientServiceId || entry.id === body.clientServiceId);
+    const clientId = String(body.clientId);
+    const item: PracticeWorkItem = {
+      id: `work-${Date.now()}`,
+      client_id: clientId,
+      client_name: clientId === "demo-org-2" ? "Harbour Trading Ltd" : "Northstar Community Foundation",
+      client_service_id: String(body.clientServiceId),
+      service_name: service?.name || "Service",
+      engagement_id: body.engagementId ? String(body.engagementId) : null,
+      title: String(body.title || "New work"),
+      period_reference: body.periodReference ? String(body.periodReference) : null,
+      status: (body.status || "not_started") as PracticeWorkItem["status"],
+      priority: (body.priority || "normal") as PracticeWorkItem["priority"],
+      due_date: body.dueDate ? String(body.dueDate) : null,
+    };
+    demoPracticeWork = [item, ...demoPracticeWork];
+    return { item: structuredClone(item) };
+  }
+  if (method === "POST" && path === "/v1/client-requests") {
+    const body = JSON.parse(String(init?.body || "{}")) as Record<string, unknown>;
+    const work = demoPracticeWork.find((entry) => entry.id === body.workItemId);
+    const item: ClientRequestItem = {
+      id: `client-request-${Date.now()}`,
+      client_id: String(body.clientId),
+      client_name: work?.client_name || "Client",
+      title: String(body.title || "Client request"),
+      description: body.description ? String(body.description) : undefined,
+      request_type: String(body.requestType || "information"),
+      status: body.send === true ? "open" : "draft",
+      priority: String(body.priority || "normal"),
+      due_at: body.dueAt ? String(body.dueAt) : null,
+      work_title: work?.title,
+      response_count: 0,
+      completion_mode: "manual",
+    };
+    demoClientRequests = [item, ...demoClientRequests];
+    if (body.waitingOnClient === true && work) demoPracticeWork = demoPracticeWork.map((entry) => entry.id === work.id ? { ...entry, status: "waiting_on_client" } : entry);
+    return { item: structuredClone(item) };
+  }
   const assignmentMatch = path.match(/^\/v1\/practice\/work\/([^/]+)\/resource-assignment$/);
   if (method === "POST" && assignmentMatch) {
     const body = JSON.parse(String(init?.body || "{}")) as { assignedMemberId?: string };
     const resource = demoResources.find((item) => item.id === body.assignedMemberId);
     demoAllocations = demoAllocations.map((item) => item.id === assignmentMatch[1] ? { ...item, resource_name: resource?.display_name || null, team_name: resource?.team_name || item.team_name, assignment_state: "confirmed" } : item);
+    demoPracticeWork = demoPracticeWork.map((item) => item.id === assignmentMatch[1] ? { ...item, assigned_member_id: resource?.id || null, assigned_member_name: resource?.display_name || null, assigned_team_name: resource?.team_name || item.assigned_team_name } : item);
     return { item: structuredClone(demoAllocations.find((item) => item.id === assignmentMatch[1])) };
+  }
+  const deadlineOverrideMatch = path.match(/^\/v1\/practice\/work\/([^/]+)\/deadline-override$/);
+  if (method === "POST" && deadlineOverrideMatch) {
+    const body = JSON.parse(String(init?.body || "{}")) as { dueDate?: string; reason?: string };
+    demoPracticeWork = demoPracticeWork.map((item) => item.id === deadlineOverrideMatch[1] ? { ...item, due_date: body.dueDate || item.due_date, due_date_overridden: true, due_date_override_reason: body.reason || null } : item);
+    return { item: structuredClone(demoPracticeWork.find((item) => item.id === deadlineOverrideMatch[1])) };
   }
   if (method === "POST" && path === "/v1/practice/time-entries") {
     const body = JSON.parse(String(init?.body || "{}")) as Record<string, unknown>;
