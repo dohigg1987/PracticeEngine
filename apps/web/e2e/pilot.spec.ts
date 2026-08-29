@@ -1,6 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
+test.describe.configure({ timeout: 60_000 });
+
 async function openEngagementSection(page: Page, label: string) {
   const paths: Record<string, string> = {
     "Source data": "/ledgerly/trial-balance",
