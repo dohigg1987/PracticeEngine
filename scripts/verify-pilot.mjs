@@ -53,7 +53,7 @@ async function runBrowserMatrix() {
   );
   const jobTimeoutMs = positiveInteger(
     process.env.PLAYWRIGHT_BROWSER_JOB_TIMEOUT_MS,
-    30 * 60 * 1000,
+    45 * 60 * 1000,
     "PLAYWRIGHT_BROWSER_JOB_TIMEOUT_MS",
   );
   const batches = planBrowserBatches(jobs, jobConcurrency);
