@@ -45,9 +45,13 @@ import {
   MessageBar,
   MessageBarActions,
   MessageBarBody,
+  NavCategory,
+  NavCategoryItem,
   NavDrawer,
   NavDrawerBody,
   NavItem,
+  NavSubItem,
+  NavSubItemGroup,
   ProgressBar,
   SearchBox,
   Select,
@@ -284,6 +288,13 @@ function WorkspaceSearchIcon({
 function applicationNavigationValue(item: ApplicationNavigationItem): string {
   if (item.practiceView) return item.practiceView === "work" ? "work" : item.id;
   return item.ledgerlyView ?? (item.primary === false ? item.id : item.page);
+}
+
+function applicationNavigationIcon(item: ApplicationNavigationItem) {
+  if (item.icon === "clients" || item.icon === "home") return <BuildingRegular />;
+  if (item.icon === "people") return <PeopleTeamRegular />;
+  if (item.icon === "open") return <OpenRegular />;
+  return <DocumentRegular />;
 }
 const EngagementProduction = lazy(importEngagementProduction);
 const CommercialWorkspace = lazy(importCommercialWorkspace);
@@ -1706,6 +1717,10 @@ function AccountsWorkspace({
             className="fluent-nav"
             type="inline"
             open
+            defaultOpenCategories={activeApplication?.id === "practice"
+              ? ["practice-clients", "practice-resources", "practice-portfolio"]
+              : undefined}
+            selectedCategoryValue={navigationItemForPath(pathname)?.parentId ?? ""}
             selectedValue={navigationItemForPath(pathname) ? applicationNavigationValue(navigationItemForPath(pathname)!) : pathname.startsWith("/settings") ? "global-settings" : activeApplication && pathname.startsWith(`${activeApplication.routePrefix}/settings`) ? `${activeApplication.id}-settings` : ""}
           >
             <NavDrawerBody className="workspace-nav-body">
@@ -1745,14 +1760,31 @@ function AccountsWorkspace({
                   ).map((item, index, items) => {
                     const group = applicationNavigationGroup(item);
                     const previousGroup = index > 0 ? applicationNavigationGroup(items[index - 1]) : undefined;
+                    if (isApplicationNavigationItem(item)) {
+                      const children = activeApplication.navigation.filter((candidate) => candidate.parentId === item.id);
+                      if (children.length) {
+                        return <NavCategory key={item.id} value={item.id}>
+                          <NavCategoryItem icon={applicationNavigationIcon(item)}>{item.label}</NavCategoryItem>
+                          <NavSubItemGroup>
+                            {children.map((child) => <NavSubItem
+                              key={child.id}
+                              value={applicationNavigationValue(child)}
+                              onClick={() => activateNavigationItem(child)}
+                              onMouseEnter={() => { void preloadNavigationItem(child); }}
+                              onFocus={() => { void preloadNavigationItem(child); }}
+                            >
+                              {child.label}
+                            </NavSubItem>)}
+                          </NavSubItemGroup>
+                        </NavCategory>;
+                      }
+                    }
                     return <React.Fragment key={item.id}>
                     {group && group !== previousGroup && <span className="application-navigation-group">{group}</span>}
                     <NavItem
                       className="workspace-nav-item"
                       value={isApplicationNavigationItem(item) ? applicationNavigationValue(item) : pathname === item.path ? `${activeApplication.id}-settings` : item.id}
-                      icon={"icon" in item && (item.icon === "clients" || item.icon === "home") ? <BuildingRegular /> :
-                        "icon" in item && item.icon === "people" ? <PeopleTeamRegular /> :
-                        "icon" in item && item.icon === "open" ? <OpenRegular /> : <DocumentRegular />}
+                      icon={isApplicationNavigationItem(item) ? applicationNavigationIcon(item) : <DocumentRegular />}
                       onClick={() => isApplicationNavigationItem(item) ? activateNavigationItem(item) : navigate(item.path)}
                       onMouseEnter={() => { if (isApplicationNavigationItem(item)) void preloadNavigationItem(item); }}
                       onFocus={() => { if (isApplicationNavigationItem(item)) void preloadNavigationItem(item); }}
