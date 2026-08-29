@@ -1318,6 +1318,15 @@ tfoot td {
 .application-navigation {
   padding-inline: var(--spacingHorizontalXS);
 }
+.application-navigation-group {
+  display: block;
+  padding: var(--spacingVerticalM) var(--spacingHorizontalM) var(--spacingVerticalXXS);
+  color: var(--colorNeutralForeground3);
+  font-size: var(--fontSizeBase200);
+  font-weight: var(--fontWeightSemibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
 .application-settings-link {
   margin-top: var(--spacingVerticalM);
   border-top: var(--strokeWidthThin) solid var(--colorNeutralStroke2);

@@ -50,6 +50,7 @@ type Props = {
   view: ResourceEconomicsView;
   onOpenWork?: (id: string) => void;
   onNavigate?: (path: string) => void;
+  routeSearch?: string;
 };
 
 type CapacityTone = "available" | "balanced" | "pressure" | "overallocated";
@@ -125,7 +126,7 @@ export default function ResourceEconomics({ view, ...props }: Props) {
   return <ResourcesView {...props} />;
 }
 
-function ResourcesView({ context }: Omit<Props, "view">) {
+function ResourcesView({ context, onNavigate }: Omit<Props, "view">) {
   const [items, setItems] = useState<ResourceProfile[]>([]), [loading, setLoading] = useState(true), [error, setError] = useState("");
   const [query, setQuery] = useState(""), [team, setTeam] = useState(""), [status, setStatus] = useState("");
   const load = useCallback(async () => { setLoading(true); setError(""); try { setItems((await api.resourceProfiles(context)).items); } catch (reason) { setError(errorText(reason)); } finally { setLoading(false); } }, [context]);
@@ -141,6 +142,7 @@ function ResourcesView({ context }: Omit<Props, "view">) {
     createTableColumn({ columnId: "utilisation", renderHeaderCell: () => "Utilisation", renderCell: (item) => `${Math.round(item.utilisation_percentage)}%` }),
     createTableColumn({ columnId: "overdue", renderHeaderCell: () => "Overdue", renderCell: (item) => <span className={item.overdue_work > 0 ? "re-exception" : undefined}>{item.overdue_work}</span> }),
     createTableColumn({ columnId: "status", renderHeaderCell: () => "Status", renderCell: (item) => <Status value={item.status} /> }),
+    createTableColumn({ columnId: "action", renderHeaderCell: () => "Action", renderCell: (item) => <Link href={resourceCapacityPath(item.id)} onClick={onNavigate ? (event) => { event.preventDefault(); onNavigate(resourceCapacityPath(item.id)); } : undefined}>Plan capacity</Link> }),
   ];
   if (loading) return <section className="re-page"><Head title="Resources" body="Operational capacity, workload and delivery exceptions for practice members." /><Loading text="Loading resources" /></section>;
   return <section className="re-page"><Head title="Resources" body="Operational capacity, workload and delivery exceptions for practice members." />{error && <Failure message={error} retry={load} />}
@@ -150,33 +152,35 @@ function ResourcesView({ context }: Omit<Props, "view">) {
   </section>;
 }
 
-function CapacityView({ context }: Omit<Props, "view">) {
+function CapacityView({ context, onNavigate, routeSearch }: Omit<Props, "view">) {
   const initial = useMemo(() => currentRange(), []);
   const [from, setFrom] = useState(initial.from), [to, setTo] = useState(initial.to), [items, setItems] = useState<CapacityRow[]>([]);
+  const [resourceId, setResourceId] = useState(() => new URLSearchParams(routeSearch || "").get("resource") || "");
   const [loading, setLoading] = useState(true), [error, setError] = useState("");
   const load = useCallback(async () => { setLoading(true); setError(""); try { setItems((await api.capacity(context, { from, to })).items); } catch (reason) { setError(errorText(reason)); } finally { setLoading(false); } }, [context, from, to]);
   useEffect(() => { void load(); }, [load]);
   if (loading) return <section className="re-page"><Head title="Capacity" body="Available capacity less committed work and unavailable time. Forecast work is shown separately." /><Loading text="Loading capacity plan" /></section>;
   const periods = items[0]?.periods || [];
+  const visible = resourceId ? items.filter((item) => item.resource_id === resourceId) : items;
   return <section className="re-page"><Head title="Capacity" body="Available capacity less committed work and unavailable time. Forecast work is shown separately." />{error && <Failure message={error} retry={load} />}
-    <div className="re-filters re-range"><Field label="From"><Input type="date" value={from} onChange={(_, data) => setFrom(data.value)} /></Field><Field label="To"><Input type="date" value={to} onChange={(_, data) => setTo(data.value)} /></Field></div>
-    {items.length ? <div className="re-table-scroll"><Table aria-label="Resource capacity by period"><TableHeader><TableRow><TableHeaderCell>Resource</TableHeaderCell>{periods.map((period) => <TableHeaderCell key={period.key}>{period.label}</TableHeaderCell>)}</TableRow></TableHeader><TableBody>{items.map((item) => <TableRow key={item.resource_id}><TableCell><span className="re-primary-cell"><strong>{item.display_name}</strong><small>{item.team_name || "Unassigned"}</small></span></TableCell>{item.periods.map((period) => <TableCell key={period.key}><span className={`re-capacity re-capacity--${capacityTone(period.remaining_hours, period.available_hours)}`}><strong>{capacityDescription(period.remaining_hours, period.available_hours)}</strong><small>{hours(period.committed_hours)} committed · {hours(period.forecast_hours)} forecast · {hours(period.unavailable_hours)} unavailable</small></span></TableCell>)}</TableRow>)}</TableBody></Table></div> : <Empty>No capacity records are available for this period.</Empty>}
+    <div className="re-filters"><Field label="From"><Input type="date" value={from} onChange={(_, data) => setFrom(data.value)} /></Field><Field label="To"><Input type="date" value={to} onChange={(_, data) => setTo(data.value)} /></Field><Field label="Resource"><Select value={resourceId} onChange={(_, data) => setResourceId(data.value)}><option value="">All resources</option>{items.map((item) => <option key={item.resource_id} value={item.resource_id}>{item.display_name}</option>)}</Select></Field></div>
+    {visible.length ? <div className="re-table-scroll"><Table aria-label="Resource capacity by period"><TableHeader><TableRow><TableHeaderCell>Resource</TableHeaderCell>{periods.map((period) => <TableHeaderCell key={period.key}>{period.label}</TableHeaderCell>)}<TableHeaderCell>Action</TableHeaderCell></TableRow></TableHeader><TableBody>{visible.map((item) => <TableRow key={item.resource_id}><TableCell><span className="re-primary-cell"><strong>{item.display_name}</strong><small>{item.team_name || "Unassigned"}</small></span></TableCell>{item.periods.map((period) => <TableCell key={period.key}><span className={`re-capacity re-capacity--${capacityTone(period.remaining_hours, period.available_hours)}`}><strong>{capacityDescription(period.remaining_hours, period.available_hours)}</strong><small>{hours(period.committed_hours)} committed · {hours(period.forecast_hours)} forecast · {hours(period.unavailable_hours)} unavailable</small></span></TableCell>)}<TableCell><Link href={resourceAllocationPath(item.display_name)} onClick={onNavigate ? (event) => { event.preventDefault(); onNavigate(resourceAllocationPath(item.display_name)); } : undefined}>Open allocation</Link></TableCell></TableRow>)}</TableBody></Table></div> : <Empty>No capacity records match the current filters.</Empty>}
   </section>;
 }
 
-function AllocationView({ context, onOpenWork }: Omit<Props, "view">) {
+function AllocationView({ context, onOpenWork, routeSearch }: Omit<Props, "view">) {
   const initial = useMemo(() => currentRange(), []);
   const [items, setItems] = useState<WorkAllocation[]>([]), [resources, setResources] = useState<ResourceProfile[]>([]);
-  const [from, setFrom] = useState(initial.from), [to, setTo] = useState(initial.to), [team, setTeam] = useState(""), [resourceByWork, setResourceByWork] = useState<Record<string, string>>({});
+  const [from, setFrom] = useState(initial.from), [to, setTo] = useState(initial.to), [team, setTeam] = useState(""), [resourceName, setResourceName] = useState(() => new URLSearchParams(routeSearch || "").get("resource") || ""), [resourceByWork, setResourceByWork] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true), [error, setError] = useState(""), [busy, setBusy] = useState("");
   const load = useCallback(async () => { setLoading(true); setError(""); try { const [allocationData, resourceData] = await Promise.all([api.workAllocations(context, { from, to }), api.resourceProfiles(context)]); setItems(allocationData.items); setResources(resourceData.items); } catch (reason) { setError(errorText(reason)); } finally { setLoading(false); } }, [context, from, to]);
   useEffect(() => { void load(); }, [load]);
   const teams = [...new Set(items.map((item) => item.team_name).filter((value): value is string => Boolean(value)))].sort();
-  const visible = team ? items.filter((item) => item.team_name === team) : items;
+  const visible = items.filter((item) => (!team || item.team_name === team) && (!resourceName || item.resource_name === resourceName));
   async function reassign(item: WorkAllocation) { const resourceId = resourceByWork[item.id]; if (!resourceId) return; setBusy(item.id); setError(""); try { await api.reassignWork(context, item.id, { resourceId }); await load(); } catch (reason) { setError(errorText(reason)); } finally { setBusy(""); } }
   if (loading) return <Loading text="Loading work allocation" />;
   return <section className="re-page"><Head title="Work allocation" body="Upcoming work, planned effort and resource capacity for authorised assignment decisions." />{error && <Failure message={error} retry={load} />}
-    <div className="re-filters"><Field label="From"><Input type="date" value={from} onChange={(_, data) => setFrom(data.value)} /></Field><Field label="To"><Input type="date" value={to} onChange={(_, data) => setTo(data.value)} /></Field><Field label="Team"><Select value={team} onChange={(_, data) => setTeam(data.value)}><option value="">All teams</option>{teams.map((value) => <option key={value}>{value}</option>)}</Select></Field></div>
+    <div className="re-filters re-filters--four"><Field label="From"><Input type="date" value={from} onChange={(_, data) => setFrom(data.value)} /></Field><Field label="To"><Input type="date" value={to} onChange={(_, data) => setTo(data.value)} /></Field><Field label="Team"><Select value={team} onChange={(_, data) => setTeam(data.value)}><option value="">All teams</option>{teams.map((value) => <option key={value}>{value}</option>)}</Select></Field><Field label="Current owner"><Select value={resourceName} onChange={(_, data) => setResourceName(data.value)}><option value="">All owners</option>{[...new Set(items.map((item) => item.resource_name).filter((value): value is string => Boolean(value)))].sort().map((value) => <option key={value}>{value}</option>)}</Select></Field></div>
     {visible.length ? <div className="re-table-scroll"><Table aria-label="Upcoming work allocation"><TableHeader><TableRow><TableHeaderCell>Work</TableHeaderCell><TableHeaderCell>Due</TableHeaderCell><TableHeaderCell>Planned</TableHeaderCell><TableHeaderCell>Current owner</TableHeaderCell><TableHeaderCell>Status</TableHeaderCell><TableHeaderCell>Reassign</TableHeaderCell></TableRow></TableHeader><TableBody>{visible.map((item) => <TableRow key={item.id}><TableCell><span className="re-primary-cell">{onOpenWork ? <Button appearance="transparent" className="re-link" onClick={() => onOpenWork(item.id)}>{item.work_title}</Button> : <strong>{item.work_title}</strong>}<small>{item.client_name} · {item.service_name}</small></span></TableCell><TableCell>{date(item.due_date)}</TableCell><TableCell>{hours(item.planned_hours)}<small>{item.remaining_hours == null ? "Remaining not set" : `${hours(item.remaining_hours)} remaining`}</small></TableCell><TableCell>{item.resource_name || item.team_name || "Unassigned"}</TableCell><TableCell><Status value={item.assignment_state || item.status} /></TableCell><TableCell><div className="re-row-action"><Select aria-label={`Resource for ${item.work_title}`} value={resourceByWork[item.id] || ""} onChange={(_, data) => setResourceByWork((current) => ({ ...current, [item.id]: data.value }))}><option value="">Select resource</option>{resources.filter((resource) => resource.status === "active").map((resource) => <option key={resource.id} value={resource.id}>{resource.display_name} · {hours(resource.available_hours)} available</option>)}</Select><Button size="small" disabled={!resourceByWork[item.id] || Boolean(busy)} onClick={() => void reassign(item)}>{busy === item.id ? "Saving…" : "Assign"}</Button></div></TableCell></TableRow>)}</TableBody></Table></div> : <Empty>No upcoming work matches the current period and team.</Empty>}
   </section>;
 }
@@ -227,6 +231,9 @@ export function practiceHomeQueues(overview: PracticeEconomicsOverview): Practic
     { label: "Awaiting review", value: overview.review_queue, description: "Work ready for a reviewer decision", path: "/practice/review", priority: "standard" },
   ];
 }
+
+export const resourceCapacityPath = (resourceId: string) => `/practice/capacity?resource=${encodeURIComponent(resourceId)}`;
+export const resourceAllocationPath = (resourceName: string) => `/practice/work-allocation?resource=${encodeURIComponent(resourceName)}`;
 
 export function practiceHomeNextAction(overview: PracticeEconomicsOverview): string {
   const next = practiceHomeQueues(overview).find((item) => item.value > 0);

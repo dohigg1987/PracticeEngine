@@ -67,6 +67,7 @@ for (const viewport of viewports) {
 
     await openSurface(page, surfaces[0]);
     await page.locator(".client-name-button").first().click();
+    await page.getByRole("tab", { name: "Contacts & permanent file" }).click();
     await expect(page.locator(".permanent-file")).toBeVisible();
     await assertPageReflows(page);
   });
@@ -126,6 +127,7 @@ test("client permanent file preserves forced-color focus and axe semantics", asy
   await page.emulateMedia({ forcedColors: "active", reducedMotion: "reduce" });
   await openSurface(page, surfaces[0]);
   await page.locator(".client-name-button").first().click();
+  await page.getByRole("tab", { name: "Contacts & permanent file" }).click();
   await expect(page.locator(".permanent-file")).toBeVisible();
   const back = page.getByRole("button", { name: "Clients", exact: true });
   await back.focus();

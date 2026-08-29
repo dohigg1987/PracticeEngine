@@ -215,6 +215,10 @@ function isApplicationNavigationItem(
   return "page" in item && "icon" in item;
 }
 
+function applicationNavigationGroup(item: ApplicationNavigationItem | ApplicationSetting): ApplicationNavigationItem["group"] {
+  return isApplicationNavigationItem(item) ? item.group : undefined;
+}
+
 const productionNavStageForView: Partial<Record<View, ProductionNavStage>> = {
   data: "source",
   mapping: "source",
@@ -1739,9 +1743,12 @@ function AccountsWorkspace({
                   {(pathname.startsWith(`${activeApplication.routePrefix}/settings`)
                     ? activeApplication.settings
                     : activeApplication.navigation.filter((item) => item.primary !== false)
-                  ).map((item) => (
+                  ).map((item, index, items) => {
+                    const group = applicationNavigationGroup(item);
+                    const previousGroup = index > 0 ? applicationNavigationGroup(items[index - 1]) : undefined;
+                    return <React.Fragment key={item.id}>
+                    {group && group !== previousGroup && <span className="application-navigation-group">{group}</span>}
                     <NavItem
-                      key={item.id}
                       className="workspace-nav-item"
                       value={isApplicationNavigationItem(item) ? applicationNavigationValue(item) : pathname === item.path ? `${activeApplication.id}-settings` : item.id}
                       icon={"icon" in item && (item.icon === "clients" || item.icon === "home") ? <BuildingRegular /> :
@@ -1753,7 +1760,8 @@ function AccountsWorkspace({
                     >
                       {item.label}
                     </NavItem>
-                  ))}
+                    </React.Fragment>;
+                  })}
                   {!pathname.startsWith(`${activeApplication.routePrefix}/settings`) && ["OWNER", "ADMIN"].includes(selectedMembership?.role_code || "") && activeApplication.settings.length > 0 && (
                     <NavItem
                       className="workspace-nav-item application-settings-link"
@@ -1878,6 +1886,7 @@ function AccountsWorkspace({
                   context={context}
                   view={workspacePage as "resources" | "capacity" | "allocation" | "time" | "portfolio" | "management"}
                   onNavigate={navigate}
+                  routeSearch={locationSearch}
                   onOpenWork={(workItemId) => {
                     setPracticeWorkItemId(workItemId);
                     setPracticeView("work-detail");

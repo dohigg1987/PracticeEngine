@@ -45,6 +45,17 @@ describe("PracticeEngine application manifests", () => {
     );
   });
 
+  it("groups Practice navigation around commercial workflows", () => {
+    const practice = applicationManifests.find((app) => app.id === "practice")!;
+    expect([...new Set(practice.navigation.map((item) => item.group).filter(Boolean))]).toEqual([
+      "Relationships",
+      "Delivery",
+      "Collaboration",
+      "People & planning",
+      "Insight",
+    ]);
+  });
+
   it("returns only effectively entitled, implemented applications", () => {
     expect(availableApplications({ "practice.enabled": true, "ledgerly.enabled": true, "quotebench.enabled": false }).map((app) => app.id)).toEqual(["practice", "ledgerly"]);
     expect(availableApplications({ "practice.enabled": true, "quotebench.enabled": true }).map((app) => app.id)).toEqual(["practice", "quotebench"]);

@@ -4,6 +4,7 @@
 .re-head p { margin: var(--spacingVerticalXS) 0 0; color: var(--colorNeutralForeground3); }
 .re-loading { display: grid; gap: var(--spacingVerticalS); padding-block: var(--spacingVerticalL); }
 .re-filters { display: grid; grid-template-columns: minmax(240px, 2fr) repeat(2, minmax(160px, 1fr)); gap: var(--spacingHorizontalM); align-items: end; }
+.re-filters--four { grid-template-columns: repeat(4, minmax(150px, 1fr)); }
 .re-range { grid-template-columns: repeat(2, minmax(160px, 220px)); }
 .re-single-filter { grid-template-columns: minmax(220px, 320px); }
 .re-result-count { margin: 0; color: var(--colorNeutralForeground3); font-size: var(--fontSizeBase200); }

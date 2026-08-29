@@ -51,6 +51,7 @@ export type ApplicationNavigationItem = {
   practiceView?: PracticeView;
   requiredEntitlement?: string;
   primary?: boolean;
+  group?: "Relationships" | "Delivery" | "Collaboration" | "People & planning" | "Insight";
 };
 
 export type ApplicationSetting = {
@@ -97,21 +98,21 @@ export type ApplicationManifest = {
 
 const practiceNavigation = [
   { id: "practice-home", label: "Home", path: "/practice/home", icon: "home", page: "management" },
-  { id: "practice-prospects", label: "Prospects", path: "/practice/crm/prospects", icon: "people", page: "crm-prospects" },
-  { id: "practice-opportunities", label: "Opportunities", path: "/practice/crm/opportunities", icon: "document", page: "crm-opportunities" },
-  { id: "practice-onboarding", label: "Onboarding", path: "/practice/onboarding", icon: "document", page: "onboarding" },
-  { id: "practice-clients", label: "Clients", path: "/practice/clients", icon: "clients", page: "clients" },
-  { id: "practice-work", label: "Work", path: "/practice/work", icon: "work", page: "work", practiceView: "work" },
-  { id: "practice-review", label: "Review", path: "/practice/review", icon: "document", page: "work", practiceView: "reviews" },
-  { id: "practice-recurring", label: "Recurring work", path: "/practice/recurring-work", icon: "document", page: "work", practiceView: "recurring" },
-  { id: "practice-operations", label: "Automation & operations", path: "/practice/automation", icon: "document", page: "work", practiceView: "operations" },
-  { id: "practice-collaboration", label: "Client collaboration", path: "/practice/collaboration", icon: "people", page: "collaboration" },
-  { id: "practice-client-portal", label: "Client portal", path: "/practice/client-portal", icon: "open", page: "client-portal", primary: false },
-  { id: "practice-resources", label: "Resources", path: "/practice/resources", icon: "people", page: "resources" },
-  { id: "practice-capacity", label: "Capacity", path: "/practice/capacity", icon: "document", page: "capacity" },
-  { id: "practice-allocation", label: "Work allocation", path: "/practice/work-allocation", icon: "document", page: "allocation" },
-  { id: "practice-time", label: "Time", path: "/practice/time", icon: "document", page: "time" },
-  { id: "practice-portfolio", label: "Portfolio economics", path: "/practice/portfolio-economics", icon: "clients", page: "portfolio" },
+  { id: "practice-prospects", label: "Prospects", path: "/practice/crm/prospects", icon: "people", page: "crm-prospects", group: "Relationships" },
+  { id: "practice-opportunities", label: "Opportunities", path: "/practice/crm/opportunities", icon: "document", page: "crm-opportunities", group: "Relationships" },
+  { id: "practice-onboarding", label: "Onboarding", path: "/practice/onboarding", icon: "document", page: "onboarding", group: "Relationships" },
+  { id: "practice-clients", label: "Clients", path: "/practice/clients", icon: "clients", page: "clients", group: "Relationships" },
+  { id: "practice-work", label: "Work", path: "/practice/work", icon: "work", page: "work", practiceView: "work", group: "Delivery" },
+  { id: "practice-review", label: "Review", path: "/practice/review", icon: "document", page: "work", practiceView: "reviews", group: "Delivery" },
+  { id: "practice-recurring", label: "Recurring work", path: "/practice/recurring-work", icon: "document", page: "work", practiceView: "recurring", group: "Delivery" },
+  { id: "practice-operations", label: "Automation & operations", path: "/practice/automation", icon: "document", page: "work", practiceView: "operations", group: "Delivery" },
+  { id: "practice-collaboration", label: "Client collaboration", path: "/practice/collaboration", icon: "people", page: "collaboration", group: "Collaboration" },
+  { id: "practice-client-portal", label: "Client portal", path: "/practice/client-portal", icon: "open", page: "client-portal", primary: false, group: "Collaboration" },
+  { id: "practice-resources", label: "Resources", path: "/practice/resources", icon: "people", page: "resources", group: "People & planning" },
+  { id: "practice-capacity", label: "Capacity", path: "/practice/capacity", icon: "document", page: "capacity", group: "People & planning" },
+  { id: "practice-allocation", label: "Work allocation", path: "/practice/work-allocation", icon: "document", page: "allocation", group: "People & planning" },
+  { id: "practice-time", label: "Time", path: "/practice/time", icon: "document", page: "time", group: "People & planning" },
+  { id: "practice-portfolio", label: "Portfolio economics", path: "/practice/portfolio-economics", icon: "clients", page: "portfolio", group: "Insight" },
 ] as const satisfies readonly ApplicationNavigationItem[];
 
 const ledgerlyNavigation = [

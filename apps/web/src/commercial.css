@@ -3,6 +3,16 @@
   gap: 20px;
   min-width: 0;
 }
+.commercial-page > *,
+.commercial-message,
+.commercial-message * {
+  min-width: 0;
+  max-width: 100%;
+}
+.commercial-message * {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
 .commercial-head {
   display: flex;
   align-items: flex-start;
@@ -191,6 +201,11 @@
   padding: 10px 12px;
   border-bottom: 1px solid var(--colorNeutralStroke2);
 }
+.inbox-list article > div,
+.inbox-list article :is(header, b, p, small) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .inbox-list article:last-child {
   border-bottom: 0;
 }
@@ -287,10 +302,10 @@
     justify-self: start;
   }
   .inbox-list article {
-    grid-template-columns: 3px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
   }
   .inbox-list article > button {
-    grid-column: 2;
+    grid-column: 1;
     justify-self: start;
   }
 }

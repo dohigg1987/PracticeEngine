@@ -11,7 +11,7 @@ vi.mock("@fluentui/react-components", async () => {
   return createRequire(import.meta.url)("@fluentui/react-components");
 });
 
-import ResourceEconomics, { capacityDescription, capacityTone, filterResources, formatEconomicValue, practiceHomeNextAction, practiceHomeQueues } from "./ResourceEconomics";
+import ResourceEconomics, { capacityDescription, capacityTone, filterResources, formatEconomicValue, practiceHomeNextAction, practiceHomeQueues, resourceAllocationPath, resourceCapacityPath } from "./ResourceEconomics";
 import type { PracticeEconomicsOverview, ResourceProfile } from "./api";
 
 const resources: ResourceProfile[] = [
@@ -36,6 +36,11 @@ describe("resource economics UI contracts", () => {
     expect(formatEconomicValue(undefined, "GBP", "unavailable")).toBe("Unavailable");
     expect(formatEconomicValue(0, "GBP", "known")).toBe("£0");
     expect(formatEconomicValue(1250, "GBP", "estimated")).toBe("£1,250");
+  });
+
+  it("preserves resource context across capacity and allocation actions", () => {
+    expect(resourceCapacityPath("resource 1")).toBe("/practice/capacity?resource=resource%201");
+    expect(resourceAllocationPath("Aisha Khan")).toBe("/practice/work-allocation?resource=Aisha%20Khan");
   });
 
   it("turns every home exception into a direct operational route", () => {
