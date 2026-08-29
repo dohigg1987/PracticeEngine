@@ -52,10 +52,20 @@ test("portfolio economics preserves known and unavailable values", async ({ page
   await expect(portfolio).toContainText("Unavailable");
 });
 
-test("practice overview exposes economic exceptions", async ({ page }) => {
-  await open(page, "management", "Practice overview");
-  await expect(page.getByText("Economic exceptions")).toBeVisible();
+test("practice home prioritises actionable queues and preserves narrow reflow", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await open(page, "management", "Home");
+  await expect(page.getByRole("heading", { name: "Attention required" })).toBeVisible();
+  const overdue = page.getByRole("link", { name: /Overdue/ });
+  await expect(overdue).toHaveAttribute("href", "/practice/work?due=overdue");
+  await expect(page.getByRole("link", { name: /Awaiting review/ })).toHaveAttribute("href", "/practice/review");
+  await expect(page.getByRole("link", { name: "Open capacity plan" })).toHaveAttribute("href", "/practice/capacity");
   await expect(page.getByText("No reliable billing source")).toBeVisible();
+  const widths = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, page: document.documentElement.scrollWidth }));
+  expect(widths.page).toBeLessThanOrEqual(widths.viewport + 1);
+  await overdue.click();
+  await expect(page).toHaveURL(/\/practice\/work\?due=overdue$/);
+  await expect(page.getByRole("combobox", { name: "Deadline" })).toHaveValue("overdue");
 });
 
 test("resource planning remains usable in forced-colors mode", async ({ page }) => {

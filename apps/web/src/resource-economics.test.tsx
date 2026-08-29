@@ -11,8 +11,8 @@ vi.mock("@fluentui/react-components", async () => {
   return createRequire(import.meta.url)("@fluentui/react-components");
 });
 
-import ResourceEconomics, { capacityDescription, capacityTone, filterResources, formatEconomicValue } from "./ResourceEconomics";
-import type { ResourceProfile } from "./api";
+import ResourceEconomics, { capacityDescription, capacityTone, filterResources, formatEconomicValue, practiceHomeNextAction, practiceHomeQueues } from "./ResourceEconomics";
+import type { PracticeEconomicsOverview, ResourceProfile } from "./api";
 
 const resources: ResourceProfile[] = [
   { id: "r1", display_name: "Aisha Khan", team_name: "Accounts", role_title: "Manager", status: "active", weekly_capacity_hours: 35, assigned_hours: 30, available_hours: 5, utilisation_percentage: 86, overdue_work: 1 },
@@ -36,6 +36,23 @@ describe("resource economics UI contracts", () => {
     expect(formatEconomicValue(undefined, "GBP", "unavailable")).toBe("Unavailable");
     expect(formatEconomicValue(0, "GBP", "known")).toBe("£0");
     expect(formatEconomicValue(1250, "GBP", "estimated")).toBe("£1,250");
+  });
+
+  it("turns every home exception into a direct operational route", () => {
+    const overview: PracticeEconomicsOverview = { due_this_week: 7, overdue_work: 2, waiting_on_client: 3, review_queue: 4, capacity_utilisation_percentage: 86, forecast_capacity_hours: 120, economic_exceptions: 1 };
+    const queues = practiceHomeQueues(overview);
+    expect(queues.map((item) => item.path)).toEqual([
+      "/practice/work?due=overdue",
+      "/practice/work?due=this-week",
+      "/practice/work?status=waiting_on_client",
+      "/practice/review",
+    ]);
+    expect(practiceHomeNextAction(overview)).toBe("Overdue: 2 items need attention.");
+  });
+
+  it("gives an explicit all-clear when the practice has no delivery exceptions", () => {
+    const overview: PracticeEconomicsOverview = { due_this_week: 0, overdue_work: 0, waiting_on_client: 0, review_queue: 0, capacity_utilisation_percentage: 50, forecast_capacity_hours: 80, economic_exceptions: 0 };
+    expect(practiceHomeNextAction(overview)).toBe("No delivery exceptions need immediate attention.");
   });
 
   it("announces loading for every resource and economics surface", () => {

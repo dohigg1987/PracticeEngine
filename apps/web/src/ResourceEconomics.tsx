@@ -12,6 +12,7 @@ import {
   DataGridRow,
   Field,
   Input,
+  Link,
   MessageBar,
   MessageBarBody,
   Select,
@@ -39,6 +40,7 @@ import {
 import { formatDate } from "./displayFormat";
 import { statutoryLabel } from "./format";
 import { statusBadgeProps } from "./statusBadge";
+import { ErrorState, LoadingState, PageHeader, PageShell } from "./CanonicalPatterns";
 import "./resource-economics.css";
 
 export type ResourceEconomicsView = "resources" | "capacity" | "allocation" | "time" | "portfolio" | "management";
@@ -47,6 +49,7 @@ type Props = {
   context: ApiContext;
   view: ResourceEconomicsView;
   onOpenWork?: (id: string) => void;
+  onNavigate?: (path: string) => void;
 };
 
 type CapacityTone = "available" | "balanced" | "pressure" | "overallocated";
@@ -208,21 +211,56 @@ function PortfolioView({ context }: Omit<Props, "view">) {
   </section>;
 }
 
-function ManagementView({ context }: Omit<Props, "view">) {
+export type PracticeHomeQueue = {
+  label: string;
+  value: number;
+  description: string;
+  path: string;
+  priority: "critical" | "attention" | "standard";
+};
+
+export function practiceHomeQueues(overview: PracticeEconomicsOverview): PracticeHomeQueue[] {
+  return [
+    { label: "Overdue", value: overview.overdue_work, description: "Work past its deadline", path: "/practice/work?due=overdue", priority: "critical" },
+    { label: "Due this week", value: overview.due_this_week, description: "Work requiring delivery or scheduling", path: "/practice/work?due=this-week", priority: "attention" },
+    { label: "Waiting on clients", value: overview.waiting_on_client, description: "Follow-ups or evidence blocking progress", path: "/practice/work?status=waiting_on_client", priority: "attention" },
+    { label: "Awaiting review", value: overview.review_queue, description: "Work ready for a reviewer decision", path: "/practice/review", priority: "standard" },
+  ];
+}
+
+export function practiceHomeNextAction(overview: PracticeEconomicsOverview): string {
+  const next = practiceHomeQueues(overview).find((item) => item.value > 0);
+  return next ? `${next.label}: ${next.value} item${next.value === 1 ? "" : "s"} need attention.` : "No delivery exceptions need immediate attention.";
+}
+
+function ManagementView({ context, onNavigate }: Omit<Props, "view">) {
   const [overview, setOverview] = useState<PracticeEconomicsOverview | null>(null), [loading, setLoading] = useState(true), [error, setError] = useState("");
   const load = useCallback(async () => { setLoading(true); setError(""); try { setOverview(await api.practiceEconomicsOverview(context)); } catch (reason) { setError(errorText(reason)); } finally { setLoading(false); } }, [context]);
   useEffect(() => { void load(); }, [load]);
-  if (loading) return <section className="re-page"><Head title="Practice overview" body="A decision-focused view of delivery, capacity and economics across the practice." /><Loading text="Loading practice overview" /></section>;
-  if (!overview) return <section className="re-page"><Head title="Practice overview" body="Operational exceptions that require a management decision." /><Failure message={error || "The practice overview is unavailable."} retry={load} /></section>;
-  const measures = [
-    ["Due this week", overview.due_this_week, "Work requiring scheduling"],
-    ["Overdue work", overview.overdue_work, "Delivery exception"],
-    ["Waiting on client", overview.waiting_on_client, "Follow-up decision"],
-    ["Review queue", overview.review_queue, "Reviewer capacity"],
-    ["Capacity utilisation", `${Math.round(overview.capacity_utilisation_percentage)}%`, "Current period"],
-    ["Forecast capacity", hours(overview.forecast_capacity_hours), "Remaining capacity"],
-    ["Operational WIP", overview.wip_amount == null ? "Unavailable" : formatEconomicValue(overview.wip_amount, overview.currency, "known"), overview.wip_amount == null ? "No reliable billing source" : "Known or calculated"],
-    ["Economic exceptions", overview.economic_exceptions, "Review source data"],
-  ] as const;
-  return <section className="re-page"><Head title="Practice overview" body="Operational exceptions and capacity signals that support management decisions." />{error && <Failure message={error} retry={load} />}<dl className="re-measures">{measures.map(([name, value, help]) => <div key={name}><dt>{name}</dt><dd>{value}</dd><span>{help}</span></div>)}</dl></section>;
+  if (loading) return <LoadingState title="Home" description="Delivery exceptions, review demand and capacity across the practice." kind="grid" />;
+  if (!overview) return <PageShell><PageHeader title="Home" description="Delivery exceptions, review demand and capacity across the practice." /><ErrorState message={error || "The operational overview is unavailable."} retry={load} secondaryAction={<Link href="/practice/work" onClick={onNavigate ? (event) => { event.preventDefault(); onNavigate("/practice/work"); } : undefined}>Open work</Link>} /></PageShell>;
+  const queues = practiceHomeQueues(overview);
+  const navigateLink = (path: string) => onNavigate ? (event: React.MouseEvent<HTMLAnchorElement>) => { event.preventDefault(); onNavigate(path); } : undefined;
+  return <PageShell className="re-home">
+    <PageHeader title="Home" description="Delivery exceptions, review demand and capacity across the practice." meta={<span className="re-home-next">{practiceHomeNextAction(overview)}</span>} />
+    {error && <ErrorState title="Some home data may be out of date" message={error} retry={load} />}
+    <div className="re-home-layout">
+      <section className="re-home-section re-home-attention" aria-labelledby="home-attention-title">
+        <header><h2 id="home-attention-title">Attention required</h2><p>Open a queue to act on the underlying work.</p></header>
+        <ul>{queues.map((item) => <li key={item.label} className={`re-home-queue re-home-queue--${item.priority}`}>
+          <Link href={item.path} onClick={navigateLink(item.path)}><span><strong>{item.label}</strong><small>{item.description}</small></span><b aria-label={`${item.value} ${item.label.toLowerCase()}`}>{item.value}</b></Link>
+        </li>)}</ul>
+      </section>
+      <div className="re-home-signals">
+        <section className="re-home-section" aria-labelledby="home-capacity-title">
+          <header><h2 id="home-capacity-title">Capacity</h2><Link href="/practice/capacity" onClick={navigateLink("/practice/capacity")}>Open capacity plan</Link></header>
+          <dl><div><dt>Current utilisation</dt><dd>{Math.round(overview.capacity_utilisation_percentage)}%</dd><span>Across available practice capacity</span></div><div><dt>Forecast capacity</dt><dd>{hours(overview.forecast_capacity_hours)}</dd><span>Remaining in the planning horizon</span></div></dl>
+        </section>
+        <section className="re-home-section" aria-labelledby="home-economics-title">
+          <header><h2 id="home-economics-title">Economics</h2><Link href="/practice/portfolio-economics" onClick={navigateLink("/practice/portfolio-economics")}>Open portfolio</Link></header>
+          <dl><div><dt>Operational WIP</dt><dd>{overview.wip_amount == null ? "Unavailable" : formatEconomicValue(overview.wip_amount, overview.currency, "known")}</dd><span>{overview.wip_amount == null ? "No reliable billing source" : "Known or calculated"}</span></div><div><dt>Data exceptions</dt><dd>{overview.economic_exceptions}</dd><span>Records requiring source review</span></div></dl>
+        </section>
+      </div>
+    </div>
+  </PageShell>;
 }

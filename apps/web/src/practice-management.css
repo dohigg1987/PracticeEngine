@@ -3,7 +3,7 @@
 .pm-head h1 { margin: 0; font-size: var(--fontSizeBase500); line-height: var(--lineHeightBase500); font-weight: var(--fontWeightSemibold); }
 .pm-head p, .pm-section header p { margin: var(--spacingVerticalXS) 0 0; color: var(--colorNeutralForeground3); }
 .pm-loading { display: grid; gap: var(--spacingVerticalS); padding-block: var(--spacingVerticalL); }
-.pm-filters { display: grid; grid-template-columns: minmax(220px, 2fr) repeat(3, minmax(150px, 1fr)) auto; gap: var(--spacingHorizontalM); align-items: end; }
+.pm-filters { display: grid; grid-template-columns: minmax(220px, 2fr) repeat(3, minmax(150px, 1fr)); gap: var(--spacingHorizontalM); align-items: end; }
 .pm-command-bar { display: flex; flex-wrap: wrap; gap: var(--spacingHorizontalS); align-items: center; }
 .pm-stage-actions { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(280px, 2fr) auto; gap: var(--spacingHorizontalM); align-items: end; }
 .pm-service-options { display: grid; grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--spacingVerticalS) var(--spacingHorizontalM); margin: 0; padding: var(--spacingVerticalM) var(--spacingHorizontalM); border: 1px solid var(--colorNeutralStroke1); }

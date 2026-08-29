@@ -30,6 +30,7 @@ type Props = {
   onOpenClient?: (id: string) => void;
   onOpenLedgerly?: (engagementId: string, clientId: string) => void;
   onBack?: () => void;
+  routeSearch?: string;
 };
 
 const label = statutoryLabel;
@@ -37,12 +38,24 @@ const date = (value?: string | null) => formatDate(value, "Not set");
 const errorText = (value: unknown) => value instanceof Error ? value.message : "The request could not be completed.";
 export const isOverdue = (value?: string | null, status?: PracticeWorkStatus, today = new Date()): boolean =>
   Boolean(value && status !== "completed" && status !== "cancelled" && new Date(`${value}T23:59:59`) < today);
-export const filterPracticeWork = (items: PracticeWorkItem[], query: string, status: string, priority: string) => {
+export const initialWorkFilters = (search = "") => {
+  const parameters = new URLSearchParams(search);
+  const status = parameters.get("status") || "";
+  const due = parameters.get("due") || "";
+  return {
+    status: ["not_started", "ready", "in_progress", "waiting_on_client", "waiting_internal", "review", "completed", "cancelled"].includes(status) ? status : "",
+    due: ["overdue", "this-week"].includes(due) ? due : "",
+  };
+};
+export const filterPracticeWork = (items: PracticeWorkItem[], query: string, status: string, priority: string, due = "", today = new Date()) => {
   const term = query.trim().toLowerCase();
+  const start = new Date(today); start.setHours(0, 0, 0, 0);
+  const end = new Date(start); end.setDate(end.getDate() + (6 - ((end.getDay() + 6) % 7))); end.setHours(23, 59, 59, 999);
   return items.filter((item) =>
     (!term || [item.client_name, item.service_name, item.title, item.period_reference, item.assigned_member_name, item.assigned_team_name]
       .some((value) => value?.toLowerCase().includes(term))) &&
-    (!status || item.status === status) && (!priority || item.priority === priority));
+    (!status || item.status === status) && (!priority || item.priority === priority) &&
+    (!due || (due === "overdue" ? isOverdue(item.due_date, item.status, today) : Boolean(item.due_date && !isOverdue(item.due_date, item.status, today) && new Date(`${item.due_date}T23:59:59`) <= end))));
 };
 export const practiceServiceCategories = ["accounts", "bookkeeping", "tax", "payroll", "company_secretarial", "assurance", "advisory", "other"] as const;
 export const practiceServiceCreateInput = (name: string, category: string) => ({ name: name.trim(), category, status: "active" as const });
@@ -118,22 +131,26 @@ const workColumns: TableColumnDefinition<PracticeWorkItem>[] = [
   createTableColumn({ columnId: "priority", compare: (a, b) => a.priority.localeCompare(b.priority), renderHeaderCell: () => "Priority", renderCell: (item) => label(item.priority) }),
 ];
 
-function WorkList({ context, onOpenWork }: Props) {
+function WorkList({ context, onOpenWork, routeSearch }: Props) {
+  const initialFilters = useMemo(() => initialWorkFilters(routeSearch), [routeSearch]);
   const [items, setItems] = useState<PracticeWorkItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState(initialFilters.status);
   const [priority, setPriority] = useState("");
+  const [due, setDue] = useState(initialFilters.due);
   const load = useCallback(async () => { setLoading(true); setError(""); try { setItems((await api.practiceWork(context)).items); } catch (e) { setError(errorText(e)); } finally { setLoading(false); } }, [context]);
   useEffect(() => { void load(); }, [load]);
-  const visible = useMemo(() => filterPracticeWork(items, query, status, priority), [items, query, status, priority]);
+  useEffect(() => { setStatus(initialFilters.status); setDue(initialFilters.due); }, [initialFilters]);
+  const visible = useMemo(() => filterPracticeWork(items, query, status, priority, due), [items, query, status, priority, due]);
   if (loading) return <section className="pm-page"><Head title="Work" body="Operational deliverables across clients, services and teams." /><Loading text="Loading practice work" /></section>;
   return <section className="pm-page"><Head title="Work" body="Operational deliverables across clients, services and teams." />{error && <Failure message={error} retry={load} />}
     <div className="pm-filters" aria-label="Work filters">
       <Field label="Search"><Input value={query} onChange={(_, data) => setQuery(data.value)} placeholder="Client, service or work item" /></Field>
       <Field label="Status"><Select value={status} onChange={(_, data) => setStatus(data.value)}><option value="">All statuses</option>{["not_started","ready","in_progress","waiting_on_client","waiting_internal","review","completed","cancelled"].map((value) => <option key={value} value={value}>{label(value)}</option>)}</Select></Field>
       <Field label="Priority"><Select value={priority} onChange={(_, data) => setPriority(data.value)}><option value="">All priorities</option>{["urgent","high","normal","low"].map((value) => <option key={value} value={value}>{label(value)}</option>)}</Select></Field>
+      <Field label="Deadline"><Select value={due} onChange={(_, data) => setDue(data.value)}><option value="">Any deadline</option><option value="overdue">Overdue</option><option value="this-week">Due this week</option></Select></Field>
     </div>
     <p className="pm-result-count" aria-live="polite">{visible.length} work item{visible.length === 1 ? "" : "s"}</p>
     {visible.length ? <div className="pm-grid-scroll"><DataGrid items={visible} columns={workColumns} sortable getRowId={(item) => item.id} aria-label="Practice work"><DataGridHeader><DataGridRow>{({ renderHeaderCell }) => <DataGridHeaderCell>{renderHeaderCell()}</DataGridHeaderCell>}</DataGridRow></DataGridHeader><DataGridBody<PracticeWorkItem>>{({ item, rowId }) => <DataGridRow<PracticeWorkItem> key={rowId}>{({ renderCell, columnId }) => <DataGridCell>{columnId === "work" && onOpenWork ? <Button appearance="transparent" className="pm-open" icon={<OpenRegular />} iconPosition="after" onClick={() => onOpenWork(item.id)}>{renderCell(item)}</Button> : renderCell(item)}</DataGridCell>}</DataGridRow>}</DataGridBody></DataGrid></div> : <div className="pm-empty"><h2>No matching work</h2><p>Adjust the filters or create work from an active client service.</p></div>}

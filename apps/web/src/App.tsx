@@ -1851,6 +1851,7 @@ function AccountsWorkspace({
                   workItemId={practiceWorkItemId}
                     clientId={practiceClientId}
                   initialTab={practiceSection}
+                  routeSearch={locationSearch}
                   settingsSection={practiceSettingsSection(pathname)}
                   canManageSettings={canManageSettings(selectedMembership?.role_code || "")}
                     onOpenLedgerly={entitlementDecisions["ledgerly.enabled"] ? (engagementId, clientId) => {
@@ -1875,6 +1876,7 @@ function AccountsWorkspace({
                 <ResourceEconomics
                   context={context}
                   view={workspacePage as "resources" | "capacity" | "allocation" | "time" | "portfolio" | "management"}
+                  onNavigate={navigate}
                   onOpenWork={(workItemId) => {
                     setPracticeWorkItemId(workItemId);
                     setPracticeView("work-detail");

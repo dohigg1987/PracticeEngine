@@ -11,7 +11,7 @@ vi.mock("@fluentui/react-components", async () => {
   return createRequire(import.meta.url)("@fluentui/react-components");
 });
 
-import PracticeManagement, { assignmentDisplay, filterPracticeWork, isOverdue, practiceServiceCategories, practiceServiceCreateInput, safeAssignmentName, taskAssignmentDisplay } from "./PracticeManagement";
+import PracticeManagement, { assignmentDisplay, filterPracticeWork, initialWorkFilters, isOverdue, practiceServiceCategories, practiceServiceCreateInput, safeAssignmentName, taskAssignmentDisplay } from "./PracticeManagement";
 import { practiceClientSummaryItem, type PracticeClientSummary, type PracticeWorkItem } from "./api";
 
 const items: PracticeWorkItem[] = [
@@ -24,6 +24,18 @@ describe("Practice Management UI contracts", () => {
     expect(filterPracticeWork(items, "north", "", "").map((item) => item.id)).toEqual(["w1"]);
     expect(filterPracticeWork(items, "VAT", "waiting_on_client", "urgent").map((item) => item.id)).toEqual(["w2"]);
     expect(filterPracticeWork(items, "", "completed", "")).toEqual([]);
+  });
+
+  it("restores supported Home queue filters from a work deep link", () => {
+    expect(initialWorkFilters("?status=waiting_on_client")).toEqual({ status: "waiting_on_client", due: "" });
+    expect(initialWorkFilters("?due=overdue")).toEqual({ status: "", due: "overdue" });
+    expect(initialWorkFilters("?status=unknown&due=all")).toEqual({ status: "", due: "" });
+  });
+
+  it("filters overdue and due-this-week work without treating completed work as overdue", () => {
+    const today = new Date("2027-05-03T12:00:00");
+    expect(filterPracticeWork(items, "", "", "", "overdue", today).map((item) => item.id)).toEqual([]);
+    expect(filterPracticeWork(items, "", "", "", "this-week", today).map((item) => item.id)).toEqual(["w2"]);
   });
 
   it("only marks unfinished work overdue", () => {
