@@ -38,6 +38,12 @@ describe("Practice Management UI contracts", () => {
     expect(filterPracticeWork(items, "", "", "", "this-week", today).map((item) => item.id)).toEqual(["w2"]);
   });
 
+  it("filters work by client, service, assignee and team dimensions", () => {
+    const assigned = { ...items[0], assigned_member_id: "member-1", assigned_member_name: "Morgan Reed", assigned_team_id: "team-1", assigned_team_name: "Accounts" };
+    expect(filterPracticeWork([assigned, items[1]], "", "", "", "", new Date(), { client: "c1", service: "cs1", assignee: "member-1", team: "team-1" }).map((item) => item.id)).toEqual(["w1"]);
+    expect(filterPracticeWork([assigned, items[1]], "", "", "", "", new Date(), { assignee: "unassigned" }).map((item) => item.id)).toEqual(["w2"]);
+  });
+
   it("only marks unfinished work overdue", () => {
     const today = new Date("2027-06-01T12:00:00Z");
     expect(isOverdue("2027-05-07", "in_progress", today)).toBe(true);

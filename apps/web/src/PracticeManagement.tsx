@@ -47,7 +47,7 @@ export const initialWorkFilters = (search = "") => {
     due: ["overdue", "this-week"].includes(due) ? due : "",
   };
 };
-export const filterPracticeWork = (items: PracticeWorkItem[], query: string, status: string, priority: string, due = "", today = new Date()) => {
+export const filterPracticeWork = (items: PracticeWorkItem[], query: string, status: string, priority: string, due = "", today = new Date(), dimensions: { client?: string; service?: string; assignee?: string; team?: string } = {}) => {
   const term = query.trim().toLowerCase();
   const start = new Date(today); start.setHours(0, 0, 0, 0);
   const end = new Date(start); end.setDate(end.getDate() + (6 - ((end.getDay() + 6) % 7))); end.setHours(23, 59, 59, 999);
@@ -55,7 +55,10 @@ export const filterPracticeWork = (items: PracticeWorkItem[], query: string, sta
     (!term || [item.client_name, item.service_name, item.title, item.period_reference, item.assigned_member_name, item.assigned_team_name]
       .some((value) => value?.toLowerCase().includes(term))) &&
     (!status || item.status === status) && (!priority || item.priority === priority) &&
-    (!due || (due === "overdue" ? isOverdue(item.due_date, item.status, today) : Boolean(item.due_date && !isOverdue(item.due_date, item.status, today) && new Date(`${item.due_date}T23:59:59`) <= end))));
+    (!due || (due === "overdue" ? isOverdue(item.due_date, item.status, today) : Boolean(item.due_date && !isOverdue(item.due_date, item.status, today) && new Date(`${item.due_date}T23:59:59`) <= end))) &&
+    (!dimensions.client || item.client_id === dimensions.client) && (!dimensions.service || item.client_service_id === dimensions.service) &&
+    (!dimensions.assignee || (dimensions.assignee === "unassigned" ? !item.assigned_member_id : item.assigned_member_id === dimensions.assignee)) &&
+    (!dimensions.team || (dimensions.team === "unassigned" ? !item.assigned_team_id : item.assigned_team_id === dimensions.team)));
 };
 export const practiceServiceCategories = ["accounts", "bookkeeping", "tax", "payroll", "company_secretarial", "assurance", "advisory", "other"] as const;
 export const practiceServiceCreateInput = (name: string, category: string) => ({ name: name.trim(), category, status: "active" as const });
@@ -140,10 +143,15 @@ function WorkList({ context, onOpenWork, routeSearch }: Props) {
   const [status, setStatus] = useState(initialFilters.status);
   const [priority, setPriority] = useState("");
   const [due, setDue] = useState(initialFilters.due);
+  const [client, setClient] = useState(""), [service, setService] = useState(""), [assignee, setAssignee] = useState(""), [team, setTeam] = useState("");
   const load = useCallback(async () => { setLoading(true); setError(""); try { setItems((await api.practiceWork(context)).items); } catch (e) { setError(errorText(e)); } finally { setLoading(false); } }, [context]);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { setStatus(initialFilters.status); setDue(initialFilters.due); }, [initialFilters]);
-  const visible = useMemo(() => filterPracticeWork(items, query, status, priority, due), [items, query, status, priority, due]);
+  const visible = useMemo(() => filterPracticeWork(items, query, status, priority, due, new Date(), { client, service, assignee, team }), [items, query, status, priority, due, client, service, assignee, team]);
+  const clients = useMemo(() => [...new Map(items.map((item) => [item.client_id, item.client_name || "Client"])).entries()], [items]);
+  const services = useMemo(() => [...new Map(items.map((item) => [item.client_service_id, item.service_name || "Service"])).entries()], [items]);
+  const assignees = useMemo(() => [...new Map(items.filter((item) => item.assigned_member_id).map((item) => [item.assigned_member_id!, safeAssignmentName(item.assigned_member_name) || "Assigned member"])).entries()], [items]);
+  const teams = useMemo(() => [...new Map(items.filter((item) => item.assigned_team_id).map((item) => [item.assigned_team_id!, safeAssignmentName(item.assigned_team_name) || "Assigned team"])).entries()], [items]);
   if (loading) return <section className="pm-page"><Head title="Work" body="Operational deliverables across clients, services and teams." /><Loading text="Loading practice work" /></section>;
   return <section className="pm-page"><Head title="Work" body="Operational deliverables across clients, services and teams." />{error && <Failure message={error} retry={load} />}
     <div className="pm-filters" aria-label="Work filters">
@@ -151,6 +159,10 @@ function WorkList({ context, onOpenWork, routeSearch }: Props) {
       <Field label="Status"><Select value={status} onChange={(_, data) => setStatus(data.value)}><option value="">All statuses</option>{["not_started","ready","in_progress","waiting_on_client","waiting_internal","review","completed","cancelled"].map((value) => <option key={value} value={value}>{label(value)}</option>)}</Select></Field>
       <Field label="Priority"><Select value={priority} onChange={(_, data) => setPriority(data.value)}><option value="">All priorities</option>{["urgent","high","normal","low"].map((value) => <option key={value} value={value}>{label(value)}</option>)}</Select></Field>
       <Field label="Deadline"><Select value={due} onChange={(_, data) => setDue(data.value)}><option value="">Any deadline</option><option value="overdue">Overdue</option><option value="this-week">Due this week</option></Select></Field>
+      <Field label="Client"><Select value={client} onChange={(_, data) => setClient(data.value)}><option value="">All clients</option>{clients.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</Select></Field>
+      <Field label="Service"><Select value={service} onChange={(_, data) => setService(data.value)}><option value="">All services</option>{services.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</Select></Field>
+      <Field label="Assignee"><Select value={assignee} onChange={(_, data) => setAssignee(data.value)}><option value="">All assignees</option><option value="unassigned">Unassigned</option>{assignees.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</Select></Field>
+      <Field label="Team"><Select value={team} onChange={(_, data) => setTeam(data.value)}><option value="">All teams</option><option value="unassigned">Unassigned</option>{teams.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</Select></Field>
     </div>
     <p className="pm-result-count" aria-live="polite">{visible.length} work item{visible.length === 1 ? "" : "s"}</p>
     {visible.length ? <div className="pm-grid-scroll"><DataGrid items={visible} columns={workColumns} sortable getRowId={(item) => item.id} aria-label="Practice work"><DataGridHeader><DataGridRow>{({ renderHeaderCell }) => <DataGridHeaderCell>{renderHeaderCell()}</DataGridHeaderCell>}</DataGridRow></DataGridHeader><DataGridBody<PracticeWorkItem>>{({ item, rowId }) => <DataGridRow<PracticeWorkItem> key={rowId}>{({ renderCell, columnId }) => <DataGridCell>{columnId === "work" && onOpenWork ? <Button appearance="transparent" className="pm-open" icon={<OpenRegular />} iconPosition="after" onClick={() => onOpenWork(item.id)}>{renderCell(item)}</Button> : renderCell(item)}</DataGridCell>}</DataGridRow>}</DataGridBody></DataGrid></div> : <div className="pm-empty"><h2>No matching work</h2><p>Adjust the filters or create work from an active client service.</p></div>}
