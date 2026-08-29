@@ -31,6 +31,25 @@ import "./canonical-patterns.css";
 
 type Action = React.ReactNode;
 
+const MasterDetailSelectionContext = React.createContext(false);
+
+const masterDetailColumnSizingById: TableColumnSizingOptions = {
+  work: { minWidth: 180, idealWidth: 260 },
+  due: { minWidth: 82, idealWidth: 104 },
+  owner: { minWidth: 96, idealWidth: 132 },
+  state: { minWidth: 96, idealWidth: 114 },
+  status: { minWidth: 96, idealWidth: 124 },
+  priority: { minWidth: 72, idealWidth: 84 },
+};
+
+function inferredMasterDetailColumnSizing<T>(columns: TableColumnDefinition<T>[]) {
+  if (!columns.every((column) => masterDetailColumnSizingById[String(column.columnId)])) return undefined;
+  return Object.fromEntries(columns.map((column) => {
+    const columnId = String(column.columnId);
+    return [columnId, masterDetailColumnSizingById[columnId]];
+  })) as TableColumnSizingOptions;
+}
+
 export function PageShell({ children, className = "" }: React.PropsWithChildren<{ className?: string }>) {
   return <section className={`pe-page-shell ${className}`.trim()}>{children}</section>;
 }
@@ -106,7 +125,9 @@ export function CompactFilterBar({ children, advanced, advancedOpen, onAdvancedT
 
 export function MasterDetailWorkspace({ children, inspector, selected = false, className = "" }: React.PropsWithChildren<{ inspector?: React.ReactNode; selected?: boolean; className?: string }>) {
   return <div className={`pe-master-detail ${selected ? "pe-master-detail--selected" : ""} ${className}`.trim()}>
-    <div className="pe-master-region">{children}</div>
+    <MasterDetailSelectionContext.Provider value={selected}>
+      <div className="pe-master-region">{children}</div>
+    </MasterDetailSelectionContext.Provider>
     {inspector && <aside className="pe-inspector-region" aria-label="Selected record inspector">{inspector}</aside>}
   </div>;
 }
@@ -168,9 +189,11 @@ export function OperationalDataGrid<T>({
   sortable?: boolean;
   columnSizingOptions?: TableColumnSizingOptions;
 }) {
+  const inSelectedMasterDetail = React.useContext(MasterDetailSelectionContext);
+  const resolvedColumnSizing = columnSizingOptions ?? (inSelectedMasterDetail ? inferredMasterDetailColumnSizing(columns) : undefined);
   if (!items.length) return <>{empty}</>;
   return <div className="pe-operational-grid">
-    <DataGrid items={items} columns={columns} sortable={sortable} getRowId={getRowId} aria-label={label} resizableColumns={columnSizingOptions ? true : undefined} columnSizingOptions={columnSizingOptions}>
+    <DataGrid items={items} columns={columns} sortable={sortable} getRowId={getRowId} aria-label={label} resizableColumns={resolvedColumnSizing ? true : undefined} columnSizingOptions={resolvedColumnSizing}>
       <DataGridHeader>
         <DataGridRow>{({ renderHeaderCell }) => <DataGridHeaderCell>{renderHeaderCell()}</DataGridHeaderCell>}</DataGridRow>
       </DataGridHeader>
