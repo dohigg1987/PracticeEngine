@@ -21,6 +21,7 @@ import type {
   SelectTabData,
   SelectTabEvent,
   TableColumnDefinition,
+  TableColumnSizingOptions,
   TabValue,
 } from "@fluentui/react-components";
 import { ArrowLeftRegular } from "@fluentui/react-icons";
@@ -154,6 +155,7 @@ export function OperationalDataGrid<T>({
   onOpenItem,
   empty,
   sortable = true,
+  columnSizingOptions,
 }: {
   items: T[];
   columns: TableColumnDefinition<T>[];
@@ -164,10 +166,11 @@ export function OperationalDataGrid<T>({
   onOpenItem?: (item: T) => void;
   empty?: React.ReactNode;
   sortable?: boolean;
+  columnSizingOptions?: TableColumnSizingOptions;
 }) {
   if (!items.length) return <>{empty}</>;
   return <div className="pe-operational-grid">
-    <DataGrid items={items} columns={columns} sortable={sortable} getRowId={getRowId} aria-label={label}>
+    <DataGrid items={items} columns={columns} sortable={sortable} getRowId={getRowId} aria-label={label} resizableColumns={columnSizingOptions ? true : undefined} columnSizingOptions={columnSizingOptions}>
       <DataGridHeader>
         <DataGridRow>{({ renderHeaderCell }) => <DataGridHeaderCell>{renderHeaderCell()}</DataGridHeaderCell>}</DataGridRow>
       </DataGridHeader>

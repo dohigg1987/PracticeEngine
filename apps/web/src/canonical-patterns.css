@@ -21,6 +21,7 @@
 .pe-filter-summary { display: flex; align-items: center; justify-content: space-between; min-height: 32px; color: var(--colorNeutralForeground3); font-size: var(--fontSizeBase200); }
 .pe-operational-grid { min-width: 0; overflow-x: auto; border-block: 1px solid var(--colorNeutralStroke1); }
 .pe-operational-grid [role="grid"] { min-width: 880px; }
+.pe-master-detail--selected .pe-operational-grid [role="grid"] { min-width: 0; }
 .pe-operational-grid [role="row"] { min-height: 34px; }
 .pe-operational-grid a { font-weight: var(--fontWeightSemibold); }
 .pe-detail-header { display: grid; gap: var(--spacingVerticalM); }
