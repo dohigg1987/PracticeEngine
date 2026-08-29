@@ -36,18 +36,36 @@ jobs:
       - run: npm ci
       - name: Guarded production-shaped build
         run: npm run build:production --workspace apps/web
+      - name: Resolve the Pages production branch
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          response=$(curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/practiceengine-dev")
+          if [ "$(jq -r '.success' <<<"$response")" != "true" ]; then
+            echo "Could not read the Pages project."
+            jq -r '.errors' <<<"$response"
+            exit 1
+          fi
+          branch=$(jq -r '.result.production_branch' <<<"$response")
+          if [ -z "$branch" ] || [ "$branch" = "null" ]; then
+            echo "The Pages project reports no production_branch."
+            exit 1
+          fi
+          echo "Pages production branch is ${branch}"
+          echo "PAGES_PRODUCTION_BRANCH=${branch}" >> "$GITHUB_ENV"
       - name: Publish to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: apps/web
-          command: >-
-            pages deploy dist
-            --project-name practiceengine-dev
-            --branch environment-dev-integrated
-            --commit-hash ${{ github.sha }}
-            --commit-message "DEV deploy ${{ github.sha }}"
+        working-directory: apps/web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          node ../../node_modules/wrangler/bin/wrangler.js pages deploy dist \
+            --project-name practiceengine-dev \
+            --branch "$PAGES_PRODUCTION_BRANCH" \
+            --commit-hash "$GITHUB_SHA" \
+            --commit-message "DEV deploy $GITHUB_SHA" \
             --commit-dirty=false
       - name: Deployment summary
         run: |
