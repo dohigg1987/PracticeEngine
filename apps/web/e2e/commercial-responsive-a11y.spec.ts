@@ -93,6 +93,7 @@ test("owned surfaces tolerate WCAG text spacing at 320px", async ({ page }) => {
 
   await openSurface(page, surfaces[0]);
   await page.locator(".client-name-button").first().click();
+  await page.getByRole("tab", { name: "Contacts & permanent file" }).click();
   await expect(page.locator(".permanent-file")).toBeVisible();
   await assertPageReflows(page);
 });

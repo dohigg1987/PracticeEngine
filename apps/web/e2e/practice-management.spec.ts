@@ -65,6 +65,16 @@ test("clients are created through the canonical Practice client command", async 
   await expect(page.getByRole("grid", { name: "Clients" })).toContainText("DEV Review Client Ltd");
 });
 
+test("client record joins delivery overview and permanent-file context", async ({ page }) => {
+  await page.goto("/practice/clients");
+  await page.getByRole("button", { name: "Northstar Community Foundation" }).click();
+  await expect(page.getByRole("tab", { name: "Overview & delivery" })).toBeVisible();
+  await expect(page.getByRole("table", { name: "Client services" })).toBeVisible();
+  await expect(page.getByRole("table", { name: "Client work" })).toContainText("2026 Annual Accounts");
+  await page.getByRole("tab", { name: "Contacts & permanent file" }).click();
+  await expect(page.getByRole("heading", { name: "Legal and registered details" })).toBeVisible();
+});
+
 test("practice settings exposes service and template configuration at narrow width", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 720 });
   await page.goto("/practice/settings/services");

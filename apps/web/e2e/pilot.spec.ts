@@ -215,6 +215,7 @@ test("pilot workspace administration reaches clients and team without actor iden
   await page
     .getByRole("button", { name: "Northstar Community Foundation" })
     .click();
+  await page.getByRole("tab", { name: "Contacts & permanent file" }).click();
   await expect(
     page.getByRole("heading", { name: "Legal and registered details" }),
   ).toBeVisible();
