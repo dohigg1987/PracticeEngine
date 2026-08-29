@@ -23,7 +23,7 @@ test("detects every prohibited UI source pattern", async (t) => {
   });
   t.after(() => rm(root, { recursive: true, force: true }));
   const rules = new Set((await auditSource(root)).map(({ rule }) => rule));
-  assert.deepEqual(rules, new Set(["browser-dialog", "literal-color", "native-interactive", "off-ramp-radius", "private-fluent-selector", "small-font", "visible-hash"]));
+  assert.deepEqual(rules, new Set(["browser-dialog", "literal-color", "native-interactive", "off-ramp-font-size", "off-ramp-radius", "private-fluent-selector", "small-font", "visible-hash"]));
 });
 
 test("detects confirm and prompt browser-dialog variants", async (t) => {
@@ -37,13 +37,22 @@ test("detects confirm and prompt browser-dialog variants", async (t) => {
   assert.equal(findings.length, 4);
 });
 
-test("accepts public selectors, the type floor, and the Fluent radius ramp", async (t) => {
+test("accepts public selectors, the Fluent type ramp, and the Fluent radius ramp", async (t) => {
   const root = await fixture({
     "good.tsx": `import { Button } from "@fluentui/react-components"; export const Good = () => <Button>Continue</Button>`,
-    "good.css": `.a { font-size: 12px; border-radius: 2px; } .b { border-radius: 4px; } .c { border-radius: 6px; } .d { border-radius: 8px; } .round { border-radius: 50%; } .token { border-radius: var(--borderRadiusMedium); } .circular { border-radius: 10000px; }`,
+    "good.css": `.a { font-size: var(--fontSizeBase200); border-radius: 2px; } .b { border-radius: 4px; } .c { border-radius: 6px; } .d { border-radius: 8px; } .round { border-radius: 50%; } .token { border-radius: var(--borderRadiusMedium); } .circular { border-radius: 10000px; } .hero { font-size: var(--fontSizeHero700); } .parent { font-size: inherit; }`,
   });
   t.after(() => rm(root, { recursive: true, force: true }));
   assert.deepEqual(await auditSource(root), []);
+});
+
+test("requires the Fluent type ramp outside statutory document output", async (t) => {
+  const root = await fixture({
+    "app.css": `.bad { font-size: 13px; } .good { font-size: var(--fontSizeBase300); } .statutory-page { font-size: 12px; } .statutory-page h2 { font-size: 23px; }`,
+  });
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const findings = (await auditSource(root)).filter(({ rule }) => rule === "off-ramp-font-size");
+  assert.deepEqual(findings.map(({ key }) => key), ["13px"]);
 });
 
 test("detects native interactive elements but permits hidden file plumbing", async (t) => {

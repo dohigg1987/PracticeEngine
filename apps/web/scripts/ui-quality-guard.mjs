@@ -73,6 +73,20 @@ function auditFile(relativeFile, source) {
         add(findings, "off-ramp-radius", relativeFile, source, match.index, value, `Border radius ${value} is outside the Fluent radius ramp`);
     }
 
+    for (const block of source.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const selector = block[1].trim();
+      if (statutorySelectorPattern.test(selector)) continue;
+      const declarationBlock = block[2];
+      for (const match of declarationBlock.matchAll(/font-size\s*:\s*([^;}\n]+)/gi)) {
+        const value = match[1].trim().toLowerCase().replace(/\s*!important$/, "");
+        const fluentToken = /^var\(--fontsizebase\d+\)$/.test(value) || /^var\(--fontsizehero\d+\)$/.test(value);
+        if (value !== "inherit" && !fluentToken) {
+          const index = block.index + block[0].indexOf(declarationBlock) + match.index;
+          add(findings, "off-ramp-font-size", relativeFile, source, index, value, `Font size ${value} is outside the Fluent type ramp`);
+        }
+      }
+    }
+
     for (const match of source.matchAll(/([^{}]+)\{/g)) {
       const selector = match[1].trim();
       for (const token of selector.matchAll(/\.fui-[\w-]+|\.___[\w-]+|\[class(?:\^|\*|~)?=[^\]]*fui-/g))
