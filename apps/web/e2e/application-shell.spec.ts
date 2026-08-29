@@ -56,6 +56,28 @@ test("representative sidebar routes keep the shell and expose destination contex
   await expect(page.getByRole("heading", { name: "Portfolio economics", exact: true })).toBeVisible();
 });
 
+test("secondary practice routes are reachable with consistent sidebar density", async ({ page }) => {
+  await page.goto("/practice/home");
+
+  await page.getByRole("button", { name: "Work", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Work", exact: true })).toBeVisible();
+  for (const label of ["Review", "Recurring work"] as const) {
+    await expect(page.getByRole("button", { name: label, exact: true })).toBeVisible();
+  }
+
+  await page.getByRole("button", { name: "Collaboration", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Client portal", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Automation", exact: true })).toHaveCount(1);
+
+  const [primaryFontSize, categoryFontSize, subItemFontSize] = await Promise.all([
+    page.getByRole("button", { name: "Home", exact: true }).evaluate((element) => getComputedStyle(element).fontSize),
+    page.getByRole("button", { name: "Collaboration", exact: true }).evaluate((element) => getComputedStyle(element).fontSize),
+    page.getByRole("button", { name: "Client portal", exact: true }).evaluate((element) => getComputedStyle(element).fontSize),
+  ]);
+  expect(categoryFontSize).toBe(primaryFontSize);
+  expect(subItemFontSize).toBe(primaryFontSize);
+});
+
 test("contextual Ledgerly switch retains canonical client and linked engagement", async ({ page }) => {
   await page.goto("/practice/work");
   await page.getByRole("link", { name: /2026 Annual Accounts/ }).click();
