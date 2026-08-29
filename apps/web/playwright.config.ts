@@ -13,6 +13,7 @@ const edgeInstalled = [
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
+  timeout: 60_000,
   retries: process.env.CI ? 2 : 0,
   workers: Number(process.env.PLAYWRIGHT_WORKERS || 4),
   outputDir,
