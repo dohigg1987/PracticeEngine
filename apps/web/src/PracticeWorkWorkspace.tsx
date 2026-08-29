@@ -14,7 +14,7 @@ import {
   MessageBarBody,
   Select,
 } from "@fluentui/react-components";
-import type { TableColumnDefinition } from "@fluentui/react-components";
+import type { TableColumnDefinition, TableColumnSizingOptions } from "@fluentui/react-components";
 import { OpenRegular } from "@fluentui/react-icons";
 import {
   api,
@@ -43,6 +43,14 @@ import {
 import { formatDate } from "./displayFormat";
 import { statutoryLabel } from "./format";
 import "./practice-work-workspace.css";
+
+const workColumnSizing: TableColumnSizingOptions = {
+  work: { minWidth: 160, idealWidth: 260 },
+  due: { minWidth: 92, idealWidth: 104 },
+  owner: { minWidth: 96, idealWidth: 132 },
+  status: { minWidth: 104, idealWidth: 124 },
+  priority: { minWidth: 72, idealWidth: 84 },
+};
 
 export type WorkSavedView = "my" | "all" | "due-soon" | "overdue" | "waiting-client" | "review";
 
@@ -193,7 +201,7 @@ export default function PracticeWorkWorkspace({ context, routeSearch, onNavigate
       <Field label="Priority"><Select value={urlState.priority} onChange={(_, data) => updateUrl({ priority: data.value })}><option value="">All priorities</option>{["urgent", "high", "normal", "low"].map((value) => <option key={value} value={value}>{statutoryLabel(value)}</option>)}</Select></Field>
     </CompactFilterBar>
     <MasterDetailWorkspace selected={Boolean(inspector)} inspector={inspector}>
-      <OperationalDataGrid items={visible} columns={columns} label="Practice work" getRowId={(item) => item.id} primaryColumnId="work" getItemHref={(item) => selectedWorkPath(routeSearch, { selected: item.id })} onOpenItem={(item) => updateUrl({ selected: item.id })} empty={<EmptyState title="No work in this view" description="Change the saved view or clear filters." />} />
+      <OperationalDataGrid items={visible} columns={columns} label="Practice work" getRowId={(item) => item.id} primaryColumnId="work" getItemHref={(item) => selectedWorkPath(routeSearch, { selected: item.id })} onOpenItem={(item) => updateUrl({ selected: item.id })} columnSizingOptions={workColumnSizing} empty={<EmptyState title="No work in this view" description="Change the saved view or clear filters." />} />
     </MasterDetailWorkspace>
   </PageShell>;
 }
@@ -224,7 +232,7 @@ export function WorkInspector({ context, item, resources, onChanged, onClose, on
     subtitle={`${item.client_name || "Client"} · ${item.service_name || "Service"}`}
     status={<StatusTreatment value={item.status} />}
     onClose={onClose}
-    footer={<><Button onClick={() => onOpenWork?.(item.id)}>Open work</Button>{item.specialist_module_key === "ledgerly" && item.specialist_record_reference && onOpenLedgerly && <Button appearance="primary" icon={<OpenRegular />} onClick={() => onOpenLedgerly(item.specialist_record_reference!, item.client_id)}>Open in Ledgerly</Button>}</>}
+    footer={<><Button onClick={() => onOpenWork?.(item.id)}>Open work</Button>{item.specialist_module_key === "ledgerly" && item.specialist_record_reference && onOpenLedgerly && <Button icon={<OpenRegular />} onClick={() => onOpenLedgerly(item.specialist_record_reference!, item.client_id)}>Open in Ledgerly</Button>}</>}
   >
     {error && <MessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></MessageBar>}
     {feedback && <MessageBar intent="success"><MessageBarBody>{feedback}</MessageBarBody></MessageBar>}
