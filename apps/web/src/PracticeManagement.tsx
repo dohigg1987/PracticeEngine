@@ -1,19 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Badge, Button, createTableColumn, DataGrid, DataGridBody, DataGridCell,
+  Button, createTableColumn, DataGrid, DataGridBody, DataGridCell,
   DataGridHeader, DataGridHeaderCell, DataGridRow, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, DialogTrigger, Field, Input, MessageBar,
   MessageBarBody, Select, Skeleton, SkeletonItem, Tab, TabList, Table,
   TableBody, TableCell, TableHeader, TableHeaderCell, TableRow,
 } from "@fluentui/react-components";
 import type { TableColumnDefinition } from "@fluentui/react-components";
-import { ArrowLeftRegular, OpenRegular } from "@fluentui/react-icons";
+import { OpenRegular } from "@fluentui/react-icons";
 import {
   api, ApiContext, AutomationRule, PracticeClientSummary, PracticeReview, PracticeService, PracticeTask, ResourceProfile,
   PracticeWorkItem, PracticeWorkStage, PracticeWorkStatus, PracticeWorkTemplate, RecurrenceExecution, RecurringWorkSchedule,
 } from "./api";
 import { formatDate } from "./displayFormat";
 import { statutoryLabel } from "./format";
-import { statusBadgeProps } from "./statusBadge";
+import { ErrorState, PageHeader, StatusTreatment } from "./CanonicalPatterns";
 import ClientCollaboration from "./ClientCollaboration";
 import "./practice-management.css";
 
@@ -62,13 +62,13 @@ function Loading({ text }: { text: string }) {
   return <Skeleton className="pm-loading" aria-label={text} role="status"><SkeletonItem size={24} /><SkeletonItem /><SkeletonItem /><SkeletonItem /></Skeleton>;
 }
 function Failure({ message, retry }: { message: string; retry: () => void }) {
-  return <MessageBar intent="error"><MessageBarBody>{message}</MessageBarBody><Button appearance="transparent" onClick={retry}>Retry</Button></MessageBar>;
+  return <ErrorState message={message} retry={retry} />;
 }
 function Status({ value }: { value: string }) {
-  return <Badge {...statusBadgeProps(value)}>{label(value)}</Badge>;
+  return <StatusTreatment value={value} />;
 }
 function Head({ title, body, back }: { title: string; body: string; back?: () => void }) {
-  return <header className="pm-head">{back && <Button appearance="subtle" icon={<ArrowLeftRegular />} aria-label="Back" onClick={back} />}<div><h1>{title}</h1><p>{body}</p></div></header>;
+  return <PageHeader title={title} description={body} back={back} />;
 }
 
 export default function PracticeManagement(props: Props) {
