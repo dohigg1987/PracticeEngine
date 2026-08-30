@@ -82,7 +82,7 @@ textarea {
 .global-search-group {
   padding: 8px 8px 4px;
   color: var(--colorNeutralForeground3);
-  font-size: 12px;
+  font-size: var(--fontSizeBase200);
   font-weight: 600;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -93,7 +93,7 @@ textarea {
   height: 24px;
   place-items: center;
   color: var(--colorNeutralForeground2);
-  font-size: 16px;
+  font-size: var(--fontSizeBase400);
 }
 .global-search-copy {
   display: grid;
@@ -111,7 +111,7 @@ textarea {
 .global-search-results small {
   color: var(--colorNeutralForeground3);
   overflow: hidden;
-  font-size: 12px;
+  font-size: var(--fontSizeBase200);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -122,7 +122,9 @@ textarea {
   border-radius: var(--borderRadiusSmall);
   background: var(--colorNeutralBackground2);
   color: var(--colorNeutralForeground3);
-  font: 10px/16px "Segoe UI", sans-serif;
+  font-family: var(--fontFamilyBase);
+  font-size: var(--fontSizeBase100);
+  line-height: var(--lineHeightBase200);
   text-align: center;
   opacity: 0;
 }
@@ -133,7 +135,7 @@ textarea {
   margin: 0;
   padding: 10px;
   color: var(--colorNeutralForeground3);
-  font-size: 12px;
+  font-size: var(--fontSizeBase200);
 }
 
 @media (max-width: 900px) {
@@ -190,7 +192,7 @@ pre,
   padding: 8px 8px 10px;
   margin: 0;
   color: var(--colorNeutralForeground2);
-  font-size: 12px;
+  font-size: var(--fontSizeBase200);
   font-weight: 600;
 }
 
@@ -207,9 +209,9 @@ pre,
   border-bottom: 1px solid var(--colorNeutralStroke2);
   background: var(--colorNeutralBackground3);
   color: var(--colorNeutralForeground2);
-  font-size: 12px;
+  font-size: var(--fontSizeBase200);
   font-weight: 600;
-  line-height: 16px;
+  line-height: var(--lineHeightBase200);
 }
 
 .workspace-nav-bookend > h2 {
@@ -230,31 +232,13 @@ pre,
 .production-navigation > label {
   padding: 5px 8px 4px;
   color: var(--colorNeutralForeground3);
-  font-size: 12px;
+  font-size: var(--fontSizeBase200);
   font-weight: 600;
 }
 
 .production-navigation > select {
   width: calc(100% - 8px);
   margin: 0 4px 8px;
-}
-
-.fluent-nav [role="menuitem"] {
-  min-height: 32px;
-  margin: 1px 0;
-  border-radius: 2px;
-  background: transparent !important;
-  font-size: 12px;
-}
-
-.fluent-nav [role="menuitem"]:hover {
-  background: var(--colorSubtleBackgroundHover) !important;
-}
-
-.fluent-nav [role="menuitem"][aria-current="page"],
-.fluent-nav [role="menuitem"][aria-selected="true"] {
-  background: var(--colorBrandBackground2) !important;
-  color: var(--colorBrandForeground1) !important;
 }
 
 .production-navigation nav {
@@ -285,9 +269,9 @@ pre,
   background: var(--colorNeutralBackground3) !important;
   color: var(--colorNeutralForeground1);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--fontSizeBase300);
   font-weight: 600;
-  line-height: 20px;
+  line-height: var(--lineHeightBase300);
   text-align: left;
   cursor: pointer;
 }
@@ -331,12 +315,6 @@ pre,
   margin: 0;
 }
 
-.production-nav-stage-items [role="menuitem"] {
-  min-height: 34px;
-  padding-left: 20px;
-  font-size: 12px;
-}
-
 .workspace-nav-items {
   padding: 3px 0 6px;
   background: var(--colorNeutralBackground1);
@@ -351,7 +329,7 @@ pre,
 .eyebrow {
   margin: 0 0 4px;
   color: var(--colorNeutralForeground3);
-  font-size: 12px;
+  font-size: var(--fontSizeBase200);
   font-weight: 600;
   letter-spacing: 0;
   text-transform: none;
@@ -500,13 +478,13 @@ textarea,
   display: block;
 }
 .production-spine b {
-  font-size: 12px;
+  font-size: var(--fontSizeBase200);
   font-weight: 600;
 }
 .production-spine small {
   margin-top: 2px;
   color: var(--colorNeutralForeground3);
-  font-size: 12px;
+  font-size: var(--fontSizeBase200);
 }
 .production-spine [role="tab"].ready {
   background: var(--colorStatusSuccessBackground1);
@@ -560,7 +538,7 @@ textarea,
   min-width: 0;
   padding: 8px 12px;
   color: var(--colorNeutralForeground2);
-  font-size: 12px;
+  font-size: var(--fontSizeBase200);
   font-weight: 400;
   white-space: nowrap;
 }
@@ -584,12 +562,12 @@ th {
   padding: 0 10px;
   background: var(--colorNeutralBackground3);
   color: var(--colorNeutralForeground2);
-  font-size: 12px;
+  font-size: var(--fontSizeBase200);
   font-weight: 600;
 }
 td {
   padding: 8px 10px;
-  font-size: 12px;
+  font-size: var(--fontSizeBase200);
 }
 tbody tr:hover {
   background: var(--colorNeutralBackground2);
@@ -622,7 +600,7 @@ tbody tr:hover {
   margin: 12px 0;
   color: var(--colorNeutralForeground1);
   font-family: inherit;
-  font-size: 32px;
+  font-size: var(--fontSizeHero800);
   font-weight: 600;
   letter-spacing: 0;
 }
@@ -702,7 +680,7 @@ tbody tr:hover {
   padding: 14px 16px;
 }
 .panel-head h2 {
-  font-size: 16px;
+  font-size: var(--fontSizeBase400);
 }
 .metrics {
   gap: 8px;
@@ -806,26 +784,26 @@ table thead {
 .production-empty,
 .document-edit-form small {
   color: var(--colorNeutralForeground2);
-  font-size: 12px;
-  line-height: 1.45;
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
 }
-.production-spine b { font-size: 13px; }
-.production-spine small { font-size: 12px; }
+.production-spine b { font-size: var(--fontSizeBase200); }
+.production-spine small { font-size: var(--fontSizeBase200); }
 .production-spine [role="tab"].ready { background: var(--success-soft); }
 .production-spine [role="tab"].attention { background: var(--warning-soft); }
 .production-spine [role="tab"].active { background: var(--accent-soft); }
-.production-stage-menu [role="tab"] { font-size: 13px; }
+.production-stage-menu [role="tab"] { font-size: var(--fontSizeBase300); }
 .statutory-page { width: min(100%, 760px); padding: 58px 64px 42px; }
 .statutory-page table thead { background: #fff !important; }
 .statutory-page > header p { font-size: 14px; }
 .statutory-page > header small { color: #4f4f4f; font-size: 12px; }
 .statutory-page h2 { font-size: 23px; line-height: 1.25; }
-.page-period { color: var(--colorNeutralForeground2); font-size: 12px; }
+.statutory-page .page-period { color: var(--colorNeutralForeground2); font-size: 12px; }
 .statutory-page th { font-size: 12px; }
 .statutory-page td { font-size: 12px; }
-.narrative-page,
+.statutory-page .narrative-page,
 .statutory-page .accounting-note { font-size: 12px; line-height: 1.58; }
-.narrative-page h3 { font-size: 13px; }
+.statutory-page .narrative-page h3 { font-size: 13px; }
 .statutory-page .note-heading > span,
 .statutory-page .note-heading h3 { font-size: 16px; }
 .statutory-page .note-section h4,
@@ -1009,26 +987,26 @@ table thead {
 
 /* Readable Fluent application text; the statutory document keeps its own print scale. */
 .app-shell :where(small, .helper-text, .field-help, .record-meta, .muted):not(.statutory-page *) {
-  font-size: 12px !important;
-  line-height: 1.45;
+  font-size: var(--fontSizeBase200) !important;
+  line-height: var(--lineHeightBase200);
 }
-.app-shell :where(label, input, select, textarea, button):not(.statutory-page *) { font-size: 14px; }
-.app-shell :where(table):not(.statutory-page table) :where(th, td) { font-size: 13px; line-height: 1.4; }
+.app-shell :where(label, input, select, textarea, button):not(.statutory-page *) { font-size: var(--fontSizeBase300); }
+.app-shell :where(table):not(.statutory-page table) :where(th, td) { font-size: var(--fontSizeBase200); line-height: var(--lineHeightBase200); }
 .app-shell :where(table):not(.statutory-page table) :where(th, td) {
   vertical-align: middle;
 }
 .app-shell :where(.number, .amount, .money, .mono, th, td) {
   font-variant-numeric: tabular-nums;
 }
-.app-shell :where(.panel-head, .operations-panel > header, .production-panel > header) p { font-size: 13px; line-height: 1.45; }
-.app-shell .eyebrow { color: var(--colorNeutralForeground2); font-size: 12px; font-weight: 600; letter-spacing: 0; text-transform: none; }
+.app-shell :where(.panel-head, .operations-panel > header, .production-panel > header) p { font-size: var(--fontSizeBase200); line-height: var(--lineHeightBase200); }
+.app-shell .eyebrow { color: var(--colorNeutralForeground2); font-size: var(--fontSizeBase200); font-weight: 600; letter-spacing: 0; text-transform: none; }
 .app-shell .task-board :where(h3, h4, small, select),
 .app-shell .review-list :where(p, .severity),
 .app-shell .operational-metrics small,
 .app-shell .record-list :where(h3, small, details),
-.app-shell .readiness :where(p, dl div) { font-size: 12px !important; }
+.app-shell .readiness :where(p, dl div) { font-size: var(--fontSizeBase200) !important; }
 .app-shell .blocking,
-.app-shell .severity { font-size: 12px !important; letter-spacing: 0; text-transform: none; }
+.app-shell .severity { font-size: var(--fontSizeBase200) !important; letter-spacing: 0; text-transform: none; }
 .app-shell .task-select-native { font-size: var(--fontSizeBase300) !important; }
 .app-shell .permanent-file-section:nth-of-type(2) > header { border-left: 4px solid var(--colorBrandStroke1); background: var(--colorBrandBackground2); }
 .app-shell .permanent-file-section:nth-of-type(3) > header { border-left: 4px solid var(--colorPaletteTealBorderActive); background: var(--colorPaletteTealBackground2); }
