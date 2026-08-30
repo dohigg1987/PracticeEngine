@@ -21,6 +21,21 @@ test("practice work supports operational filtering", async ({ page }) => {
   await expect(page.getByRole("row", { name: /Northstar.*Annual accounts.*2026 Annual Accounts/ })).toBeVisible();
 });
 
+test("practice work status treatments remain inside their Fluent badge", async ({ page }) => {
+  await page.goto("/practice/work?view=all");
+  const cell = page.locator('[role="gridcell"]').filter({ hasText: "Waiting On Client" }).first();
+  const badge = cell.locator(".pe-status-treatment");
+  await expect(badge).toBeVisible();
+  const geometry = await badge.evaluate((element) => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }));
+  expect(geometry.scrollHeight).toBeLessThanOrEqual(geometry.clientHeight);
+  expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.clientWidth);
+});
+
 test("CRM pipeline and onboarding stay operational at narrow width", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await start(page);

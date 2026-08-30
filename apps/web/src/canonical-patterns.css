@@ -24,6 +24,7 @@
 .pe-master-detail--selected .pe-operational-grid [role="grid"] { min-width: 0; }
 .pe-operational-grid [role="row"] { min-height: 34px; }
 .pe-operational-grid a { font-weight: var(--fontWeightSemibold); }
+.pe-status-treatment { white-space: nowrap; }
 .pe-detail-header { display: grid; gap: var(--spacingVerticalM); }
 .pe-detail-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--spacingVerticalM) var(--spacingHorizontalL); margin: 0; }
 .pe-detail-facts div { min-width: 0; }

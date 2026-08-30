@@ -298,7 +298,7 @@ export function ErrorState({ title = "This page could not be loaded", message, r
 }
 
 export function StatusTreatment({ value }: { value: string }) {
-  return <Badge {...statusBadgeProps(value)}>{statutoryLabel(value)}</Badge>;
+  return <Badge className="pe-status-treatment" {...statusBadgeProps(value)}>{statutoryLabel(value)}</Badge>;
 }
 
 export function ContextualActions({ children }: React.PropsWithChildren) {
