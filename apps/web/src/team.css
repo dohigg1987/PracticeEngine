@@ -18,12 +18,12 @@
 }
 .team-section-head h2,
 .team-section-head p { margin: 0; }
-.team-section-head h2 { font-size: 18px; line-height: 24px; }
+.team-section-head h2 { font-size: var(--fontSizeBase500); line-height: var(--lineHeightBase500); }
 .team-section-head p {
   margin-top: 2px;
   color: var(--colorNeutralForeground2);
-  font-size: 14px;
-  line-height: 20px;
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase300);
 }
 .invitation-list {
   display: grid;
@@ -42,7 +42,7 @@
 .invitation-list small {
   display: block;
   color: var(--colorNeutralForeground2);
-  font-size: 13px;
+  font-size: var(--fontSizeBase200);
   overflow-wrap: anywhere;
 }
 .invite-form {
@@ -56,7 +56,7 @@
   display: grid;
   gap: 6px;
   color: var(--colorNeutralForeground2);
-  font-size: 14px;
+  font-size: var(--fontSizeBase300);
   font-weight: 700;
 }
 .invite-form input,
@@ -71,8 +71,8 @@
 .delivery-note {
   margin: 4px 16px 16px;
   color: var(--colorNeutralForeground2);
-  font-size: 13px;
-  line-height: 18px;
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
 }
 .one-time-link {
   display: grid;
@@ -89,14 +89,14 @@
   display: grid;
   gap: 4px;
   color: var(--colorStatusSuccessForeground1);
-  font-size: 13px;
+  font-size: var(--fontSizeBase200);
 }
 .one-time-link input {
   width: 100%;
   min-width: 0;
   height: 38px;
   font-family: Consolas, "SFMono-Regular", ui-monospace, monospace;
-  font-size: 12px;
+  font-size: var(--fontSizeBase200);
 }
 .one-time-link > div:nth-of-type(2) {
   display: flex;
@@ -118,13 +118,13 @@
 .invitation-list > h3 {
   margin: 0;
   padding: 14px 16px 8px;
-  font-size: 14px;
+  font-size: var(--fontSizeBase300);
 }
 .invitation-list > p {
   margin: 0;
   padding: 0 16px 16px;
   color: var(--colorNeutralForeground2);
-  font-size: 13px;
+  font-size: var(--fontSizeBase200);
 }
 .invitation-list article {
   grid-template-columns: minmax(0, 1fr) auto auto;
