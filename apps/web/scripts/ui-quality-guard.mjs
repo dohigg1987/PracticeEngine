@@ -3,6 +3,18 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const allowedRadius = new Set(["0", "2px", "4px", "6px", "8px", "50%", "10000px"]);
+const fluentFontSizeTokenPixels = {
+  fontsizebase100: 10,
+  fontsizebase200: 12,
+  fontsizebase300: 14,
+  fontsizebase400: 16,
+  fontsizebase500: 20,
+  fontsizebase600: 24,
+  fontsizehero700: 28,
+  fontsizehero800: 32,
+  fontsizehero900: 40,
+  fontsizehero1000: 68,
+};
 const sourceExtensions = new Set([".css", ".js", ".jsx", ".mjs", ".ts", ".tsx"]);
 const nativeInteractiveElements = new Set(["a", "button", "details", "input", "select", "summary", "textarea"]);
 const literalColorPattern = /#[0-9a-f]{3,8}\b|\b(?:rgb|rgba|hsl|hsla)\s*\([^)]*\)/gi;
@@ -64,6 +76,12 @@ function auditFile(relativeFile, source) {
       const pixels = Number(match[1]) * (match[2].toLowerCase() === "rem" ? 16 : 1);
       if (pixels < 12)
         add(findings, "small-font", relativeFile, source, match.index, `${match[1]}${match[2].toLowerCase()}`, `Font size resolves to ${pixels}px, below the 12px floor`);
+    }
+
+    for (const match of source.matchAll(/font-size\s*:\s*var\(--(fontSizeBase\d+|fontSizeHero\d+)\)/gi)) {
+      const pixels = fluentFontSizeTokenPixels[match[1].toLowerCase()];
+      if (pixels !== undefined && pixels < 12)
+        add(findings, "small-font", relativeFile, source, match.index, `var(--${match[1]})`, `Font size resolves to ${pixels}px, below the 12px floor`);
     }
 
     for (const match of source.matchAll(/border(?:-(?:top|bottom)-(?:left|right))?-radius\s*:\s*([^;}\n]+)/gi)) {

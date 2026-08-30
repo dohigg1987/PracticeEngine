@@ -55,6 +55,15 @@ test("requires the Fluent type ramp outside statutory document output", async (t
   assert.deepEqual(findings.map(({ key }) => key), ["13px"]);
 });
 
+test("small-font resolves Fluent type-ramp tokens instead of only literal px and rem", async (t) => {
+  const root = await fixture({
+    "app.css": `.tiny { font-size: var(--fontSizeBase100); } .body { font-size: var(--fontSizeBase200); } .literal { font-size: 10px; }`,
+  });
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const findings = (await auditSource(root)).filter(({ rule }) => rule === "small-font");
+  assert.deepEqual(findings.map(({ key }) => key).sort(), ["10px", "var(--fontSizeBase100)"]);
+});
+
 test("detects native interactive elements but permits hidden file plumbing", async (t) => {
   const root = await fixture({
     "controls.tsx": `export const Bad = () => <><a href="/">Home</a><button>Save</button><details><summary>More</summary></details><input /><select /><textarea /></>`,
