@@ -758,13 +758,13 @@ body { background: var(--colorNeutralBackground3); }
   background: var(--colorBrandBackground2) !important;
   color: var(--colorBrandForeground1) !important;
 }
-.sidebar nav button[aria-current="page"],
-.sidebar nav button.selected {
+.sidebar nav button.workspace-nav-item[aria-current="page"],
+.sidebar nav button.workspace-nav-item.selected {
   background: var(--colorBrandBackground2) !important;
   color: var(--colorBrandForeground1) !important;
   box-shadow: inset 3px 0 var(--colorBrandStroke1);
 }
-.sidebar nav button svg { color: var(--colorBrandForeground1); }
+.sidebar nav button.workspace-nav-item svg { color: var(--colorBrandForeground1); }
 .production-stage-menu {
   background: var(--colorNeutralBackground1);
   border-color: var(--colorNeutralStroke2);
@@ -1034,3 +1034,9 @@ table thead {
 .app-shell .permanent-file-section:nth-of-type(3) > header { border-left: 4px solid var(--colorPaletteTealBorderActive); background: var(--colorPaletteTealBackground2); }
 .app-shell .permanent-file-section:nth-of-type(4) > header { border-left: 4px solid var(--colorPalettePurpleBorderActive); background: var(--colorPalettePurpleBackground2); }
 .app-shell .permanent-file-section:nth-of-type(5) > header { border-left: 4px solid var(--colorPaletteDarkOrangeBorderActive); background: var(--colorPaletteDarkOrangeBackground2); }
+
+/* Typography only. Fluent owns the nav layout, indentation and chevron placement. */
+.sidebar .workspace-nav-typography {
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}
