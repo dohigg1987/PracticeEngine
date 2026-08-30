@@ -1765,7 +1765,6 @@ function AccountsWorkspace({
                       if (children.length) {
                         return <NavCategory key={item.id} value={item.id}>
                           <NavCategoryItem
-                            className="workspace-nav-item"
                             icon={applicationNavigationIcon(item)}
                             onClick={() => activateNavigationItem(item)}
                             onMouseEnter={() => { void preloadNavigationItem(item); }}
@@ -1775,7 +1774,6 @@ function AccountsWorkspace({
                           </NavCategoryItem>
                           <NavSubItemGroup>
                             {children.map((child) => <NavSubItem
-                              className="workspace-nav-item"
                               key={child.id}
                               value={applicationNavigationValue(child)}
                               onClick={() => activateNavigationItem(child)}
