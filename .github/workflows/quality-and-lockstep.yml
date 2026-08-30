@@ -42,7 +42,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run test:e2e --workspace apps/web -- --project=chromium-functional --shard=${{ matrix.shard }}/2 --workers=1 --fully-parallel
+      - working-directory: apps/web
+        run: npx playwright test --project=chromium-functional --shard=${{ matrix.shard }}/2 --workers=1 --fully-parallel
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
@@ -68,7 +69,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run test:e2e --workspace apps/web -- --project=chromium-a11y --workers=1 --fully-parallel
+      - working-directory: apps/web
+        run: npx playwright test --project=chromium-a11y --workers=1 --fully-parallel
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
