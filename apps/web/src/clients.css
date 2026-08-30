@@ -8,7 +8,7 @@
   border-radius: var(--borderRadiusLarge);
   padding: 10px 9px;
   color: var(--colorNeutralForeground2);
-  font-size: 12px;
+  font-size: var(--fontSizeBase200);
   margin-top: 20px;
 }
 .client-nav:hover {
@@ -24,7 +24,7 @@
   background: var(--colorNeutralBackground3);
   border-radius: var(--borderRadiusSmall);
   padding: 2px 7px;
-  font-size: 12px;
+  font-size: var(--fontSizeBase200);
 }
 .page-actions {
   display: flex;
@@ -113,7 +113,7 @@
   min-height: 24px;
   padding: 0;
   color: var(--colorBrandForeground1);
-  font-size: 14px;
+  font-size: var(--fontSizeBase300);
   font-weight: 400;
   line-height: 20px;
   text-decoration: underline;
@@ -121,7 +121,7 @@
 }
 .client-engagement-links .muted {
   color: var(--colorNeutralForeground3);
-  font-size: 12px;
+  font-size: var(--fontSizeBase200);
 }
 .client-name-button {
   min-width: 0;
@@ -129,14 +129,14 @@
   height: auto;
   padding: 0;
   color: var(--colorBrandForegroundLink);
-  font-size: 14px;
+  font-size: var(--fontSizeBase300);
   font-weight: 400;
   line-height: 20px;
   justify-content: flex-start;
 }
 .client-data-grid-cell,
 .client-data-grid-header-cell {
-  font-size: 14px;
+  font-size: var(--fontSizeBase300);
   line-height: 20px;
 }
 .client-data-grid {
@@ -218,13 +218,13 @@
   justify-content: space-between;
   gap: 12px;
 }
-.permanent-file-edit > header h2 { margin: 0; font-size: 16px; }
+.permanent-file-edit > header h2 { margin: 0; font-size: var(--fontSizeBase400); }
 .permanent-file-edit > header div,
 .permanent-file-period { display: flex; gap: 8px; }
 .permanent-file-period > * { flex: 1 1 0; }
 .permanent-file-head h1 {
   margin: 0;
-  font-size: 20px;
+  font-size: var(--fontSizeBase500);
   font-weight: 600;
 }
 .permanent-file-head p {
@@ -260,11 +260,11 @@
   justify-content: space-between;
   gap: 12px;
 }
-.permanent-file-record-form h3 { margin: 0; font-size: 16px; }
+.permanent-file-record-form h3 { margin: 0; font-size: var(--fontSizeBase400); }
 .permanent-file-record-form > header div { display: flex; gap: 8px; }
 .permanent-file-section h2 {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--fontSizeBase300);
   font-weight: 600;
 }
 .permanent-file-register {
