@@ -3,6 +3,18 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const allowedRadius = new Set(["0", "2px", "4px", "6px", "8px", "50%", "10000px"]);
+const fluentFontSizeTokenPixels = {
+  fontsizebase100: 10,
+  fontsizebase200: 12,
+  fontsizebase300: 14,
+  fontsizebase400: 16,
+  fontsizebase500: 20,
+  fontsizebase600: 24,
+  fontsizehero700: 28,
+  fontsizehero800: 32,
+  fontsizehero900: 40,
+  fontsizehero1000: 68,
+};
 const sourceExtensions = new Set([".css", ".js", ".jsx", ".mjs", ".ts", ".tsx"]);
 const nativeInteractiveElements = new Set(["a", "button", "details", "input", "select", "summary", "textarea"]);
 const literalColorPattern = /#[0-9a-f]{3,8}\b|\b(?:rgb|rgba|hsl|hsla)\s*\([^)]*\)/gi;
@@ -66,11 +78,31 @@ function auditFile(relativeFile, source) {
         add(findings, "small-font", relativeFile, source, match.index, `${match[1]}${match[2].toLowerCase()}`, `Font size resolves to ${pixels}px, below the 12px floor`);
     }
 
+    for (const match of source.matchAll(/font-size\s*:\s*var\(--(fontSizeBase\d+|fontSizeHero\d+)\)/gi)) {
+      const pixels = fluentFontSizeTokenPixels[match[1].toLowerCase()];
+      if (pixels !== undefined && pixels < 12)
+        add(findings, "small-font", relativeFile, source, match.index, `var(--${match[1]})`, `Font size resolves to ${pixels}px, below the 12px floor`);
+    }
+
     for (const match of source.matchAll(/border(?:-(?:top|bottom)-(?:left|right))?-radius\s*:\s*([^;}\n]+)/gi)) {
       const value = match[1].trim().toLowerCase().replace(/\s*!important$/, "");
       const fluentToken = /^var\(--borderradius(?:none|small|medium|large|xlarge|circular)\)$/.test(value);
       if (!allowedRadius.has(value) && !fluentToken)
         add(findings, "off-ramp-radius", relativeFile, source, match.index, value, `Border radius ${value} is outside the Fluent radius ramp`);
+    }
+
+    for (const block of source.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const selector = block[1].trim();
+      if (statutorySelectorPattern.test(selector)) continue;
+      const declarationBlock = block[2];
+      for (const match of declarationBlock.matchAll(/font-size\s*:\s*([^;}\n]+)/gi)) {
+        const value = match[1].trim().toLowerCase().replace(/\s*!important$/, "");
+        const fluentToken = /^var\(--fontsizebase\d+\)$/.test(value) || /^var\(--fontsizehero\d+\)$/.test(value);
+        if (value !== "inherit" && !fluentToken) {
+          const index = block.index + block[0].indexOf(declarationBlock) + match.index;
+          add(findings, "off-ramp-font-size", relativeFile, source, index, value, `Font size ${value} is outside the Fluent type ramp`);
+        }
+      }
     }
 
     for (const match of source.matchAll(/([^{}]+)\{/g)) {
