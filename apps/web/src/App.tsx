@@ -1764,9 +1764,18 @@ function AccountsWorkspace({
                       const children = activeApplication.navigation.filter((candidate) => candidate.parentId === item.id);
                       if (children.length) {
                         return <NavCategory key={item.id} value={item.id}>
-                          <NavCategoryItem icon={applicationNavigationIcon(item)}>{item.label}</NavCategoryItem>
+                          <NavCategoryItem
+                            className="workspace-nav-item"
+                            icon={applicationNavigationIcon(item)}
+                            onClick={() => activateNavigationItem(item)}
+                            onMouseEnter={() => { void preloadNavigationItem(item); }}
+                            onFocus={() => { void preloadNavigationItem(item); }}
+                          >
+                            {item.label}
+                          </NavCategoryItem>
                           <NavSubItemGroup>
                             {children.map((child) => <NavSubItem
+                              className="workspace-nav-item"
                               key={child.id}
                               value={applicationNavigationValue(child)}
                               onClick={() => activateNavigationItem(child)}
