@@ -23,7 +23,7 @@
 }
 .commercial-head h1 {
   margin: 0;
-  font-size: 28px;
+  font-size: var(--fontSizeHero700);
   font-weight: 600;
 }
 .commercial-head p,
@@ -46,7 +46,7 @@
 }
 .commercial-section h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: var(--fontSizeBase500);
   font-weight: 600;
 }
 .commercial-form {
@@ -91,7 +91,7 @@
   padding: 0 10px;
   overflow: hidden;
   color: var(--colorNeutralForeground2);
-  font-size: 14px;
+  font-size: var(--fontSizeBase300);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -139,7 +139,7 @@
 }
 .commercial-secret span {
   color: var(--colorNeutralForeground2);
-  font-size: 12px;
+  font-size: var(--fontSizeBase200);
 }
 .capability-list {
   display: grid;
@@ -162,7 +162,7 @@
 .capability-list span,
 .filing-locked {
   color: var(--colorNeutralForeground3);
-  font-size: 12px;
+  font-size: var(--fontSizeBase200);
 }
 .commercial-section > .commercial-message {
   margin: 12px 16px 16px;
@@ -184,7 +184,7 @@
   grid-column: 1 / -1;
   margin-top: 2px;
   color: var(--colorNeutralForeground2);
-  font-size: 12px;
+  font-size: var(--fontSizeBase200);
   line-height: 16px;
 }
 .row-actions + .action-precondition {
