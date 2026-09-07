@@ -75,6 +75,15 @@ for (const width of [320, 390]) {
     await trigger.click();
     const drawer = page.getByRole("dialog", { name: "Application navigation" });
     await expect(drawer).toBeVisible();
+    const targets = await drawer.getByRole("button").evaluateAll(buttons => buttons.map(button => {
+      const box = button.getBoundingClientRect();
+      return { label: button.getAttribute("aria-label") || button.textContent, width: box.width, height: box.height };
+    }));
+    expect(targets.length).toBeGreaterThan(0);
+    for (const target of targets) {
+      expect(target.width, `touch target width: ${target.label}`).toBeGreaterThanOrEqual(44);
+      expect(target.height, `touch target height: ${target.label}`).toBeGreaterThanOrEqual(44);
+    }
     await page.keyboard.press("Escape");
     await expect(drawer).toBeHidden();
     await expect(trigger).toBeFocused();

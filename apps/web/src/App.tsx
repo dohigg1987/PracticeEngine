@@ -1754,7 +1754,7 @@ function AccountsWorkspace({
             selectedValue={navigationItemForPath(pathname) ? applicationNavigationValue(navigationItemForPath(pathname)!) : pathname.startsWith("/settings") ? "global-settings" : activeApplication && pathname.startsWith(`${activeApplication.routePrefix}/settings`) ? `${activeApplication.id}-settings` : ""}
           >
             {narrowNavigation && <NavDrawerHeader>
-              <FluentButton appearance="subtle" icon={<DismissRegular />} aria-label="Close application navigation" onClick={() => setMobileNavOpen(false)} />
+              <FluentButton className="suite-mobile-nav-close" appearance="subtle" icon={<DismissRegular />} aria-label="Close application navigation" onClick={() => setMobileNavOpen(false)} />
             </NavDrawerHeader>}
             <NavDrawerBody className="workspace-nav-body">
               <div className="application-identity">
