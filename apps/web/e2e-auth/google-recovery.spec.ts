@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
 const testUser = { id: "11111111-1111-4111-8111-111111111111", name: "Existing account", email: "existing@example.test", emailVerified: false };
-async function mockAuth(page: Page, options: { signedIn?: boolean; connected?: boolean; listFailure?: boolean } = {}) {
+async function mockAuth(page: Page, options: { signedIn?: boolean; connected?: boolean; listFailure?: boolean; linkError?: string } = {}) {
   let signedIn = Boolean(options.signedIn);
   let connected = Boolean(options.connected);
   let listFailure = Boolean(options.listFailure);
@@ -33,6 +33,11 @@ async function mockAuth(page: Page, options: { signedIn?: boolean; connected?: b
       expect(signedIn).toBe(true);
       const body = route.request().postDataJSON();
       links.push(body);
+      if (options.linkError) {
+        const callback = new URL(String(body.errorCallbackURL));
+        callback.searchParams.set("error", options.linkError);
+        return route.fulfill({ json: { url: callback.href, redirect: true } });
+      }
       connected = true;
       return route.fulfill({ json: { url: body.callbackURL, redirect: true } });
     }
@@ -72,6 +77,7 @@ for (const width of [320, 390, 1440]) {
     await dialog.getByRole("button", { name: "Connect Google", exact: true }).click();
     await expect.poll(() => calls.links.length).toBe(1);
     expect(calls.links[0].provider).toBe("google");
+    expect(calls.links[0].errorCallbackURL).toBe(calls.links[0].callbackURL);
     expect(new URL(String(calls.links[0].callbackURL)).searchParams.get("sign_in_methods")).toBe("1");
     await expect(page.getByText("Google is connected.", { exact: false })).toBeVisible();
     await expect(page.getByRole("button", { name: "Connect Google", exact: true })).toHaveCount(0);
@@ -105,3 +111,22 @@ test("unknown callback errors show a safe actionable message", async ({ page }) 
   await expect(page.getByText("do-not-display")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Forgot your password?" })).toBeVisible();
 });
+
+for (const [code, message] of [
+  ["access_denied", "Google sign-in was cancelled"],
+  ["email_doesn't_match", "Choose the Google account with the same email"],
+]) {
+  test(`a rejected Google connection remains recoverable: ${code}`, async ({ page }) => {
+    const calls = await mockAuth(page, { signedIn: true, linkError: code });
+    await page.goto("/?sign_in_methods=1");
+    await page.getByRole("button", { name: "Connect Google", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Sign-in methods" });
+    await expect(dialog.getByText(message, { exact: false })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Connect Google", exact: true })).toBeEnabled();
+    await expect(page.getByText("Google is connected.", { exact: false })).toHaveCount(0);
+    await expect(page).not.toHaveURL(/error=/);
+    expect(calls.links).toHaveLength(1);
+    await dialog.getByRole("button", { name: "Close", exact: true }).click();
+    await expect(dialog).toBeHidden();
+  });
+}

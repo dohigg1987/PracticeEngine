@@ -53,7 +53,7 @@ export default function SignInMethodsDialog({
     try {
       const callback = new URL("/", window.location.origin);
       callback.searchParams.set("sign_in_methods", "1");
-      const result = await authClient.linkSocial({ provider: "google", callbackURL: callback.href });
+      const result = await authClient.linkSocial({ provider: "google", callbackURL: callback.href, errorCallbackURL: callback.href });
       if (result.error) throw result.error;
     } catch (reason) {
       setError(authFailureMessage(reason));
