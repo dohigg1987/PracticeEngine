@@ -1,0 +1,59 @@
+name: Ledgerly Google authentication hotfix
+on:
+  pull_request:
+    branches: ['release/ledgerly-google-auth']
+  push:
+    branches: ['release/ledgerly-google-auth']
+permissions:
+  contents: read
+concurrency:
+  group: ledgerly-google-auth-hotfix-${{ github.event_name }}
+  cancel-in-progress: true
+env:
+  WEB_ORIGIN: https://ledgerly-accounts.pages.dev
+  VITE_API_URL: https://uk-accounts-api-production.dennis-ohiggins.workers.dev
+  VITE_NEON_AUTH_URL: https://ep-wispy-thunder-zatp3scz.neonauth.c-2.eu-west-2.aws.neon.tech/neondb/auth
+  VITE_DEMO_MODE: 'false'
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble
+      options: --user 1001
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - run: npm run typecheck --workspace apps/web
+      - run: npm test --workspace apps/web
+      - run: node --test scripts/cloudflare-release.test.mjs scripts/google-auth-hotfix.test.mjs apps/web/functions/neon-auth/*.test.mjs
+      - working-directory: apps/web
+        run: npx playwright test --config playwright.auth.config.ts
+      - run: npm run build:production --workspace apps/web
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: ledgerly-auth-evidence
+          path: |
+            apps/web/playwright-auth-report/
+            apps/web/test-results-auth/
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/release/ledgerly-google-auth'
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/ledgerly-google-auth
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - run: node node_modules/wrangler/bin/wrangler.js --version
+      - run: npm exec -- node scripts/google-auth-hotfix.mjs
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || vars.CLOUDFLARE_ACCOUNT_ID }}
