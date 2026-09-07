@@ -11,12 +11,13 @@ jobs:
     env:
       WEB_ORIGIN: https://practice-delivery-review.practiceengine-dev.pages.dev
       VITE_DEMO_MODE: "true"
+      VITE_PM_PROGRESS_PREVIEW: "true"
       VITE_API_URL: https://practice-delivery-review.practiceengine-dev.pages.dev
       VITE_NEON_AUTH_URL: https://practice-delivery-review.practiceengine-dev.pages.dev
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: e54f3e6f00cc9ef449dd43210912ac6de4500b85
+          ref: ${{ github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -44,6 +45,6 @@ jobs:
           node ../../node_modules/wrangler/bin/wrangler.js pages deploy dist \
             --project-name practiceengine-dev \
             --branch practice-delivery-review \
-            --commit-hash e54f3e6f00cc9ef449dd43210912ac6de4500b85 \
+            --commit-hash "$GITHUB_SHA" \
             --commit-message "Practice delivery review — sample data — e54f3e6f00cc9ef449dd43210912ac6de4500b85" \
             --commit-dirty=false

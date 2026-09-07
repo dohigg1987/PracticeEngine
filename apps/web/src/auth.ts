@@ -4,7 +4,7 @@ const authUrl = import.meta.env.VITE_NEON_AUTH_URL?.trim() ?? "";
 const progressPreview =
   import.meta.env.VITE_PM_PROGRESS_PREVIEW === "true" &&
   typeof window !== "undefined" &&
-  window.location.hostname === "pm-002-progress.ledgerly-accounts.pages.dev";
+  window.location.hostname === "practice-delivery-review.practiceengine-dev.pages.dev";
 export const demoMode =
   progressPreview ||
   (import.meta.env.DEV && import.meta.env.VITE_DEMO_MODE === "true");

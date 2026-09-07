@@ -1005,7 +1005,7 @@ const apiBase = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 const demoTransport =
   (import.meta.env.VITE_PM_PROGRESS_PREVIEW === "true" &&
     typeof window !== "undefined" &&
-    window.location.hostname === "pm-002-progress.ledgerly-accounts.pages.dev") ||
+    window.location.hostname === "practice-delivery-review.practiceengine-dev.pages.dev") ||
   (import.meta.env.DEV && import.meta.env.VITE_DEMO_MODE === "true");
 
 type SessionCacheEntry = {
