@@ -218,7 +218,7 @@ test("pilot workspace administration reaches clients and team without actor iden
   await page
     .getByRole("button", { name: "Northstar Community Foundation" })
     .click();
-  await page.getByRole("tab", { name: "Contacts & permanent file" }).click();
+  await page.getByRole("navigation", { name: "Client workspace areas" }).getByRole("button", { name: "Details", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Legal and registered details" }),
   ).toBeVisible();
@@ -231,7 +231,8 @@ test("pilot workspace administration reaches clients and team without actor iden
   await expect(
     page.getByRole("table", { name: "Client engagement history" }),
   ).toContainText("31 Dec 2026");
-  await page.getByRole("main").getByRole("button", { name: "Clients" }).click();
+  await page.locator(".permanent-file").getByRole("button", { name: "Clients", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Clients", exact: true })).toBeVisible();
 
   await page.goto("/settings/users");
   await expect(page.getByRole("heading", { name: "Users" })).toBeVisible();
