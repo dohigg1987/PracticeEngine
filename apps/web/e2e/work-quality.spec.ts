@@ -83,4 +83,11 @@ test("capture the updated work queue and Fluent creation dialog", async ({ page 
   await page.getByRole("button", { name: "Add work", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Add work" })).toBeVisible();
   await testInfo.attach("create-work-dialog", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
+  if (process.env.PRACTICE_REVIEW_INLINE_EVIDENCE === "true") {
+    const dialogImage = await page.screenshot({ type: "jpeg", quality: 70, fullPage: true });
+    console.log("PRACTICE_REVIEW_IMAGE=" + JSON.stringify({ name: "Create work dialog", data: dialogImage.toString("base64") }));
+    await page.getByRole("dialog", { name: "Add work" }).getByRole("button", { name: "Cancel", exact: true }).click();
+    const queueImage = await page.screenshot({ type: "jpeg", quality: 70, fullPage: true });
+    console.log("PRACTICE_REVIEW_IMAGE=" + JSON.stringify({ name: "Work queue", data: queueImage.toString("base64") }));
+  }
 });

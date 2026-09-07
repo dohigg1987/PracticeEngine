@@ -43,6 +43,8 @@ jobs:
       - run: npm ci
       - working-directory: apps/web
         run: npx playwright test e2e/work-quality.spec.ts --project=chromium --workers=1
+        env:
+          PRACTICE_REVIEW_INLINE_EVIDENCE: 'true'
       - name: Upload work review evidence
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
