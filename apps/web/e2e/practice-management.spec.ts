@@ -10,6 +10,18 @@ async function openNav(page: Page) {
   if (await toggle.isVisible()) await toggle.click();
 }
 
+async function openCrmPage(page: Page, label: "Prospects" | "Opportunities" | "Onboarding") {
+  await openNav(page);
+  const nav = page.getByRole("navigation", { name: "Practice Management navigation" });
+  const category = nav.getByRole("button", { name: "Clients & CRM", exact: true });
+  if (await category.getAttribute("aria-expanded") !== "true") {
+    await category.click();
+    // Category navigation closes the narrow overlay; reopen it to choose the child.
+    await openNav(page);
+  }
+  await nav.getByRole("button", { name: label, exact: true }).click();
+}
+
 test("practice work supports operational filtering", async ({ page }) => {
   await start(page);
   await openNav(page);
@@ -39,17 +51,14 @@ test("practice work status treatments remain inside their Fluent badge", async (
 test("CRM pipeline and onboarding stay operational at narrow width", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await start(page);
-  await openNav(page);
-  await page.getByRole("navigation", { name: "Practice Management navigation" }).getByRole("button", { name: "Prospects", exact: true }).click();
+  await openCrmPage(page, "Prospects");
   await expect(page.getByRole("heading", { name: "Prospects", exact: true })).toBeVisible();
   await expect(page.getByRole("grid", { name: "CRM prospects" })).toContainText("Cedar Advisory Group");
-  await openNav(page);
-  await page.getByRole("navigation", { name: "Practice Management navigation" }).getByRole("button", { name: "Opportunities", exact: true }).click();
+  await openCrmPage(page, "Opportunities");
   await expect(page.getByRole("grid", { name: "CRM opportunities" })).toBeVisible();
   await page.getByRole("link", { name: /Finance function and annual accounts/ }).click();
   await expect(page.getByRole("table", { name: "Opportunity proposed services" })).toBeVisible();
-  await openNav(page);
-  await page.getByRole("navigation", { name: "Practice Management navigation" }).getByRole("button", { name: "Onboarding", exact: true }).click();
+  await openCrmPage(page, "Onboarding");
   await expect(page.getByRole("table", { name: "Onboarding work" })).toBeVisible();
   const widths = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, root: document.documentElement.scrollWidth }));
   expect(widths.root).toBeLessThanOrEqual(widths.viewport + 1);
@@ -57,8 +66,7 @@ test("CRM pipeline and onboarding stay operational at narrow width", async ({ pa
 
 test("prospects can be opened and edited through the product UI", async ({ page }) => {
   await start(page);
-  await openNav(page);
-  await page.getByRole("navigation", { name: "Practice Management navigation" }).getByRole("button", { name: "Prospects", exact: true }).click();
+  await openCrmPage(page, "Prospects");
   await page.getByRole("link", { name: /Cedar Advisory Group/ }).click();
   await expect(page.getByRole("heading", { name: "Prospect details" })).toBeVisible();
   await page.getByRole("textbox", { name: "Legal name" }).fill("Cedar Advisory Group Limited");
