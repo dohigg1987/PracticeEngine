@@ -402,14 +402,15 @@ async function workAction(request: Request, env: Env, actorId: string, workId: s
     const status = action === "complete" ? "completed" : enumValue(input, "status", WORK_STATUSES), completedAt = status === "completed" ? new Date().toISOString() : null;
     if (status === "completed" && action !== "complete") await assertPlatformPermission(tx, "work.complete");
     if (status === "completed") {
+      const openTasks = await tx`select 1 from practice_task where tenant_id=${ctx.tenantId} and work_item_id=${workId} and mandatory and status not in ('completed','skipped') limit 1`;
       const openStages = await tx`select 1 from work_stage where tenant_id=${ctx.tenantId} and work_item_id=${workId} and status not in ('completed','skipped') limit 1`;
       const pendingReviews = await tx`select 1 from practice_review where tenant_id=${ctx.tenantId} and work_item_id=${workId} and status not in ('approved','completed') limit 1`;
       const missingReviews = await tx`select 1 from practice_task t where t.tenant_id=${ctx.tenantId} and t.work_item_id=${workId} and t.review_required and not exists(select 1 from practice_review r where r.tenant_id=t.tenant_id and r.practice_task_id=t.id and r.status in ('approved','completed')) limit 1`;
-      if (openStages.length || pendingReviews.length || missingReviews.length) {
+      if (openTasks.length || openStages.length || pendingReviews.length || missingReviews.length) {
         const overrideReason = optional(input, "overrideReason", 500);
-        if (!overrideReason) throw new ApiError(409, "WORK_APPROVAL_GATES_NOT_MET", "Workflow stages and required reviews must be complete before work completion");
+        if (!overrideReason) throw new ApiError(409, "WORK_APPROVAL_GATES_NOT_MET", "Required tasks, workflow stages and reviews must be complete before work completion");
         await assertPlatformPermission(tx, "review.override");
-        await recordMutation(tx, ctx, "WORK_COMPLETION_OVERRIDDEN", "WORK_ITEM", workId, String(current[0]!.client_id), { reason: overrideReason, openStageGate: Boolean(openStages.length), pendingReviewGate: Boolean(pendingReviews.length), missingRequiredReviewGate:Boolean(missingReviews.length) }, "review.completion_overridden");
+        await recordMutation(tx, ctx, "WORK_COMPLETION_OVERRIDDEN", "WORK_ITEM", workId, String(current[0]!.client_id), { reason: overrideReason, openTaskGate: Boolean(openTasks.length), openStageGate: Boolean(openStages.length), pendingReviewGate: Boolean(pendingReviews.length), missingRequiredReviewGate:Boolean(missingReviews.length) }, "review.completion_overridden");
       }
     }
     if (String(current[0]!.status) === status) throw new ApiError(409, "INVALID_STATUS_TRANSITION", `Work is already ${status}`);
@@ -425,8 +426,9 @@ async function workTasks(request: Request, env: Env, actorId: string, workId: st
   return within(request, env, actorId, request.method === "GET" ? "tasks.view" : "tasks.manage", "practice.workflow", async (tx, ctx) => {
     if (request.method === "GET") return response({ items: await tx`select * from practice_task where tenant_id=${ctx.tenantId} and work_item_id=${workId} order by sequence,id` });
     const id = crypto.randomUUID();
-    const work = await tx`select client_id from work_item where tenant_id=${ctx.tenantId} and id=${workId}`;
+    const work = await tx`select client_id,status from work_item where tenant_id=${ctx.tenantId} and id=${workId} for update`;
     if (!work.length) throw new ApiError(404, "NOT_FOUND", "Work item not found");
+    if (["completed", "cancelled"].includes(String(work[0]!.status))) throw new ApiError(409, "WORK_CLOSED", "Closed work cannot receive new tasks");
     const sequence = input!.sequence;
     if (!Number.isInteger(sequence) || Number(sequence) < 1) throw new ApiError(400, "INVALID_REQUEST", "sequence must be a positive integer");
     const estimate = optionalMinutes(input!, "estimatedEffortMinutes") ?? null;
@@ -845,13 +847,22 @@ async function reviews(request: Request, env: Env, actorId: string) {
   return within(request, env, actorId, request.method === "GET" ? "review.perform" : "review.request", "practice.workflow", async (tx, ctx) => {
     if (request.method === "GET") {
       const status = new URL(request.url).searchParams.get("status"); if (status && !REVIEW_STATUSES.has(status)) throw new ApiError(400,"INVALID_REQUEST","status is invalid");
-      return response({items:await tx`select r,w.title work_title,w.due_date,o.display_name client_name,s.name service_name,ws.name stage_name,pm.display_name preparer_name,rm.display_name reviewer_name,extract(epoch from(now()-r.requested_at))/3600 waiting_hours from practice_review r join work_item w on w.tenant_id=r.tenant_id and w.id=r.work_item_id join organisation o on o.tenant_id=w.tenant_id and o.id=w.client_id join client_service cs on cs.tenant_id=w.tenant_id and cs.id=w.client_service_id join practice_service s on s.tenant_id=cs.tenant_id and s.id=cs.service_id left join work_stage ws on ws.tenant_id=r.tenant_id and ws.id=r.work_stage_id left join tenant_member pm on pm.tenant_id=r.tenant_id and pm.id=r.preparer_member_id left join tenant_member rm on rm.tenant_id=r.tenant_id and rm.id=r.reviewer_member_id where r.tenant_id=${ctx.tenantId} and (${status}::text is null or r.status=${status}) order by r.requested_at`});
+      return response({items:await tx`select r.*,w.title work_title,w.due_date,o.display_name client_name,s.name service_name,ws.name stage_name,pm.display_name preparer_name,rm.display_name reviewer_name,extract(epoch from(now()-r.requested_at))/3600 waiting_hours from practice_review r join work_item w on w.tenant_id=r.tenant_id and w.id=r.work_item_id join organisation o on o.tenant_id=w.tenant_id and o.id=w.client_id join client_service cs on cs.tenant_id=w.tenant_id and cs.id=w.client_service_id join practice_service s on s.tenant_id=cs.tenant_id and s.id=cs.service_id left join work_stage ws on ws.tenant_id=r.tenant_id and ws.id=r.work_stage_id left join tenant_member pm on pm.tenant_id=r.tenant_id and pm.id=r.preparer_member_id left join tenant_member rm on rm.tenant_id=r.tenant_id and rm.id=r.reviewer_member_id where r.tenant_id=${ctx.tenantId} and (${status}::text is null or r.status=${status}) order by r.requested_at`});
     }
     const workId=uuid(required(input!,"workItemId",36),"Work item"), taskId=optional(input!,"taskId",36) ?? null, stageId=optional(input!,"stageId",36) ?? null;
     if (!taskId && !stageId) throw new ApiError(400,"INVALID_REQUEST","taskId or stageId is required");
-    const work=await tx`select client_id from work_item where tenant_id=${ctx.tenantId} and id=${workId}`; if(!work.length) throw new ApiError(404,"NOT_FOUND","Work item not found");
-    const id=crypto.randomUUID(), rows=await tx`insert into practice_review(id,tenant_id,work_item_id,practice_task_id,work_stage_id,preparer_member_id,reviewer_member_id,approver_member_id,segregation_required,requested_by) values(${id},${ctx.tenantId},${workId},${taskId},${stageId},${optional(input!,"preparerMemberId",36) ?? null},${optional(input!,"reviewerMemberId",36) ?? null},${optional(input!,"approverMemberId",36) ?? null},${input!.segregationRequired !== false},${ctx.actorId}) returning *`;
+    const work=await tx`select client_id,status,assigned_member_id from work_item where tenant_id=${ctx.tenantId} and id=${workId} for update`; if(!work.length) throw new ApiError(404,"NOT_FOUND","Work item not found");
+    if (["completed","cancelled"].includes(String(work[0]!.status))) throw new ApiError(409,"WORK_CLOSED","Closed work cannot be sent for review");
+    if (taskId) { uuid(taskId,"Task"); const tasks=await tx`select id from practice_task where tenant_id=${ctx.tenantId} and id=${taskId} and work_item_id=${workId}`; if(!tasks.length) throw new ApiError(404,"NOT_FOUND","Task does not belong to this work"); }
+    if (stageId) { uuid(stageId,"Stage"); const stages=await tx`select id from work_stage where tenant_id=${ctx.tenantId} and id=${stageId} and work_item_id=${workId}`; if(!stages.length) throw new ApiError(404,"NOT_FOUND","Stage does not belong to this work"); }
+    const existing=await tx`select id from practice_review where tenant_id=${ctx.tenantId} and work_item_id=${workId} and practice_task_id is not distinct from ${taskId}::uuid and work_stage_id is not distinct from ${stageId}::uuid and status not in ('approved','completed') limit 1`;
+    if(existing.length) throw new ApiError(409,"REVIEW_ALREADY_OPEN","This task or stage already has an open review");
+    const actor=await tx`select id from tenant_member where tenant_id=${ctx.tenantId} and actor_id=${ctx.actorId} and membership_status='ACTIVE'`;
+    const preparerId=optional(input!,"preparerMemberId",36) ?? (work[0]!.assigned_member_id ? String(work[0]!.assigned_member_id) : actor[0]?.id ? String(actor[0].id) : null);
+    const id=crypto.randomUUID(), rows=await tx`insert into practice_review(id,tenant_id,work_item_id,practice_task_id,work_stage_id,preparer_member_id,reviewer_member_id,approver_member_id,segregation_required,requested_by) values(${id},${ctx.tenantId},${workId},${taskId},${stageId},${preparerId},${optional(input!,"reviewerMemberId",36) ?? null},${optional(input!,"approverMemberId",36) ?? null},${input!.segregationRequired !== false},${ctx.actorId}) returning *`;
     await recordMutation(tx,ctx,"REVIEW_REQUESTED","PRACTICE_REVIEW",id,String(work[0]!.client_id),{workItemId:workId,taskId,stageId},"review.requested");
+    await tx`update work_item set status='review',updated_by=${ctx.actorId},updated_at=now() where tenant_id=${ctx.tenantId} and id=${workId}`;
+    await recordMutation(tx,ctx,"WORK_STATUS_CHANGED","WORK_ITEM",workId,String(work[0]!.client_id),{fromStatus:String(work[0]!.status),toStatus:"review"},"work.status_changed");
     return response({item:rows[0]},201);
   });
 }

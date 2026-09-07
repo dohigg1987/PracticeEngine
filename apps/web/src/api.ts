@@ -775,6 +775,10 @@ export type NormalizedImportPreview = {
   warnings: string[];
 };
 export type ApiContext = { tenantId: string };
+export type ClientRequestRecipient = {
+  id: string; display_name: string; email_normalized: string; status: string;
+  principal_status: string; engagement_id?: string | null; client_service_id?: string | null;
+};
 export type ClientRequestItem = {
   id: string; client_id: string; client_name?: string; title: string; request_type: string;
   status: "draft" | "open" | "viewed" | "responded" | "partially_complete" | "completed" | "cancelled" | "overdue";
@@ -901,13 +905,14 @@ export type PracticeTask = {
   sequence: number;
   due_date?: string | null;
   completed_at?: string | null;
+  mandatory?: boolean;
   review_required?: boolean;
   work_stage_id?: string | null;
   blockers?: Array<{ predecessorTaskId:string; dependencyType:string; blockingReason?:string|null; resolvedAt?:string|null }>;
 };
 export type PracticeWorkStage={id:string;work_item_id:string;name:string;sequence:number;stage_type:"preparation"|"client_input"|"internal_review"|"approval"|"specialist_execution"|"completion";status:"not_started"|"active"|"blocked"|"waiting"|"review"|"completed"|"skipped";block_reason?:string|null;source_template_version:number;};
 export type PracticeReviewPoint={id:string;description:string;status:"open"|"addressed"|"cleared"|"reopened";resolution?:string|null;};
-export type PracticeReview={id:string;work_item_id:string;work_title?:string;client_name?:string;service_name?:string;stage_name?:string;preparer_name?:string;reviewer_name?:string;due_date?:string|null;status:"requested"|"in_progress"|"changes_requested"|"approved"|"rejected"|"completed"|"reopened";requested_at:string;waiting_hours?:number;review_points?:PracticeReviewPoint[];};
+export type PracticeReview={practice_task_id?:string|null;work_stage_id?:string|null;reviewer_member_id?:string|null;preparer_member_id?:string|null;decision_reason?:string|null;id:string;work_item_id:string;work_title?:string;client_name?:string;service_name?:string;stage_name?:string;preparer_name?:string;reviewer_name?:string;due_date?:string|null;status:"requested"|"in_progress"|"changes_requested"|"approved"|"rejected"|"completed"|"reopened";requested_at:string;waiting_hours?:number;review_points?:PracticeReviewPoint[];};
 export type AutomationRule={id:string;name:string;enabled:boolean;trigger_type:string;conditions:Array<Record<string,unknown>>;actions:Array<Record<string,unknown>>;priority:number;last_executed_at?:string|null;last_failure_code?:string|null;recent_executions?:Array<{id:string;status:string;started_at:string}>;};
 export type RecurrenceExecution={id:string;trigger_type:"scheduled"|"manual"|"dry_run"|"replay";status:string;range_from?:string|null;range_to?:string|null;schedules_evaluated:number;work_generated:number;blocked_entitlement:number;skipped_idempotent:number;failures:number;started_at:string;completed_at?:string|null;};
 export type PracticeWorkTemplate = {
@@ -2284,6 +2289,18 @@ export const api = {
     request<{ item: PracticeService }>(`/v1/practice/services/${encodeURIComponent(id)}`, context, { method: "PATCH", body: JSON.stringify(body) }),
   clientServices: (context: ApiContext, clientId: string) =>
     request<{ items: ClientService[] }>(`/v1/clients/${encodeURIComponent(clientId)}/services`, context),
+  activateClientService: (context: ApiContext, clientId: string, body: { serviceId: string; startDate: string; frequency?: string }) =>
+    request<{ item: ClientService }>(`/v1/clients/${encodeURIComponent(clientId)}/services`, context, { method: "POST", body: JSON.stringify(body) }),
+  clientRequestRecipients: (context: ApiContext, clientId: string) =>
+    request<{ items: ClientRequestRecipient[] }>(`/v1/clients/${encodeURIComponent(clientId)}/portal-access`, context),
+  createPracticeTask: (context: ApiContext, workId: string, body: { title: string; description?: string; sequence: number; dueDate?: string; assigneeMemberId?: string }) =>
+    request<{ item: PracticeTask }>(`/v1/practice/work/${encodeURIComponent(workId)}/tasks`, context, { method: "POST", body: JSON.stringify(body) }),
+  requestPracticeReview: (context: ApiContext, body: { workItemId: string; taskId?: string; stageId?: string; reviewerMemberId: string; preparerMemberId?: string }) =>
+    request<{ item: PracticeReview }>("/v1/practice/reviews", context, { method: "POST", body: JSON.stringify(body) }),
+  createPracticeReviewPoint: (context: ApiContext, reviewId: string, description: string) =>
+    request<{ item: PracticeReviewPoint }>(`/v1/practice/reviews/${encodeURIComponent(reviewId)}/points`, context, { method: "POST", body: JSON.stringify({ description }) }),
+  updatePracticeReviewPoint: (context: ApiContext, id: string, status: PracticeReviewPoint["status"], resolution?: string) =>
+    request<{ item: PracticeReviewPoint }>(`/v1/practice/review-points/${encodeURIComponent(id)}/status`, context, { method: "POST", body: JSON.stringify({ status, resolution }) }),
   practiceEngagements: (context: ApiContext, clientId?: string) =>
     request<{ items: PracticeEngagement[] }>(`/v1/practice/engagements${clientId ? `?clientId=${encodeURIComponent(clientId)}` : ""}`, context),
   practiceWork: (context: ApiContext, filters: { clientId?: string; serviceId?: string; status?: string; assignedMemberId?: string; dueBefore?: string } = {}) => {
