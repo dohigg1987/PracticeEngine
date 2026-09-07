@@ -134,7 +134,7 @@ import {
   demoMode,
 } from "./auth";
 import ClientPermanentFile from "./ClientPermanentFile";
-import SignInMethodsDialog from "./SignInMethodsDialog";
+
 import { ConfirmAction } from "./ConfirmAction";
 import {
   blockingItemsLabel,
@@ -270,6 +270,7 @@ const PracticeManagement = lazy(() => import("./PracticeManagement"));
 const ResourceEconomics = lazy(() => import("./ResourceEconomics"));
 const CrmOnboarding = lazy(() => import("./CrmOnboarding"));
 const ClientCollaboration = lazy(() => import("./ClientCollaboration"));
+const SignInMethodsDialog = lazy(() => import("./SignInMethodsDialog"));
 type CsvRow = {
   accountCode: string;
   accountName: string;
@@ -403,8 +404,8 @@ export function App() {
   const [checkingSession, setCheckingSession] = useState(authConfigured);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [sessionMessage, setSessionMessage] = useState("");
-  const [redirectError, setRedirectError] = useState(() => authRedirectError(window.location.search));
-  const [signInMethodsOpen, setSignInMethodsOpen] = useState(() => Boolean(redirectError) || new URLSearchParams(window.location.search).get("sign_in_methods") === "1");
+  const [redirectError, setRedirectError] = useState(() => authRedirectError(typeof window === "undefined" ? "" : window.location.search));
+  const [signInMethodsOpen, setSignInMethodsOpen] = useState(() => Boolean(redirectError) || (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("sign_in_methods") === "1"));
 
   const refreshSession = useCallback(async () => {
     if (demoMode) {
@@ -481,13 +482,13 @@ export function App() {
     );
   return <>
     <AccountsWorkspace user={user} onSignOut={signOut} onManageSignIn={() => { setRedirectError(""); setSignInMethodsOpen(true); }} />
-    {!demoMode && signInMethodsOpen && <SignInMethodsDialog key={user.id} email={user.email} initialError={redirectError} onClose={() => {
+    {!demoMode && signInMethodsOpen && <Suspense fallback={<span role="status">Loading sign-in methods…</span>}><SignInMethodsDialog key={user.id} email={user.email} initialError={redirectError} onClose={() => {
       setSignInMethodsOpen(false);
       setRedirectError("");
       const url = new URL(window.location.href);
       url.searchParams.delete("sign_in_methods");
       window.history.replaceState(window.history.state, "", url.href);
-    }} />}
+    }} /></Suspense>}
   </>;
 }
 

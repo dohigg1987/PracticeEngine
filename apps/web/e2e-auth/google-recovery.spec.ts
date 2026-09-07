@@ -57,8 +57,8 @@ for (const width of [320, 390, 1440]) {
     await expect(page.getByText("do-not-display")).toHaveCount(0);
     await expect(page.getByRole("dialog")).toHaveCount(0);
     expect(calls.links).toHaveLength(0);
-    await page.getByLabel("Email address", { exact: true }).fill(testUser.email);
-    await page.getByLabel("Password", { exact: true }).fill("Example-password-for-test-only");
+    await page.getByRole("textbox", { name: /^Email address/ }).fill(testUser.email);
+    await page.getByLabel(/^Password/).fill("Example-password-for-test-only");
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "Sign-in methods" });
     await expect(dialog).toBeVisible();

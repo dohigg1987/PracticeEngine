@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Button, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface,
   DialogTitle, MessageBar, MessageBarBody, Spinner, Text, makeStyles, tokens,
@@ -17,6 +17,7 @@ export default function SignInMethodsDialog({
 }: { email: string; initialError?: string; onClose: () => void }) {
   const styles = useStyles();
   const focusSource = useRestoreFocusSource();
+  const closeButton = useRef<HTMLButtonElement>(null);
   const [loading, setLoading] = useState(true);
   const [linked, setLinked] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -69,13 +70,13 @@ export default function SignInMethodsDialog({
           <Text className={styles.email}>Account: {email}</Text>
           {error && <MessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></MessageBar>}
           {loading ? <Spinner size="small" label="Loading sign-in methods" /> : loadError ?
-            <MessageBar intent="error"><MessageBarBody>{loadError} <Button appearance="transparent" onClick={() => setAttempt(value => value + 1)}>Retry</Button></MessageBarBody></MessageBar> :
+            <MessageBar intent="error"><MessageBarBody>{loadError} <Button appearance="transparent" onClick={() => { closeButton.current?.focus(); setAttempt(value => value + 1); }}>Retry</Button></MessageBarBody></MessageBar> :
             linked ? <MessageBar intent="success"><MessageBarBody>Google is connected. You can use Continue with Google next time you sign in.</MessageBarBody></MessageBar> :
             <Text>Connect the Google account that uses this same email address. You will confirm the connection with Google and keep your existing account and work.</Text>}
         </DialogContent>
         <DialogActions>
           {!linked && <Button appearance="primary" disabled={loading || busy || Boolean(loadError)} onClick={() => void connectGoogle()}>{busy ? "Connecting…" : "Connect Google"}</Button>}
-          <Button appearance="secondary" disabled={busy} onClick={onClose}>Close</Button>
+          <Button ref={closeButton} appearance="secondary" disabled={busy} onClick={onClose}>Close</Button>
         </DialogActions>
       </DialogBody>
     </DialogSurface>

@@ -33,3 +33,9 @@ No deployment is performed by this workflow. Rollback is a revert of this PR and
 - [Better Auth account_not_linked](https://better-auth.com/docs/reference/errors/account_not_linked)
 - [Better Auth explicit account linking](https://better-auth.com/docs/concepts/users-accounts#manually-linking-accounts)
 - [Neon OAuth setup](https://neon.com/docs/auth/guides/setup-oauth)
+
+## Executed attempts
+
+The first remote strict typecheck and focused auth/callback unit tests passed. The full web unit suite exposed an import-time interaction with an existing shallow Fluent mock in unrelated App helper tests. The personal sign-in dialog now loads on demand, matching the existing workspace loading pattern and keeping it out of the initial application bundle. Full verification is rerun after the correction.
+
+The first browser attempt confirmed safe error handling and callback completion. Recovery form tests needed to match Fluent required-field accessible names (including their required marker). Retry also exposed lost keyboard focus when its button was removed during loading; focus now moves to the persistent Close action before retrying, keeping Escape dismissal available. All six scenarios are rerun without removing assertions.
