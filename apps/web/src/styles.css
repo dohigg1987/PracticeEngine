@@ -988,7 +988,7 @@ tfoot td {
 .setup > p:not(.eyebrow),
 .error-state p {
   font-size: 12px;
-  color: #6f7e83;
+  color: var(--colorNeutralForeground2);
 }
 .setup form {
   display: grid;
