@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useRestoreFocusTarget, useRestoreFocusSource, Button, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, Field, Input, MessageBar, MessageBarBody, Select, Tab, TabList, Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow, Textarea } from "@fluentui/react-components";
+import { useRestoreFocusTarget, useRestoreFocusSource, Accordion, AccordionHeader, AccordionItem, AccordionPanel, Avatar, Badge, ProgressBar, Tooltip, Button, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, Field, Input, MessageBar, MessageBarBody, Select, Tab, TabList, Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow, Textarea } from "@fluentui/react-components";
+import { AddRegular, ArrowLeftRegular, ArrowRightRegular, CalendarLtrRegular, CheckmarkCircleRegular, CircleRegular, MailRegular, ArrowClockwiseRegular } from "@fluentui/react-icons";
 import { api, type ApiContext, type PracticeReview, type PracticeReviewPoint, type PracticeTask, type PracticeWorkStage, type ResourceProfile } from "./api";
 import { EmptyState, ErrorState, LoadingState, PageHeader, PageShell, StatusTreatment } from "./CanonicalPatterns";
 import { formatDate } from "./displayFormat";
@@ -42,6 +43,7 @@ export default function PracticeWorkDetail({ context, workItemId, onBack, onOpen
   const [area, setArea] = useState<Area>("tasks");
   const [dialog, setDialog] = useState<DialogAction | null>(null);
   const [requestOpen, setRequestOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(true);
   const generation = useRef(0);
   const load = useCallback(async () => {
     const request = ++generation.current;
@@ -74,35 +76,31 @@ export default function PracticeWorkDetail({ context, workItemId, onBack, onOpen
     else setArea(next.area);
   }
   return <PageShell className="pd-page">
-    <PageHeader title={item.title} description={`${item.client_name || "Client"} · ${item.service_name || "Service"}`} back={onBack} backLabel="Back to work"
-      meta={<StatusTreatment value={item.status} />} secondaryActions={<div className="pd-actions"><Button onClick={() => void load()} disabled={busy}>Refresh</Button>{!isClosed && <Button onClick={() => setRequestOpen(true)} disabled={busy}>Request from client</Button>}</div>} />
+    <header className="pd-header">
+      <div className="pd-topline"><div className="pd-breadcrumb"><Button appearance="transparent" size="small" icon={<ArrowLeftRegular />} aria-label="Back to work" onClick={onBack}>Work</Button><span aria-hidden="true">/</span><span>{item.service_name || "Service"}</span></div>
+        <div className="pd-header-actions"><Tooltip content="Refresh work" relationship="label"><Button appearance="subtle" icon={<ArrowClockwiseRegular />} aria-label="Refresh" onClick={() => void load()} disabled={busy} /></Tooltip>{!isClosed && <Button icon={<MailRegular />} aria-label="Request from client" onClick={() => setRequestOpen(true)} disabled={busy}><span className="pd-request-full">Request from client</span><span className="pd-request-short" aria-hidden="true">Request</span></Button>}</div>
+      </div>
+      <div className="pd-heading"><div className="pd-heading-copy"><h1>{item.title}</h1><Button className="pd-client-link" appearance="transparent" onClick={() => onOpenClient?.(item.client_id)}>{item.client_name || "Open client"}</Button></div></div>
+      <div className="pd-context"><Badge appearance="tint" color={isClosed ? "success" : "informative"}>{label(item.status)}</Badge><span><CalendarLtrRegular aria-hidden="true" />Due {formatDate(item.due_date, "not set")}</span><span><Avatar name={item.assigned_member_name || item.assigned_team_name || "Unassigned"} size={20} color="neutral" aria-hidden="true" />{item.assigned_member_name || item.assigned_team_name || "Unassigned"}</span></div>
+    </header>
     {error && <ErrorState title="The work could not be updated" message={error} retry={load} />}
     {notice && <MessageBar intent="success"><MessageBarBody>{notice}</MessageBarBody></MessageBar>}
     {peopleError && <MessageBar intent="warning"><MessageBarBody>{peopleError}</MessageBarBody></MessageBar>}
-    <dl className="pd-facts">
-      <div><dt>Client</dt><dd><Button appearance="transparent" onClick={() => onOpenClient?.(item.client_id)}>{item.client_name || "Open client"}</Button></dd></div>
-      <div><dt>Owner</dt><dd>{item.assigned_member_name || item.assigned_team_name || "Unassigned"}</dd></div>
-      <div><dt>Due date</dt><dd>{formatDate(item.due_date, "Not set")}{!isClosed && <Button size="small" appearance="transparent" onClick={() => setDialog({ kind: "reschedule" })}>Reschedule</Button>}</dd></div>
-      <div><dt>Priority</dt><dd>{label(item.priority)}</dd></div>
-      {item.period_reference && <div><dt>Period</dt><dd>{item.period_reference}</dd></div>}
-    </dl>
-    <section className="pd-next" aria-label="Next action"><div><h2>{next.title}</h2><p>{next.description}</p></div>{next.action !== "none" && <Button {...restoreFocusTarget} appearance="primary" disabled={busy} onClick={nextClick}>{nextLabel}</Button>}</section>
-    {!isClosed && <div className="pd-actions">
-      <Field label="Work owner"><Select disabled={busy || !resources.length} value={item.assigned_member_id || ""} onChange={(_, data) => { if (data.value && data.value !== item.assigned_member_id) void mutate(() => api.reassignWork(context, item.id, { resourceId: data.value }), "Owner updated."); }}><option value="">Choose owner</option>{resources.filter(person => person.status === "active").map(person => <option value={person.id} key={person.id}>{person.display_name}</option>)}</Select></Field>
-      {["waiting_internal", "waiting_on_client"].includes(item.status) && <Button disabled={busy} onClick={() => void mutate(() => api.updatePracticeWorkStatus(context, item.id, "in_progress"), "Work resumed.")}>Resume work</Button>}
-    </div>}
-    <div className="pd-tabs"><TabList aria-label="Work details" selectedValue={area} onTabSelect={(_, data) => setArea(data.value as Area)}>
+    <div className="pd-layout">
+    <div className="pd-main">
+    <section className="pd-next" aria-label="Next action"><div className="pd-next-copy"><span className="pd-eyebrow">Next step</span><h2>{next.title}</h2><p>{next.description}</p></div>{next.action !== "none" && <Button {...restoreFocusTarget} appearance="primary" icon={<ArrowRightRegular />} iconPosition="after" disabled={busy} onClick={nextClick}>{nextLabel}</Button>}</section>
+    <div className="pd-tabs"><TabList size="large" aria-label="Work details" selectedValue={area} onTabSelect={(_, data) => setArea(data.value as Area)}>
       <Tab value="tasks">Tasks · {tasks.filter(task => cleared(task.status)).length}/{tasks.length}</Tab>
       <Tab value="workflow">Workflow · {stages.filter(stage => cleared(stage.status)).length}/{stages.length}</Tab>
       <Tab value="reviews">Reviews · {reviews.filter(review => !approved(review.status)).length} open</Tab>
     </TabList></div>
     {area === "tasks" && <section className="pd-section" aria-label="Tasks">
-      <header><div><h2>Tasks</h2><span className="pd-muted">The steps needed to deliver this work.</span></div>{!isClosed && <Button {...restoreFocusTarget} disabled={busy} onClick={() => setDialog({ kind: "task" })}>Add task</Button>}</header>
-      {tasks.length ? <div className="pd-table-scroll" tabIndex={0} role="region" aria-label="Task table"><Table aria-label="Work tasks"><TableHeader><TableRow><TableHeaderCell>Task</TableHeaderCell><TableHeaderCell>Owner / due</TableHeaderCell><TableHeaderCell>Status</TableHeaderCell><TableHeaderCell>Action</TableHeaderCell></TableRow></TableHeader><TableBody>{tasks.map(task => <TableRow key={task.id}>
-        <TableCell><span className="pd-primary"><strong>{task.title}</strong>{task.description && <small>{task.description}</small>}{task.blockers?.length ? <small>Blocked: {task.blockers.map(blocker => blocker.blockingReason || label(blocker.dependencyType)).join(", ")}</small> : null}{task.review_required && <small>Review required</small>}</span></TableCell>
-        <TableCell><span className="pd-primary">{task.assignee_name || resources.find(person => person.id === task.assignee_member_id)?.display_name || "Unassigned"}<small>{formatDate(task.due_date, "No due date")}</small></span></TableCell>
-        <TableCell><StatusTreatment value={task.status} /></TableCell>
-        <TableCell><div className="pd-actions">{!isClosed && !cleared(task.status) && <>
+      <header><div className="pd-task-progress"><h2>Tasks</h2><span className="pd-muted">{tasks.filter(task => cleared(task.status)).length} of {tasks.length} complete</span><ProgressBar aria-label="Task progress" value={tasks.length ? tasks.filter(task => cleared(task.status)).length / tasks.length : 0} /></div>{!isClosed && <Button {...restoreFocusTarget} icon={<AddRegular />} disabled={busy} onClick={() => setDialog({ kind: "task" })}>Add task</Button>}</header>
+      {tasks.length ? <div className="pd-table-scroll" tabIndex={0} role="region" aria-label="Task table"><Table className="pd-task-table" aria-label="Work tasks" role="table"><TableHeader className="pd-task-head"><TableRow><TableHeaderCell>Task</TableHeaderCell><TableHeaderCell>Owner / due</TableHeaderCell><TableHeaderCell>Status</TableHeaderCell><TableHeaderCell>Action</TableHeaderCell></TableRow></TableHeader><TableBody>{tasks.map(task => <TableRow className="pd-task-row" role="row" key={task.id}>
+        <TableCell className="pd-task-title" role="cell"><div className="pd-task-name"><span className={cleared(task.status) ? "pd-task-marker pd-task-marker--done" : "pd-task-marker"}>{cleared(task.status) ? <CheckmarkCircleRegular aria-hidden="true" /> : <CircleRegular aria-hidden="true" />}</span><span className="pd-primary"><strong>{task.title}</strong>{task.description && <small>{task.description}</small>}{task.blockers?.length ? <small>Blocked: {task.blockers.map(blocker => blocker.blockingReason || label(blocker.dependencyType)).join(", ")}</small> : null}{task.review_required && <small>Review required</small>}</span></div></TableCell>
+        <TableCell className="pd-task-owner" role="cell"><span className="pd-primary">{task.assignee_name || resources.find(person => person.id === task.assignee_member_id)?.display_name || "Unassigned"}<small>{formatDate(task.due_date, "No due date")}</small></span></TableCell>
+        <TableCell className="pd-task-status" role="cell"><StatusTreatment value={task.status} /></TableCell>
+        <TableCell className="pd-task-actions" role="cell"><div className="pd-actions">{!isClosed && !cleared(task.status) && <>
           {["not_started", "blocked"].includes(task.status) && <Button disabled={busy || Boolean(task.blockers?.length)} onClick={() => void mutate(() => api.updatePracticeTaskStatus(context, task.id, "in_progress"), "Task started.")}>Start</Button>}
           {["in_progress", "review"].includes(task.status) && <Button disabled={busy || Boolean(task.blockers?.length)} onClick={() => void mutate(() => api.updatePracticeTaskStatus(context, task.id, "completed"), "Task completed.")}>Complete task</Button>}
         </>}{!isClosed && task.review_required && !reviews.some(review => review.practice_task_id === task.id) && <Button {...restoreFocusTarget} disabled={busy} onClick={() => setDialog({ kind: "review", taskId: task.id })}>Request review</Button>}</div></TableCell>
@@ -129,6 +127,22 @@ export default function PracticeWorkDetail({ context, workItemId, onBack, onOpen
         </div>}</li>)}</ul> : <p className="pd-muted">No review points recorded.</p>}
       </article>)}</div> : <EmptyState title="No review requested" description={tasks.length || stages.length ? "Choose a task or stage and a reviewer to begin." : "Add a task before requesting a review."} />}
     </section>}
+    </div>
+    <aside className="pd-sidebar" aria-label="Work information">
+      <Accordion collapsible openItems={detailsOpen ? ["details"] : []} onToggle={(_, data) => setDetailsOpen(data.openItems.includes("details"))}>
+        <AccordionItem value="details"><AccordionHeader size="large">Work details</AccordionHeader><AccordionPanel className="pd-sidebar-content">
+          {!isClosed ? <Field label="Work owner"><Select disabled={busy || !resources.length} value={item.assigned_member_id || ""} onChange={(_, data) => { if (data.value && data.value !== item.assigned_member_id) void mutate(() => api.reassignWork(context, item.id, { resourceId: data.value }), "Owner updated."); }}><option value="">Choose owner</option>{resources.filter(person => person.status === "active").map(person => <option value={person.id} key={person.id}>{person.display_name}</option>)}</Select></Field> : <div className="pd-owner-readonly"><span className="pd-muted">Work owner</span><strong>{item.assigned_member_name || item.assigned_team_name || "Unassigned"}</strong></div>}
+          <dl className="pd-facts">
+            <div><dt>Due date</dt><dd>{formatDate(item.due_date, "Not set")}{!isClosed && <Button size="small" appearance="transparent" onClick={() => setDialog({ kind: "reschedule" })}>Reschedule</Button>}</dd></div>
+            <div><dt>Priority</dt><dd>{label(item.priority)}</dd></div>
+            {item.period_reference && <div><dt>Period</dt><dd>{item.period_reference}</dd></div>}
+            <div><dt>Service</dt><dd>{item.service_name || "Service"}</dd></div>
+          </dl>
+          {["waiting_internal", "waiting_on_client"].includes(item.status) && <Button disabled={busy} onClick={() => void mutate(() => api.updatePracticeWorkStatus(context, item.id, "in_progress"), "Work resumed.")}>Resume work</Button>}
+        </AccordionPanel></AccordionItem>
+      </Accordion>
+    </aside>
+    </div>
     {dialog && <DeliveryDialog key={JSON.stringify(dialog)} action={dialog} item={item} resources={resources} context={context} onClose={() => setDialog(null)} onSaved={async message => { setDialog(null); await load(); setNotice(message); }} />}
     {requestOpen && <PracticeClientRequestDialog context={context} clientId={item.client_id} work={item} onClose={() => setRequestOpen(false)} onCreated={async () => { setRequestOpen(false); await load(); setNotice("Client request sent."); }} />}
   </PageShell>;

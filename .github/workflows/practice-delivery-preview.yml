@@ -7,7 +7,10 @@ permissions:
 jobs:
   preview:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble
+      options: --user 1001
+    timeout-minutes: 20
     env:
       WEB_ORIGIN: https://practice-delivery-review.practiceengine-dev.pages.dev
       VITE_DEMO_MODE: "true"
@@ -23,6 +26,21 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - run: npm run test:ui-quality --workspace apps/web
+      - name: Verify delivery, navigation and visual reflow
+        working-directory: apps/web
+        env:
+          PRACTICE_REVIEW_INLINE_EVIDENCE: "true"
+        run: npx playwright test e2e/practice-delivery.spec.ts e2e/direction-1-1.spec.ts e2e/application-shell.spec.ts e2e/work-quality.spec.ts --project=chromium --workers=1
+      - name: Retain visual and interaction evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: practice-visual-review
+          path: |
+            apps/web/test-results/
+            apps/web/playwright-report/
+          retention-days: 7
       - name: Build the labelled sample-data review
         run: npm run build:production --workspace apps/web
       - name: Guard the preview target
@@ -46,5 +64,5 @@ jobs:
             --project-name practiceengine-dev \
             --branch practice-delivery-review \
             --commit-hash "$GITHUB_SHA" \
-            --commit-message "Practice delivery review — sample data — e54f3e6f00cc9ef449dd43210912ac6de4500b85" \
+            --commit-message "Practice visual review — sample data" \
             --commit-dirty=false

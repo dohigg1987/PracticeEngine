@@ -98,6 +98,8 @@ test("delivery review images", async ({ page }) => {
   test.skip(process.env.PRACTICE_REVIEW_INLINE_EVIDENCE !== "true", "Optional visual evidence for review");
   for (const shot of [
     { name: "delivery-desktop", width: 1440, height: 1000, path: "/practice/work?work=work-accounts-2026", reviews: false },
+    { name: "delivery-tasks-mobile", width: 390, height: 844, path: "/practice/work?work=work-accounts-2026", reviews: false },
+    { name: "delivery-tasks-narrow", width: 320, height: 844, path: "/practice/work?work=work-accounts-2026", reviews: false },
     { name: "delivery-reviews-mobile", width: 390, height: 1000, path: "/practice/work?work=work-accounts-2026", reviews: true },
     { name: "delivery-home", width: 1440, height: 1000, path: "/practice/home", reviews: false },
   ]) {
