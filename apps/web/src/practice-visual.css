@@ -1,0 +1,41 @@
+/* Practice Management owns this presentation. Public Fluent controls retain their native states and geometry. */
+.app-shell--practice .content { background: var(--colorNeutralBackground2); padding: var(--spacingVerticalXXL) var(--spacingHorizontalXXL); max-width: none; margin: 0; }
+.app-shell--practice .workspace { grid-template-columns: 224px minmax(0, 1fr); min-height: calc(100vh - 56px); }
+.app-shell--practice .sidebar { top: 56px; height: calc(100vh - 56px); background: var(--colorNeutralBackground2); border-right: var(--strokeWidthThin) solid var(--colorNeutralStroke2); }
+.app-shell--practice .practice-nav { width: 100%; height: 100%; background: var(--colorNeutralBackground2); border: 0; }
+.practice-nav .workspace-nav-body { padding: var(--spacingVerticalL) var(--spacingHorizontalS); }
+.practice-nav .application-identity { padding: var(--spacingVerticalM) var(--spacingHorizontalM) var(--spacingVerticalL); gap: var(--spacingVerticalXS); }
+.practice-nav .application-identity strong { font-size: var(--fontSizeBase300); line-height: var(--lineHeightBase300); }
+.practice-nav .application-navigation { margin-top: var(--spacingVerticalL); display: grid; gap: var(--spacingVerticalXS); padding-inline: 0; }
+.app-shell--practice .practice-nav .workspace-nav-typography { font-size: var(--fontSizeBase300); line-height: var(--lineHeightBase300); }
+.practice-nav .application-settings-link { margin-top: var(--spacingVerticalS); border: 0; padding-top: 0; }
+.app-shell--practice .topbar { background: var(--colorNeutralBackground1); border-top: 0; height: 56px; padding-inline: var(--spacingHorizontalL); }
+.app-shell--practice .global-search .global-search-box { min-height: 32px; background: var(--colorNeutralBackground2); border-color: var(--colorNeutralStroke2); }
+.app-shell--practice .global-search-box input { min-height: 28px; }
+.app-shell--practice .content > .pww-page,
+.app-shell--practice .content > .re-home { padding: var(--spacingVerticalXL) var(--spacingHorizontalXXL); border: var(--strokeWidthThin) solid var(--colorNeutralStroke2); border-radius: var(--borderRadiusLarge); background: var(--colorNeutralBackground1); }
+.app-shell--practice .pww-page .pe-page-header,
+.app-shell--practice .re-home .pe-page-header { padding-bottom: var(--spacingVerticalL); }
+.app-shell--practice .pww-page .pe-page-heading h1,
+.app-shell--practice .re-home .pe-page-heading h1 { font-size: var(--fontSizeBase600); line-height: var(--lineHeightBase600); }
+.app-shell--practice .pww-page .pe-operational-grid [role="row"],
+.app-shell--practice .re-home .pe-operational-grid [role="row"] { min-height: 60px; }
+.app-shell--practice .pww-page .pe-saved-views { margin-top: var(--spacingVerticalS); }
+.app-shell--practice .pww-page .pe-compact-filter-region { padding-block: var(--spacingVerticalS); }
+.app-shell--practice .re-home-command-centre { gap: var(--spacingVerticalXL); }
+.re-home-queue-bar { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: var(--strokeWidthThin) solid var(--colorNeutralStroke2); padding-block: var(--spacingVerticalS) var(--spacingVerticalL); gap: var(--spacingVerticalS) var(--spacingHorizontalM); }
+.re-home-queue-bar .re-home-queue-link { display: flex; align-items: baseline; justify-content: space-between; gap: var(--spacingHorizontalM); padding: var(--spacingVerticalS) var(--spacingHorizontalM); border-radius: var(--borderRadiusMedium); }
+.re-home-queue-link strong { font-size: var(--fontSizeBase600); line-height: var(--lineHeightBase600); color: var(--colorNeutralForeground1); font-weight: var(--fontWeightSemibold); }
+@media (max-width: 1100px) { .app-shell--practice .content { padding: var(--spacingVerticalL) var(--spacingHorizontalL); } }
+@media (max-width: 900px) { .app-shell--practice .workspace { display: block; } }
+@media (max-width: 640px) {
+  .app-shell--practice .content { padding: var(--spacingVerticalS); }
+  .app-shell--practice .topbar { padding-inline: var(--spacingHorizontalS); }
+  .app-shell--practice .content > .pww-page,
+  .app-shell--practice .content > .re-home { padding: var(--spacingVerticalL) var(--spacingHorizontalM); }
+  .re-home-queue-bar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--spacingVerticalXS); }
+  .re-home-queue-bar .re-home-queue-link { justify-content: space-between; padding-inline: var(--spacingHorizontalS); min-height: 44px; }
+}
+@media (forced-colors: active) {
+  .app-shell--practice .content > .pww-page, .app-shell--practice .content > .re-home, .re-home-queue-bar { border-color: CanvasText; }
+}

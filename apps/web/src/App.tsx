@@ -193,6 +193,8 @@ import {
   suiteIdentity,
 } from "./application-manifests";
 
+import "./practice-visual.css";
+
 type View =
   | "overview"
   | "data"
@@ -710,7 +712,9 @@ function AccountsWorkspace({
     performance.mark("pe:navigation:start");
     const canonical = canonicalPath(nextPath);
     const target = new URL(canonical, window.location.origin);
-    window.history[replace ? "replaceState" : "pushState"](null, "", `${target.pathname}${target.search}`);
+    const targetPath = `${target.pathname}${target.search}`;
+    const alreadyOnPracticePage = target.pathname.startsWith("/practice") && targetPath === `${window.location.pathname}${window.location.search}`;
+    if (replace || !alreadyOnPracticePage) window.history[replace ? "replaceState" : "pushState"](null, "", targetPath);
     setPathname(target.pathname);
     setLocationSearch(target.search);
     setMobileNavOpen(false);
@@ -1539,7 +1543,7 @@ function AccountsWorkspace({
     setActiveSearchIndex(0);
   }
   return (
-    <div className="app-shell">
+    <div className={activeApplication?.id === "practice" ? "app-shell app-shell--practice" : "app-shell"}>
       <header className="topbar">
         <Tooltip content="Open application navigation" relationship="description">
           <FluentButton
@@ -1595,7 +1599,7 @@ function AccountsWorkspace({
             size="large"
             role="combobox"
             contentBefore={<SearchRegular aria-hidden="true" />}
-            placeholder="Search clients, engagements and sections"
+            placeholder={activeApplication?.id === "practice" ? "Search practice" : "Search clients, engagements and sections"}
             aria-label="Search workspace"
             aria-expanded={searchOpen}
             aria-controls="workspace-search-results"
@@ -1741,16 +1745,16 @@ function AccountsWorkspace({
           <NavDrawer
             {...(narrowNavigation ? navigationFocusSource : {})}
             id="application-navigation"
-            className={narrowNavigation ? "suite-mobile-nav" : "fluent-nav"}
+            className={narrowNavigation ? "suite-mobile-nav" : activeApplication?.id === "practice" ? "practice-nav" : "fluent-nav"}
             type={narrowNavigation ? "overlay" : "inline"}
             role={narrowNavigation ? "dialog" : "navigation"}
             open={!narrowNavigation || mobileNavOpen}
             onOpenChange={(_, data) => setMobileNavOpen(data.open)}
             aria-label="Application navigation"
             defaultOpenCategories={activeApplication?.id === "practice"
-              ? ["practice-clients", "practice-resources", "practice-portfolio"]
+              ? [navigationItemForPath(pathname)?.parentId || navigationItemForPath(pathname)?.id || "practice-work"]
               : undefined}
-            selectedCategoryValue={navigationItemForPath(pathname)?.parentId ?? ""}
+            selectedCategoryValue={navigationItemForPath(pathname)?.parentId ?? (activeApplication?.id === "practice" ? navigationItemForPath(pathname)?.id ?? "" : "")}
             selectedValue={navigationItemForPath(pathname) ? applicationNavigationValue(navigationItemForPath(pathname)!) : pathname.startsWith("/settings") ? "global-settings" : activeApplication && pathname.startsWith(`${activeApplication.routePrefix}/settings`) ? `${activeApplication.id}-settings` : ""}
           >
             {narrowNavigation && <NavDrawerHeader>
@@ -1758,7 +1762,7 @@ function AccountsWorkspace({
             </NavDrawerHeader>}
             <NavDrawerBody className="workspace-nav-body">
               <div className="application-identity">
-                <p className="eyebrow">Current application</p>
+                {activeApplication?.id !== "practice" && <p className="eyebrow">Current application</p>}
                 <strong>{activeApplication?.name ?? "PracticeEngine settings"}</strong>
                 <small>{selectedMembership?.name || "Practice workspace"}</small>
               </div>
@@ -1826,7 +1830,7 @@ function AccountsWorkspace({
                     return <React.Fragment key={item.id}>
                     {group && group !== previousGroup && <span className="application-navigation-group">{group}</span>}
                     <NavItem
-                      className="workspace-nav-item"
+                      className={activeApplication.id === "practice" ? "workspace-nav-typography" : "workspace-nav-item"}
                       value={isApplicationNavigationItem(item) ? applicationNavigationValue(item) : pathname === item.path ? `${activeApplication.id}-settings` : item.id}
                       icon={isApplicationNavigationItem(item) ? applicationNavigationIcon(item) : <DocumentRegular />}
                       onClick={() => isApplicationNavigationItem(item) ? activateNavigationItem(item) : navigate(item.path)}
@@ -1838,13 +1842,13 @@ function AccountsWorkspace({
                     </React.Fragment>;
                   })}
                   {!pathname.startsWith(`${activeApplication.routePrefix}/settings`) && activeApplication.id === "practice" && (
-                    <NavItem className="workspace-nav-item application-settings-link" value="practice-automation-utility" icon={<DocumentRegular />} onClick={() => navigate("/practice/automation")}>
+                    <NavItem className="workspace-nav-typography application-settings-link" value="practice-automation-utility" icon={<DocumentRegular />} onClick={() => navigate("/practice/automation")}>
                       Automation
                     </NavItem>
                   )}
                   {!pathname.startsWith(`${activeApplication.routePrefix}/settings`) && ["OWNER", "ADMIN"].includes(selectedMembership?.role_code || "") && activeApplication.settings.length > 0 && (
                     <NavItem
-                      className="workspace-nav-item application-settings-link"
+                      className={activeApplication.id === "practice" ? "workspace-nav-typography application-settings-link" : "workspace-nav-item application-settings-link"}
                       value={`${activeApplication.id}-settings`}
                       icon={<DocumentRegular />}
                       onClick={() => {

@@ -241,7 +241,7 @@ export const resourceAllocationPath = (resourceName: string) => `/practice/work-
 
 export function practiceHomeNextAction(overview: PracticeEconomicsOverview): string {
   const next = practiceHomeQueues(overview).find((item) => item.value > 0);
-  return next ? `${next.label}: ${next.value} item${next.value === 1 ? "" : "s"} need attention.` : "No delivery exceptions need immediate attention.";
+  return next ? `${next.label}: ${next.value} item${next.value === 1 ? " needs" : "s need"} attention.` : "No delivery exceptions need immediate attention.";
 }
 
 function ManagementView({ context, onNavigate, routeSearch, onOpenWork }: Omit<Props, "view">) {
@@ -287,7 +287,7 @@ function ManagementView({ context, onNavigate, routeSearch, onOpenWork }: Omit<P
   const inspector = selected && selected.id === selectedId ? <WorkInspector key={`${context.tenantId}:${selected.id}`} context={context} item={selected} resources={resources} onChanged={async () => { await load(); const result = await api.practiceWorkItem(context, selected.id); if (selectedRef.current === selected.id) setSelected(result.item); }} onClose={() => onNavigate?.("/practice/home")} onOpenClient={(id) => onNavigate?.(`/practice/clients?client=${encodeURIComponent(id)}&return=${encodeURIComponent(`/practice/home?selected=${selected.id}`)}`)} onOpenWork={onOpenWork} /> : undefined;
   return <PageShell className="re-home">
     <PageHeader title="Home" description="Plan today. Keep client work moving." meta={<span className="re-home-next">{practiceHomeNextAction(overview)}</span>} primaryAction={<Button appearance="primary" onClick={() => setAddingWork(true)}>Add work</Button>} secondaryActions={<Button onClick={() => onNavigate?.("/practice/clients")}>Open clients</Button>} />
-    <div className="pd-actions" aria-label="Delivery queues">{practiceHomeQueues(overview).map(queue => <Button key={queue.label} onClick={() => onNavigate?.(queue.path)}>{queue.label} · {queue.value}</Button>)}</div>
+    <nav className="re-home-queue-bar" aria-label="Delivery queues">{practiceHomeQueues(overview).map(queue => <Link className="re-home-queue-link" key={queue.label} href={queue.path} onClick={navigateLink(queue.path)}><span>{queue.label}</span><strong>{queue.value}</strong></Link>)}</nav>
     {secondaryError && <MessageBar intent="warning"><MessageBarBody>{secondaryError}</MessageBarBody></MessageBar>}
     {error && <ErrorState title="Some home data may be out of date" message={error} retry={load} />}
     <MasterDetailWorkspace selected={Boolean(inspector)} inspector={inspector} className="re-home-workspace">

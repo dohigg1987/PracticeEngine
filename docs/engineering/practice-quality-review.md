@@ -32,3 +32,13 @@ No checkout, dependency install, build output or new temporary files were create
 - Client request recipient listing currently follows the server's portal-access permission contract; request-only roles may need a dedicated, appropriately authorised recipient endpoint.
 - Template/automation authoring and validation remain shallow.
 - Global styling and broader information architecture outside the delivery journey need further work.
+
+## Visual hierarchy follow-up
+
+Practice Management owns this presentation update. The work record now puts the client, status and due date in a compact header, keeps the task/review journey in the main column, and moves editable work information into a supporting desktop pane. Narrow task rows expose their status and actions without horizontal scrolling. Fluent progress, avatars, system icons, tabs, navigation and accordion components retain their public semantics.
+
+The Practice shell uses a neutral workspace canvas and one content surface. Its Fluent navigation no longer inherits legacy custom button/grid overrides, starts with the relevant group expanded, and indicates the current group. Re-selecting the current Practice route avoids duplicate browser history. Home queue counts are navigable operational summaries. The specialist application shell and authentication contracts are preserved.
+
+Visual review is performed on GitHub-generated desktop, 390px and 320px screenshots, alongside focused delivery/navigation tests, keyboard restoration, accessibility, forced-colour and text-spacing checks. The first visual pass found excess mobile cell heights and unspaced Home counts; those were corrected. The initial preview test run also exposed an ambiguous Team selector and a stale preview-only deadline assertion; selectors now address the navigation region and the saved date is checked by reopening the form. Final revision status is recorded in PR checks.
+
+No tenant, entitlement, audit, API or database contract changes are introduced by this follow-up. Rollback is the reverse of the presentation commit and its companion browser-test changes. The existing backend publication blocker still applies; the separately guarded preview uses sample data only.

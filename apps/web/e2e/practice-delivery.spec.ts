@@ -92,12 +92,21 @@ test("delivery record and dialogs remain accessible at 320px and restore focus",
     expect(audit.violations.map(item => ({ id: item.id, nodes: item.nodes.map(node => node.target) }))).toEqual([]);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
   }
+  await page.emulateMedia({ forcedColors: "active" });
+  await expect(page.getByRole("tab", { name: /^Reviews/ })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
+  await page.emulateMedia({ forcedColors: "none" });
+  await page.addStyleTag({ content: ".pd-page * { line-height: 1.5; letter-spacing: .12em; word-spacing: .16em; } .pd-page p { margin-bottom: 2em; }" });
+  await expect(page.getByRole("button", { name: "Request from client", exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
 });
 
 test("delivery review images", async ({ page }) => {
   test.skip(process.env.PRACTICE_REVIEW_INLINE_EVIDENCE !== "true", "Optional visual evidence for review");
   for (const shot of [
     { name: "delivery-desktop", width: 1440, height: 1000, path: "/practice/work?work=work-accounts-2026", reviews: false },
+    { name: "delivery-tasks-mobile", width: 390, height: 844, path: "/practice/work?work=work-accounts-2026", reviews: false },
+    { name: "delivery-tasks-narrow", width: 320, height: 844, path: "/practice/work?work=work-accounts-2026", reviews: false },
     { name: "delivery-reviews-mobile", width: 390, height: 1000, path: "/practice/work?work=work-accounts-2026", reviews: true },
     { name: "delivery-home", width: 1440, height: 1000, path: "/practice/home", reviews: false },
   ]) {
