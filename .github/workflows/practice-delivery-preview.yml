@@ -4,6 +4,9 @@ on:
     branches: [codex/practice-delivery-preview]
 permissions:
   contents: read
+concurrency:
+  group: practice-delivery-review-preview
+  cancel-in-progress: true
 jobs:
   preview:
     runs-on: ubuntu-latest

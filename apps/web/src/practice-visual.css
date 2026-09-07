@@ -1,8 +1,8 @@
 /* Practice Management owns this presentation. Public Fluent controls retain their native states and geometry. */
 .app-shell--practice .content { background: var(--colorNeutralBackground2); padding: var(--spacingVerticalXXL) var(--spacingHorizontalXXL); max-width: none; margin: 0; }
 .app-shell--practice .workspace { grid-template-columns: 224px minmax(0, 1fr); min-height: calc(100vh - 56px); }
-.app-shell--practice .sidebar { top: 56px; height: calc(100vh - 56px); background: var(--colorNeutralBackground2); border-right: var(--strokeWidthThin) solid var(--colorNeutralStroke2); }
-.app-shell--practice .practice-nav { width: 100%; height: 100%; background: var(--colorNeutralBackground2); border: 0; }
+.app-shell--practice .sidebar { top: 56px; height: calc(100vh - 56px); background: var(--colorNeutralBackground4); border-right: var(--strokeWidthThin) solid var(--colorNeutralStroke2); }
+.app-shell--practice .practice-nav { width: 100%; height: 100%; background: var(--colorNeutralBackground4); border: 0; }
 .practice-nav .workspace-nav-body { padding: var(--spacingVerticalL) var(--spacingHorizontalS); }
 .practice-nav .application-identity { padding: var(--spacingVerticalM) var(--spacingHorizontalM) var(--spacingVerticalL); gap: var(--spacingVerticalXS); }
 .practice-nav .application-identity strong { font-size: var(--fontSizeBase300); line-height: var(--lineHeightBase300); }

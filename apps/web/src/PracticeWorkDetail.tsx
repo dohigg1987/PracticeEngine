@@ -89,10 +89,10 @@ export default function PracticeWorkDetail({ context, workItemId, onBack, onOpen
     <div className="pd-layout">
     <div className="pd-main">
     <section className="pd-next" aria-label="Next action"><div className="pd-next-copy"><span className="pd-eyebrow">Next step</span><h2>{next.title}</h2><p>{next.description}</p></div>{next.action !== "none" && <Button {...restoreFocusTarget} appearance="primary" icon={<ArrowRightRegular />} iconPosition="after" disabled={busy} onClick={nextClick}>{nextLabel}</Button>}</section>
-    <div className="pd-tabs"><TabList size="large" aria-label="Work details" selectedValue={area} onTabSelect={(_, data) => setArea(data.value as Area)}>
+    <div className="pd-tabs"><TabList size="medium" aria-label="Work details" selectedValue={area} onTabSelect={(_, data) => setArea(data.value as Area)}>
       <Tab value="tasks">Tasks · {tasks.filter(task => cleared(task.status)).length}/{tasks.length}</Tab>
       <Tab value="workflow">Workflow · {stages.filter(stage => cleared(stage.status)).length}/{stages.length}</Tab>
-      <Tab value="reviews">Reviews · {reviews.filter(review => !approved(review.status)).length} open</Tab>
+      <Tab value="reviews" aria-label={`Reviews · ${reviews.filter(review => !approved(review.status)).length} open`}>Reviews · {reviews.filter(review => !approved(review.status)).length}</Tab>
     </TabList></div>
     {area === "tasks" && <section className="pd-section" aria-label="Tasks">
       <header><div className="pd-task-progress"><h2>Tasks</h2><span className="pd-muted">{tasks.filter(task => cleared(task.status)).length} of {tasks.length} complete</span><ProgressBar aria-label="Task progress" value={tasks.length ? tasks.filter(task => cleared(task.status)).length / tasks.length : 0} /></div>{!isClosed && <Button {...restoreFocusTarget} icon={<AddRegular />} disabled={busy} onClick={() => setDialog({ kind: "task" })}>Add task</Button>}</header>
