@@ -30,7 +30,7 @@ import {
   api,
   ApiContext,
   ClientRequestItem,
-  PortalContact,
+  ClientRequestRecipient,
   PortalDocumentItem,
   PortalMessageItem,
   PortalThreadItem,
@@ -122,7 +122,7 @@ function StaffWorkspace({ context, clientId, engagementIds = [], initialTab = "r
   const [requests, setRequests] = useState<ClientRequestItem[]>([]);
   const [details, setDetails] = useState<RequestDetail[]>([]);
   const [threads, setThreads] = useState<PortalThreadItem[]>([]);
-  const [contacts, setContacts] = useState<PortalContact[]>([]);
+  const [contacts, setContacts] = useState<ClientRequestRecipient[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState<RequestDetail | null>(null);
@@ -130,14 +130,17 @@ function StaffWorkspace({ context, clientId, engagementIds = [], initialTab = "r
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const [requestData, threadData, contactData] = await Promise.all([
-        api.clientRequests(context),
-        api.portalThreads(context),
-        Promise.all(engagementIds.map((id) => api.portalContacts(context, id).then((result) => result.items))).then((groups) => groups.flat()),
+      const [requestResult, threadResult, contactResult] = await Promise.allSettled([
+        api.clientRequests(context), api.portalThreads(context),
+        clientId ? api.clientRequestRecipients(context, clientId) : Promise.resolve({ items: [] }),
       ]);
-      const visibleRequests = clientId ? requestData.items.filter((item) => item.client_id === clientId) : requestData.items;
-      const visibleThreads = clientId ? threadData.items.filter((item) => item.client_id === clientId) : threadData.items;
-      setRequests(visibleRequests); setThreads(visibleThreads); setContacts(contactData);
+      if (requestResult.status === "rejected") throw requestResult.reason;
+      const visibleRequests = clientId ? requestResult.value.items.filter(item => item.client_id === clientId) : requestResult.value.items;
+      const threadItems = threadResult.status === "fulfilled" ? threadResult.value.items : [];
+      setRequests(visibleRequests);
+      setThreads(clientId ? threadItems.filter(item => item.client_id === clientId) : threadItems);
+      setContacts(contactResult.status === "fulfilled" ? contactResult.value.items : []);
+      if (threadResult.status === "rejected" || contactResult.status === "rejected") setError("Some messages or portal access information could not be loaded. Requests are still available.");
       const detailItems = await Promise.all(visibleRequests.map((item) => api.clientRequest(context, item.id).then((result) => result.item as RequestDetail)));
       setDetails(detailItems);
     } catch (error) { setError(errorText(error)); } finally { setLoading(false); }
@@ -151,7 +154,7 @@ function StaffWorkspace({ context, clientId, engagementIds = [], initialTab = "r
     {tab === "requests" && <RequestsGrid items={requests} onOpen={(item) => setSelected(details.find((detail) => detail.id === item.id) ?? item)} />}
     {tab === "documents" && <DocumentsList items={documents} context={context} allowDownload={false} />}
     {tab === "messages" && (threads.length ? <ul className="thread-list">{threads.map((thread) => <li key={thread.id}><span><strong>{thread.subject}</strong><small>{thread.client_name || "Client"} · {thread.last_message_at ? formatDateTime(thread.last_message_at) : "No messages yet"}</small></span><Status value={thread.status} /></li>)}</ul> : <Empty title="No secure messages" body="Secure client conversations will appear here when a thread is opened." />)}
-    {tab === "access" && (contacts.length ? <div className="collaboration-table-scroll"><table className="collaboration-table"><thead><tr><th>Contact</th><th>Email</th><th>Role</th><th>Access</th></tr></thead><tbody>{contacts.map((contact) => <tr key={contact.id}><td>{contact.displayName}</td><td>{contact.email}</td><td>{statutoryLabel(contact.accessRole)}</td><td><Status value={contact.accessStatus} /></td></tr>)}</tbody></table></div> : <Empty title="No portal contacts" body={engagementIds.length ? "Invite an authorised client contact from the engagement portal-access area." : "Portal contacts are managed against a client engagement."} />)}
+    {tab === "access" && (contacts.length ? <div className="collaboration-table-scroll"><table className="collaboration-table"><thead><tr><th>Contact</th><th>Email</th><th>Role</th><th>Access</th></tr></thead><tbody>{contacts.map((contact) => <tr key={contact.id}><td>{contact.display_name}</td><td>{contact.email_normalized}</td><td>{statutoryLabel(contact.access_role || "contributor")}</td><td><Status value={contact.status} /></td></tr>)}</tbody></table></div> : <Empty title="No portal contacts" body={clientId ? "No portal access has been granted for this client." : "Open a client workspace to view that client’s portal access."} />)}
     {selected && <section className="request-detail" aria-label="Request detail"><header><div><h2>{selected.title}</h2><p>{selected.engagement_name || selected.work_title || "General client request"}</p></div><Status value={selected.status} /></header><p>{selected.description || "No further instructions were supplied."}</p><dl><div><dt>Type</dt><dd>{statutoryLabel(selected.request_type)}</dd></div><div><dt>Due</dt><dd>{clientRequestDueLabel(selected)}</dd></div><div><dt>Responses</dt><dd>{selected.responses?.length ?? selected.response_count ?? 0}</dd></div><div><dt>Completion</dt><dd>{statutoryLabel(selected.completion_mode || "manual")}</dd></div></dl><div className="request-actions"><Button onClick={() => setSelected(null)}>Close</Button>{!["completed", "cancelled"].includes(selected.status) && <Button appearance="primary" icon={<CheckmarkRegular />} disabled={busy} onClick={() => void complete()}>Confirm complete</Button>}</div></section>}
   </section>;
 }

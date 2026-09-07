@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Button, Checkbox, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, Field, Input, MessageBar, MessageBarBody, Select, Spinner, Textarea } from "@fluentui/react-components";
+import { useRestoreFocusSource, Button, Checkbox, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, Field, Input, MessageBar, MessageBarBody, Select, Spinner, Textarea } from "@fluentui/react-components";
 import { api, type ApiContext, type ClientRequestRecipient, type CreateClientRequestInput, type PracticeWorkItem } from "./api";
 import "./practice-delivery.css";
 
@@ -12,6 +12,7 @@ export function eligibleRequestRecipients(items: ClientRequestRecipient[], work?
 export default function PracticeClientRequestDialog({ context, clientId, work, onClose, onCreated }: {
   context: ApiContext; clientId: string; work?: PracticeWorkItem; onClose: () => void; onCreated: () => Promise<void>;
 }) {
+  const restoreFocusSource = useRestoreFocusSource();
   const [recipients, setRecipients] = useState<ClientRequestRecipient[]>([]);
   const [recipient, setRecipient] = useState("");
   const [title, setTitle] = useState(work ? `Information needed for ${work.title}` : "");
@@ -45,7 +46,7 @@ export default function PracticeClientRequestDialog({ context, clientId, work, o
     finally { setBusy(false); }
   }
   return <Dialog open onOpenChange={(_, data) => { if (!data.open && !busy) onClose(); }}>
-    <DialogSurface><DialogBody><DialogTitle>Request from client</DialogTitle>
+    <DialogSurface {...restoreFocusSource}><DialogBody><DialogTitle>Request from client</DialogTitle>
       <DialogContent className="pd-form">
         <p>Tell your client exactly what you need. The request will be sent to the selected portal contact.</p>
         {loading && <Spinner size="tiny" label="Loading client recipients" />}

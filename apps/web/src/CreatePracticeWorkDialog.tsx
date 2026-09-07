@@ -1,3 +1,4 @@
+import ActivateClientServiceDialog from "./ActivateClientServiceDialog";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Button, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface,
@@ -19,6 +20,7 @@ const message = (error: unknown) => error instanceof Error ? error.message : "Wo
 export default function CreatePracticeWorkDialog({ context, summary: initialSummary, onClose, onCreated }: Props) {
   const styles = useStyles();
   const restoreFocusSource = useRestoreFocusSource();
+  const [addingService, setAddingService] = useState(false);
   const [clients, setClients] = useState<Organisation[]>([]);
   const [clientId, setClientId] = useState(initialSummary?.client.id || "");
   const [summary, setSummary] = useState(initialSummary);
@@ -71,6 +73,7 @@ export default function CreatePracticeWorkDialog({ context, summary: initialSumm
   }
 
   const activeServices = summary?.services.filter(item => item.status === "active") || [];
+  if (addingService && summary) return <ActivateClientServiceDialog context={context} clientId={summary.client.id} existing={summary.services} onClose={() => setAddingService(false)} onCreated={async () => { const next = await api.practiceClientSummary(context, summary.client.id); setSummary(next); setServiceId(next.services.find(item => item.status === "active")?.id || ""); setAddingService(false); }} />;
   return <Dialog open onOpenChange={(_, data) => { if (!data.open && !saving.current) onClose(); }}>
     <DialogSurface {...restoreFocusSource}><form onSubmit={event => void create(event)}><DialogBody>
       <DialogTitle>Add work</DialogTitle>
@@ -87,7 +90,7 @@ export default function CreatePracticeWorkDialog({ context, summary: initialSumm
           </Select>
         </Field>}
         {loading && <Spinner size="tiny" label="Loading client services" />}
-        {summary && !activeServices.length && <MessageBar intent="info"><MessageBarBody>This client needs an active service before work can be added.</MessageBarBody></MessageBar>}
+        {summary && !activeServices.length && <MessageBar intent="info"><MessageBarBody>This client needs an active service before work can be added.</MessageBarBody><Button onClick={() => setAddingService(true)}>Add client service</Button></MessageBar>}
         <Field label="Service" required>
           <Select value={serviceId} disabled={busy || loading || !activeServices.length} onChange={(_, data) => setServiceId(data.value)}>
             <option value="">Select service</option>

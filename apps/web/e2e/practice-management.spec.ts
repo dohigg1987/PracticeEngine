@@ -120,9 +120,11 @@ test("workflow detail exposes stages blockers and operational review points",asy
   await start(page);await openNav(page);await page.getByRole("navigation", { name: "Practice Management navigation" }).getByRole("button", { name: "Work", exact: true }).click();
   await page.getByRole("link",{name:/2026 Annual Accounts/}).click();
   await page.getByRole("complementary", { name: "Selected record inspector" }).getByRole("button", { name: "Open work", exact: true }).click();
-  await expect(page.getByRole("table",{name:"Operational workflow stages"})).toContainText("Partner review");
   await expect(page.getByRole("table",{name:"Work tasks"})).toContainText("Review");
-  await expect(page.getByRole("table",{name:"Work operational reviews"})).toContainText("Confirm the operational delivery checklist");
+  await page.getByRole("tab", { name: /^Workflow/ }).click();
+  await expect(page.getByRole("table",{name:"Operational workflow stages"})).toContainText("Partner review");
+  await page.getByRole("tab", { name: /^Reviews/ }).click();
+  await expect(page.getByLabel("Work operational reviews")).toContainText("Confirm the operational delivery checklist");
 });
 
 test("review queue and recurrence operations provide practical controls",async({page})=>{

@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { Button, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, Field, Input, MessageBar, MessageBarBody, Select, Spinner } from "@fluentui/react-components";
+import { useRestoreFocusSource, Button, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, Field, Input, MessageBar, MessageBarBody, Select, Spinner } from "@fluentui/react-components";
 import { api, type ApiContext, type ClientService, type PracticeService } from "./api";
 import "./practice-delivery.css";
 
 export default function ActivateClientServiceDialog({ context, clientId, existing, onClose, onCreated }: {
   context: ApiContext; clientId: string; existing: ClientService[]; onClose: () => void; onCreated: () => Promise<void>;
 }) {
+  const restoreFocusSource = useRestoreFocusSource();
   const [services, setServices] = useState<PracticeService[]>([]), [serviceId, setServiceId] = useState("");
   const [start, setStart] = useState(new Date().toISOString().slice(0, 10));
   const [frequency, setFrequency] = useState("");
@@ -18,7 +19,7 @@ export default function ActivateClientServiceDialog({ context, clientId, existin
     catch (reason) { setError(reason instanceof Error ? reason.message : "The service could not be activated."); }
     finally { setBusy(false); }
   }
-  return <Dialog open onOpenChange={(_, data) => { if (!data.open && !busy) onClose(); }}><DialogSurface><form onSubmit={event => void save(event)}><DialogBody><DialogTitle>Add client service</DialogTitle><DialogContent className="pd-form">
+  return <Dialog open onOpenChange={(_, data) => { if (!data.open && !busy) onClose(); }}><DialogSurface {...restoreFocusSource}><form onSubmit={event => void save(event)}><DialogBody><DialogTitle>Add client service</DialogTitle><DialogContent className="pd-form">
     <p>Choose the service this client has agreed to receive. You can then create work for it.</p>
     {loading && <Spinner size="tiny" label="Loading services" />}
     {error && <MessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></MessageBar>}

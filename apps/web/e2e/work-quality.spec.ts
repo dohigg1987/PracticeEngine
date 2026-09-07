@@ -9,7 +9,7 @@ test("full work details survive refresh, history and switching work sections", a
   await expect(page.getByRole("heading", { name: "2026 Annual Accounts", exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByRole("heading", { name: "2026 Annual Accounts", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await page.getByRole("button", { name: "Back to work", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Work", exact: true })).toBeVisible();
   await expect(page.getByLabel("Search", { exact: true })).toHaveValue("annual");
   await page.goBack();

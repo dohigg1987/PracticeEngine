@@ -5064,13 +5064,12 @@ function AuthFrame({ children }: React.PropsWithChildren) {
         </FluentLink>
         <div>
           <p className="eyebrow">Professional practice platform</p>
-          <h1>One practice. Modular applications.</h1>
+          <h1>Keep your practice moving.</h1>
           <p>
-            Practice Management, Ledgerly and specialist applications in one
-            secure suite.
+            Keep clients, services, deadlines and delivery together in one workspace.
           </p>
         </div>
-        <small>Managed authentication · Immutable engagement history</small>
+        <small>Clear ownership. Connected client work.</small>
       </section>
       <section className="auth-panel">{children}</section>
     </main>
@@ -5249,7 +5248,7 @@ function AuthScreen({
         <h2>{heading}</h2>
         <p>
           {mode === "sign-in"
-            ? "Sign in to continue to your accounts workspace."
+            ? "Sign in to your PracticeEngine workspace."
             : mode === "sign-up"
               ? "Use your work email to create a secure PracticeEngine account."
               : mode === "reset-request"

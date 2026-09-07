@@ -776,7 +776,7 @@ export type NormalizedImportPreview = {
 };
 export type ApiContext = { tenantId: string };
 export type ClientRequestRecipient = {
-  id: string; display_name: string; email_normalized: string; status: string;
+  id: string; display_name: string; email_normalized: string; status: string; access_role?: string;
   principal_status: string; engagement_id?: string | null; client_service_id?: string | null;
 };
 export type ClientRequestItem = {

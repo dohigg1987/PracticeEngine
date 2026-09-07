@@ -42,7 +42,7 @@ jobs:
           cache: npm
       - run: npm ci
       - working-directory: apps/web
-        run: npx playwright test e2e/work-quality.spec.ts --project=chromium --workers=1
+        run: npx playwright test e2e/work-quality.spec.ts e2e/practice-delivery.spec.ts --project=chromium --workers=1
         env:
           PRACTICE_REVIEW_INLINE_EVIDENCE: 'true'
       - name: Upload work review evidence

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Button, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, Field, Input, MessageBar, MessageBarBody, Select, Tab, TabList, Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow, Textarea } from "@fluentui/react-components";
+import { useRestoreFocusTarget, useRestoreFocusSource, Button, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, Field, Input, MessageBar, MessageBarBody, Select, Tab, TabList, Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow, Textarea } from "@fluentui/react-components";
 import { api, type ApiContext, type PracticeReview, type PracticeReviewPoint, type PracticeTask, type PracticeWorkItem, type PracticeWorkStage, type ResourceProfile } from "./api";
 import { EmptyState, ErrorState, LoadingState, PageHeader, PageShell, StatusTreatment } from "./CanonicalPatterns";
 import { formatDate } from "./displayFormat";
@@ -49,6 +49,7 @@ type DialogAction =
 export default function PracticeWorkDetail({ context, workItemId, onBack, onOpenClient }: {
   context: ApiContext; workItemId?: string; onBack?: () => void; onOpenClient?: (id: string) => void;
 }) {
+  const restoreFocusTarget = useRestoreFocusTarget();
   const [item, setItem] = useState<DeliveryWork | null>(null);
   const [resources, setResources] = useState<ResourceProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,7 +104,7 @@ export default function PracticeWorkDetail({ context, workItemId, onBack, onOpen
       <div><dt>Priority</dt><dd>{label(item.priority)}</dd></div>
       {item.period_reference && <div><dt>Period</dt><dd>{item.period_reference}</dd></div>}
     </dl>
-    <section className="pd-next" aria-label="Next action"><div><h2>{next.title}</h2><p>{next.description}</p></div>{next.action !== "none" && <Button appearance="primary" disabled={busy} onClick={nextClick}>{nextLabel}</Button>}</section>
+    <section className="pd-next" aria-label="Next action"><div><h2>{next.title}</h2><p>{next.description}</p></div>{next.action !== "none" && <Button {...restoreFocusTarget} appearance="primary" disabled={busy} onClick={nextClick}>{nextLabel}</Button>}</section>
     {!isClosed && <div className="pd-actions">
       <Field label="Work owner"><Select disabled={busy || !resources.length} value={item.assigned_member_id || ""} onChange={(_, data) => { if (data.value && data.value !== item.assigned_member_id) void mutate(() => api.reassignWork(context, item.id, { resourceId: data.value }), "Owner updated."); }}><option value="">Choose owner</option>{resources.filter(person => person.status === "active").map(person => <option value={person.id} key={person.id}>{person.display_name}</option>)}</Select></Field>
       {["waiting_internal", "waiting_on_client"].includes(item.status) && <Button disabled={busy} onClick={() => void mutate(() => api.updatePracticeWorkStatus(context, item.id, "in_progress"), "Work resumed.")}>Resume work</Button>}
@@ -114,7 +115,7 @@ export default function PracticeWorkDetail({ context, workItemId, onBack, onOpen
       <Tab value="reviews">Reviews · {reviews.filter(review => !approved(review.status)).length} open</Tab>
     </TabList>
     {area === "tasks" && <section className="pd-section" aria-label="Tasks">
-      <header><div><h2>Tasks</h2><span className="pd-muted">The steps needed to deliver this work.</span></div>{!isClosed && <Button disabled={busy} onClick={() => setDialog({ kind: "task" })}>Add task</Button>}</header>
+      <header><div><h2>Tasks</h2><span className="pd-muted">The steps needed to deliver this work.</span></div>{!isClosed && <Button {...restoreFocusTarget} disabled={busy} onClick={() => setDialog({ kind: "task" })}>Add task</Button>}</header>
       {tasks.length ? <div className="pd-table-scroll" tabIndex={0} role="region" aria-label="Task table"><Table aria-label="Work tasks"><TableHeader><TableRow><TableHeaderCell>Task</TableHeaderCell><TableHeaderCell>Owner / due</TableHeaderCell><TableHeaderCell>Status</TableHeaderCell><TableHeaderCell>Action</TableHeaderCell></TableRow></TableHeader><TableBody>{tasks.map(task => <TableRow key={task.id}>
         <TableCell><span className="pd-primary"><strong>{task.title}</strong>{task.description && <small>{task.description}</small>}{task.blockers?.length ? <small>Blocked: {task.blockers.map(blocker => blocker.blockingReason || label(blocker.dependencyType)).join(", ")}</small> : null}{task.review_required && <small>Review required</small>}</span></TableCell>
         <TableCell><span className="pd-primary">{task.assignee_name || resources.find(person => person.id === task.assignee_member_id)?.display_name || "Unassigned"}<small>{formatDate(task.due_date, "No due date")}</small></span></TableCell>
@@ -122,8 +123,8 @@ export default function PracticeWorkDetail({ context, workItemId, onBack, onOpen
         <TableCell><div className="pd-actions">{!isClosed && !cleared(task.status) && <>
           {["not_started", "blocked"].includes(task.status) && <Button disabled={busy || Boolean(task.blockers?.length)} onClick={() => void mutate(() => api.updatePracticeTaskStatus(context, task.id, "in_progress"), "Task started.")}>Start</Button>}
           {["in_progress", "review"].includes(task.status) && <Button disabled={busy || Boolean(task.blockers?.length)} onClick={() => void mutate(() => api.updatePracticeTaskStatus(context, task.id, "completed"), "Task completed.")}>Complete task</Button>}
-        </>}{!isClosed && task.review_required && !reviews.some(review => review.practice_task_id === task.id) && <Button disabled={busy} onClick={() => setDialog({ kind: "review", taskId: task.id })}>Request review</Button>}</div></TableCell>
-      </TableRow>)}</TableBody></Table></div> : <div className="pd-empty"><h3>No tasks yet</h3><p>Add the first task so the team knows what needs doing.</p>{!isClosed && <Button onClick={() => setDialog({ kind: "task" })}>Add first task</Button>}</div>}
+        </>}{!isClosed && task.review_required && !reviews.some(review => review.practice_task_id === task.id) && <Button {...restoreFocusTarget} disabled={busy} onClick={() => setDialog({ kind: "review", taskId: task.id })}>Request review</Button>}</div></TableCell>
+      </TableRow>)}</TableBody></Table></div> : <div className="pd-empty"><h3>No tasks yet</h3><p>Add the first task so the team knows what needs doing.</p>{!isClosed && <Button {...restoreFocusTarget} onClick={() => setDialog({ kind: "task" })}>Add first task</Button>}</div>}
     </section>}
     {area === "workflow" && <section className="pd-section" aria-label="Workflow">
       <header><div><h2>Workflow</h2><span className="pd-muted">Stage progression follows the work template's delivery controls.</span></div></header>
@@ -136,13 +137,13 @@ export default function PracticeWorkDetail({ context, workItemId, onBack, onOpen
         {review.decision_reason && <p>{review.decision_reason}</p>}
         {!isClosed && <div className="pd-actions">
           {["requested", "reopened"].includes(review.status) && <Button disabled={busy} onClick={() => void mutate(() => api.decidePracticeReview(context, review.id, "in_progress"), "Review started.")}>Start review</Button>}
-          {review.status === "in_progress" && <><Button disabled={busy || review.review_points?.some(point => point.status !== "cleared")} onClick={() => setDialog({ kind: "decision", review, status: "approved" })}>Approve review</Button><Button disabled={busy} onClick={() => setDialog({ kind: "decision", review, status: "changes_requested" })}>Request changes</Button></>}
+          {review.status === "in_progress" && <><Button disabled={busy || review.review_points?.some(point => point.status !== "cleared")} onClick={() => setDialog({ kind: "decision", review, status: "approved" })}>Approve review</Button><Button {...restoreFocusTarget} disabled={busy} onClick={() => setDialog({ kind: "decision", review, status: "changes_requested" })}>Request changes</Button></>}
           {["changes_requested", "rejected"].includes(review.status) && <Button disabled={busy} onClick={() => void mutate(() => api.decidePracticeReview(context, review.id, "reopened"), "Review resubmitted.")}>Resubmit review</Button>}
-          {!approved(review.status) && <Button disabled={busy} onClick={() => setDialog({ kind: "point", review })}>Add review point</Button>}
+          {!approved(review.status) && <Button {...restoreFocusTarget} disabled={busy} onClick={() => setDialog({ kind: "point", review })}>Add review point</Button>}
         </div>}
         {review.review_points?.length ? <ul>{review.review_points.map(point => <li className="pd-point" key={point.id}><div><strong>{point.description}</strong>{point.resolution && <p>{point.resolution}</p>}<StatusTreatment value={point.status} /></div>{!isClosed && !approved(review.status) && <div className="pd-actions">
-          {["open", "reopened"].includes(point.status) && <Button disabled={busy} onClick={() => setDialog({ kind: "point-status", point, status: "addressed" })}>Address point</Button>}
-          {point.status === "addressed" && <><Button disabled={busy} onClick={() => setDialog({ kind: "point-status", point, status: "cleared" })}>Clear point</Button><Button disabled={busy} onClick={() => setDialog({ kind: "point-status", point, status: "reopened" })}>Reopen point</Button></>}
+          {["open", "reopened"].includes(point.status) && <Button {...restoreFocusTarget} disabled={busy} onClick={() => setDialog({ kind: "point-status", point, status: "addressed" })}>Address point</Button>}
+          {point.status === "addressed" && <><Button {...restoreFocusTarget} disabled={busy} onClick={() => setDialog({ kind: "point-status", point, status: "cleared" })}>Clear point</Button><Button {...restoreFocusTarget} disabled={busy} onClick={() => setDialog({ kind: "point-status", point, status: "reopened" })}>Reopen point</Button></>}
         </div>}</li>)}</ul> : <p className="pd-muted">No review points recorded.</p>}
       </article>)}</div> : <EmptyState title="No review requested" description={tasks.length || stages.length ? "Choose a task or stage and a reviewer to begin." : "Add a task before requesting a review."} />}
     </section>}
@@ -152,6 +153,7 @@ export default function PracticeWorkDetail({ context, workItemId, onBack, onOpen
 }
 
 function DeliveryDialog({ action, item, context, resources, onClose, onSaved }: { action: DialogAction; item: DeliveryWork; context: ApiContext; resources: ResourceProfile[]; onClose: () => void; onSaved: (message: string) => Promise<void> }) {
+  const restoreFocusSource = useRestoreFocusSource();
   const [title, setTitle] = useState("");
   const [reason, setReason] = useState("");
   const [date, setDate] = useState(item.due_date || "");
@@ -185,7 +187,7 @@ function DeliveryDialog({ action, item, context, resources, onClose, onSaved }: 
     ...(item.tasks || []).map(task => ({ value: `task:${task.id}`, label: `Task · ${task.title}`, available: !(item.reviews || []).some(review => review.practice_task_id === task.id && !approved(review.status)) })),
     ...(item.stages || []).map(stage => ({ value: `stage:${stage.id}`, label: `Stage · ${stage.name}`, available: !(item.reviews || []).some(review => review.work_stage_id === stage.id && !approved(review.status)) })),
   ];
-  return <Dialog open onOpenChange={(_, data) => { if (!data.open && !busy) onClose(); }}><DialogSurface><form onSubmit={event => void save(event)}><DialogBody><DialogTitle>{dialogTitle}</DialogTitle><DialogContent className="pd-form">
+  return <Dialog open onOpenChange={(_, data) => { if (!data.open && !busy) onClose(); }}><DialogSurface {...restoreFocusSource}><form onSubmit={event => void save(event)}><DialogBody><DialogTitle>{dialogTitle}</DialogTitle><DialogContent className="pd-form">
     {error && <MessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></MessageBar>}
     {action.kind === "complete" && <p>Confirm that this work has been delivered. The server will check required tasks, stages and reviews before closing it.</p>}
     {action.kind === "task" && <Field label="Task title" required><Input disabled={busy} maxLength={240} value={title} onChange={(_, data) => setTitle(data.value)} /></Field>}
