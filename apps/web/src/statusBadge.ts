@@ -60,7 +60,8 @@ const toneProps = {
   positive: { appearance: "tint", color: "success" },
   negative: { appearance: "tint", color: "danger" },
   caution: { appearance: "tint", color: "warning" },
-  neutral: { appearance: "outline", color: "subtle" },
+  // Outline/subtle uses an inverted foreground intended for dark surfaces.
+  neutral: { appearance: "outline", color: "informative" },
   informative: { appearance: "tint", color: "informative" },
 } as const satisfies Record<StatusBadgeTone, StatusBadgeProps>;
 

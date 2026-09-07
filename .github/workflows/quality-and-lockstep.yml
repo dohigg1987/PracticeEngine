@@ -23,6 +23,37 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run verify:fast
+      - run: npm run test:ui-quality --workspace apps/web
+      - run: npm run test:headers --workspace apps/web
+      - run: npm run build --workspace apps/web
+
+  work_regressions:
+    name: Practice work regressions
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble
+      options: --user 1001
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - working-directory: apps/web
+        run: npx playwright test e2e/work-quality.spec.ts --project=chromium --workers=1
+        env:
+          PRACTICE_REVIEW_INLINE_EVIDENCE: 'true'
+      - name: Upload work review evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: practice-work-review
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          retention-days: 14
 
   chromium_e2e:
     name: Chromium functional E2E (shard ${{ matrix.shard }}/2)
@@ -85,16 +116,18 @@ jobs:
   verify:
     name: verify
     if: ${{ always() }}
-    needs: [non_browser, chromium_e2e, chromium_a11y]
+    needs: [non_browser, work_regressions, chromium_e2e, chromium_a11y]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Require every quality job
         env:
+          WORK_RESULT: ${{ needs.work_regressions.result }}
           NON_BROWSER_RESULT: ${{ needs.non_browser.result }}
           CHROMIUM_E2E_RESULT: ${{ needs.chromium_e2e.result }}
           CHROMIUM_A11Y_RESULT: ${{ needs.chromium_a11y.result }}
         run: |
+          test "$WORK_RESULT" = "success"
           test "$NON_BROWSER_RESULT" = "success"
           test "$CHROMIUM_E2E_RESULT" = "success"
           test "$CHROMIUM_A11Y_RESULT" = "success"

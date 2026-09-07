@@ -97,3 +97,32 @@ describe("Practice Management UI contracts", () => {
     }
   });
 });
+
+describe("Work queue correctness regressions", () => {
+  it("excludes closed and past work from due soon, retaining today's unfinished work", () => {
+    const now = new Date("2027-05-03T12:00:00");
+    const base = items[0];
+    const cases: PracticeWorkItem[] = [
+      { ...base, id: "past", due_date: "2027-05-02" },
+      { ...base, id: "today", due_date: "2027-05-03" },
+      { ...base, id: "closed", due_date: "2027-05-04", status: "completed" },
+      { ...base, id: "cancelled", due_date: "2027-05-05", status: "cancelled" },
+      { ...base, id: "last-day", due_date: "2027-05-10" },
+      { ...base, id: "later", due_date: "2027-05-11" },
+      { ...base, id: "undated", due_date: null },
+    ];
+    expect(workViewItems(cases, "due-soon", now).map(item => item.id)).toEqual(["today", "last-day"]);
+  });
+  it("opens the complete queue by default and recovers invalid URL filters", () => {
+    expect(workWorkspaceState()).toMatchObject({ view: "all", status: "", priority: "", sort: "due" });
+    expect(workWorkspaceState("?view=invalid&status=bad&priority=bad&sort=bad")).toMatchObject({ view: "all", status: "", priority: "", sort: "due" });
+    expect(workWorkspaceState("?due=overdue").view).toBe("overdue");
+  });
+});
+
+it("bounds the Home due-this-week queue to Sunday rather than a rolling week", () => {
+  const now = new Date("2027-05-07T12:00:00");
+  const cases = [{ ...items[0], id: "sunday", due_date: "2027-05-09" }, { ...items[0], id: "monday", due_date: "2027-05-10" }];
+  expect(workWorkspaceState("?due=this-week").view).toBe("this-week");
+  expect(workViewItems(cases, "this-week", now).map(item => item.id)).toEqual(["sunday"]);
+});

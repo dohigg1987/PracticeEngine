@@ -49,6 +49,7 @@ import {
   NavCategoryItem,
   NavDrawer,
   NavDrawerBody,
+  NavDrawerHeader,
   NavItem,
   NavSubItem,
   NavSubItemGroup,
@@ -69,6 +70,8 @@ import {
   Textarea,
   Toolbar,
   Tooltip,
+  useRestoreFocusSource,
+  useRestoreFocusTarget,
   Tree,
   TreeItem,
   TreeItemLayout,
@@ -556,12 +559,18 @@ function AccountsWorkspace({
   );
   const [entitlementsLoaded, setEntitlementsLoaded] = useState(demoMode);
   const [practiceSection, setPracticeSection] = useState<PracticeView>("work");
-  const [practiceView, setPracticeView] = useState<
-    "work" | "work-detail" | "client-summary"
-  >("work");
-  const [practiceWorkItemId, setPracticeWorkItemId] = useState("");
-  const [practiceClientId, setPracticeClientId] = useState("");
+  const practiceWorkItemId = pathname === "/practice/work" ? new URLSearchParams(locationSearch).get("work") || "" : "";
+  const practiceView = practiceWorkItemId ? "work-detail" : "work";
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const navigationFocusSource = useRestoreFocusSource();
+  const navigationFocusTarget = useRestoreFocusTarget();
+  const [narrowNavigation, setNarrowNavigation] = useState(() => window.matchMedia("(max-width: 900px)").matches);
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 900px)");
+    const update = () => { setNarrowNavigation(media.matches); setMobileNavOpen(false); };
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
   const [inviteToken, setInviteToken] = useState(() => {
     const token = inviteTokenFromHash(window.location.hash);
     if (token)
@@ -706,12 +715,25 @@ function AccountsWorkspace({
     setLocationSearch(target.search);
     setMobileNavOpen(false);
   }, []);
+  const openPracticeWork = (id: string) => {
+    const parameters = new URLSearchParams(pathname === "/practice/work" ? locationSearch : "");
+    parameters.set("work", id);
+    navigate(`/practice/work?${parameters}`);
+  };
+  const backToPracticeWork = () => {
+    const parameters = new URLSearchParams(locationSearch);
+    parameters.delete("work");
+    navigate(`/practice/work${parameters.size ? `?${parameters}` : ""}`);
+  };
   const activateNavigationItem = useCallback((item: ApplicationNavigationItem) => {
     setWorkspacePage(item.page);
     if (item.ledgerlyView) setView(item.ledgerlyView);
     if (item.practiceView) setPracticeSection(item.practiceView);
-    navigate(item.path);
-  }, [navigate]);
+    const engagement = engagements.find(entry => entry.id === selectedId);
+    if (item.path.startsWith("/ledgerly/") && engagement && new URLSearchParams(locationSearch).has("engagement")) {
+      navigate(`${item.path}?${new URLSearchParams({ engagement: engagement.id, client: engagement.organisation_id })}`);
+    } else navigate(item.path);
+  }, [navigate, engagements, selectedId, locationSearch]);
 
   useEffect(() => {
     if (configured) preloadPrimaryPracticeRoutes();
@@ -1521,10 +1543,13 @@ function AccountsWorkspace({
       <header className="topbar">
         <Tooltip content="Open application navigation" relationship="description">
           <FluentButton
+            {...(narrowNavigation ? navigationFocusTarget : {})}
             className="nav-toggle"
             appearance="subtle"
             icon={<NavigationRegular />}
             aria-label="Open application navigation"
+            aria-expanded={mobileNavOpen}
+            aria-controls="application-navigation"
             onClick={() => setMobileNavOpen((open) => !open)}
           />
         </Tooltip>
@@ -1714,15 +1739,23 @@ function AccountsWorkspace({
       <div className="workspace">
         <aside className={`sidebar ${mobileNavOpen ? "mobile-open" : ""}`}>
           <NavDrawer
-            className="fluent-nav"
-            type="inline"
-            open
+            {...(narrowNavigation ? navigationFocusSource : {})}
+            id="application-navigation"
+            className={narrowNavigation ? "suite-mobile-nav" : "fluent-nav"}
+            type={narrowNavigation ? "overlay" : "inline"}
+            role={narrowNavigation ? "dialog" : "navigation"}
+            open={!narrowNavigation || mobileNavOpen}
+            onOpenChange={(_, data) => setMobileNavOpen(data.open)}
+            aria-label="Application navigation"
             defaultOpenCategories={activeApplication?.id === "practice"
               ? ["practice-clients", "practice-resources", "practice-portfolio"]
               : undefined}
             selectedCategoryValue={navigationItemForPath(pathname)?.parentId ?? ""}
             selectedValue={navigationItemForPath(pathname) ? applicationNavigationValue(navigationItemForPath(pathname)!) : pathname.startsWith("/settings") ? "global-settings" : activeApplication && pathname.startsWith(`${activeApplication.routePrefix}/settings`) ? `${activeApplication.id}-settings` : ""}
           >
+            {narrowNavigation && <NavDrawerHeader>
+              <FluentButton className="suite-mobile-nav-close" appearance="subtle" icon={<DismissRegular />} aria-label="Close application navigation" onClick={() => setMobileNavOpen(false)} />
+            </NavDrawerHeader>}
             <NavDrawerBody className="workspace-nav-body">
               <div className="application-identity">
                 <p className="eyebrow">Current application</p>
@@ -1738,8 +1771,10 @@ function AccountsWorkspace({
                     size="small"
                     value={selectedId}
                     onChange={(event) => {
-                      setSelectedId(event.target.value);
-                      setWorkspacePage("engagement");
+                      const id = event.target.value;
+                      const engagement = engagements.find(item => item.id === id);
+                      setSelectedId(id);
+                      if (engagement) navigate(`${pathname}?${new URLSearchParams({ engagement: id, client: engagement.organisation_id })}`);
                     }}
                     disabled={loading || !engagements.length}
                   >
@@ -1898,12 +1933,12 @@ function AccountsWorkspace({
             <RoutePanelBoundary resetKey={workspacePage}>
               <Suspense fallback={<Skeleton pathname={pathname} />}>
                   <PracticeManagement
+                  key={`${context.tenantId}:${practiceView}:${practiceWorkItemId}`}
                   view={
                     workspacePage === "work" ? practiceView : "settings"
                   }
                   context={context}
                   workItemId={practiceWorkItemId}
-                    clientId={practiceClientId}
                   initialTab={practiceSection}
                   routeSearch={locationSearch}
                   onNavigate={navigate}
@@ -1913,14 +1948,11 @@ function AccountsWorkspace({
                       setSelectedId(engagementId);
                       navigate(`/ledgerly/overview?client=${encodeURIComponent(clientId)}&engagement=${encodeURIComponent(engagementId)}`);
                     } : undefined}
-                  onOpenWork={(workItemId) => {
-                    setPracticeWorkItemId(workItemId);
-                    setPracticeView("work-detail");
-                  }}
+                  onOpenWork={openPracticeWork}
                   onOpenClient={(clientId) => {
                     navigate(`/practice/clients?client=${encodeURIComponent(clientId)}&return=${encodeURIComponent(`/practice/work${locationSearch}`)}`);
                   }}
-                  onBack={() => setPracticeView("work")}
+                  onBack={backToPracticeWork}
                 />
               </Suspense>
             </RoutePanelBoundary>
@@ -1928,16 +1960,12 @@ function AccountsWorkspace({
             <RoutePanelBoundary resetKey={workspacePage}>
               <Suspense fallback={<Skeleton pathname={pathname} />}>
                 <ResourceEconomics
+                  key={context.tenantId}
                   context={context}
                   view={workspacePage as "resources" | "capacity" | "allocation" | "time" | "portfolio" | "management"}
                   onNavigate={navigate}
                   routeSearch={locationSearch}
-                  onOpenWork={(workItemId) => {
-                    setPracticeWorkItemId(workItemId);
-                    setPracticeView("work-detail");
-                    setWorkspacePage("work");
-                    navigate("/practice/work");
-                  }}
+                  onOpenWork={openPracticeWork}
                 />
               </Suspense>
             </RoutePanelBoundary>
@@ -1971,6 +1999,7 @@ function AccountsWorkspace({
             </RoutePanelBoundary>
           ) : workspacePage === "clients" ? (
             <ClientsView
+              key={context.tenantId}
               context={context}
               items={organisations}
               engagements={engagements}
@@ -1992,12 +2021,7 @@ function AccountsWorkspace({
                 setWorkspacePage("engagement");
                 navigate(`/ledgerly/overview?engagement=${encodeURIComponent(engagementId)}`);
               }}
-              onOpenWork={(workItemId) => {
-                setPracticeWorkItemId(workItemId);
-                setPracticeView("work-detail");
-                setWorkspacePage("work");
-                navigate("/practice/work");
-              }}
+              onOpenWork={openPracticeWork}
               onOpenWorkspace={() => {
                 setView("overview");
                 setWorkspacePage("engagement");
@@ -2997,6 +3021,7 @@ function ClientsView({
     return (
       <section className="pm-page">
         <PracticeManagement
+          key={`${context.tenantId}:${selectedOrganisationId}`}
           view="client-summary"
           context={context}
           clientId={selectedOrganisationId}

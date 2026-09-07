@@ -55,17 +55,21 @@ test("portfolio economics preserves known and unavailable values", async ({ page
 test("practice home prioritises actionable queues and preserves narrow reflow", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await open(page, "management", "Home");
-  await expect(page.getByRole("heading", { name: "Attention required" })).toBeVisible();
-  const overdue = page.getByRole("link", { name: /Overdue/ });
-  await expect(overdue).toHaveAttribute("href", "/practice/work?due=overdue");
-  await expect(page.getByRole("link", { name: /Awaiting review/ })).toHaveAttribute("href", "/practice/review");
-  await expect(page.getByRole("link", { name: "Open capacity plan" })).toHaveAttribute("href", "/practice/capacity");
-  await expect(page.getByText("No reliable billing source")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Priority work", exact: true })).toBeVisible();
+  const work = page.getByRole("grid", { name: "Home priority work" });
+  await expect(work).toContainText("Q1 VAT Return");
+  await expect(page.getByRole("link", { name: "Open Work", exact: true })).toHaveAttribute("href", "/practice/work");
+  await expect(page.getByRole("link", { name: "Open Team", exact: true })).toHaveAttribute("href", "/practice/capacity");
+  await expect(page.getByRole("link", { name: "Open Insights", exact: true })).toHaveAttribute("href", "/practice/portfolio-economics");
+  await expect(page.getByRole("region", { name: "Economic exceptions" })).toContainText("Unavailable");
   const widths = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, page: document.documentElement.scrollWidth }));
   expect(widths.page).toBeLessThanOrEqual(widths.viewport + 1);
-  await overdue.click();
-  await expect(page).toHaveURL(/\/practice\/work\?due=overdue$/);
-  await expect(page.getByRole("combobox", { name: "Deadline" })).toHaveValue("overdue");
+  await work.getByRole("link", { name: /Q1 VAT Return/ }).click();
+  const inspector = page.getByRole("complementary", { name: "Selected record inspector" });
+  await expect(inspector.getByRole("heading", { name: "Q1 VAT Return", exact: true })).toBeVisible();
+  await inspector.getByRole("button", { name: "Open work", exact: true }).click();
+  await expect(page).toHaveURL(/\/practice\/work\?work=/);
+  await expect(page.getByRole("heading", { name: "Q1 VAT Return", exact: true })).toBeVisible();
 });
 
 test("resource planning remains usable in forced-colors mode", async ({ page }) => {

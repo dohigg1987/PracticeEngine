@@ -15,6 +15,8 @@ import {
   SkeletonItem,
   Tab,
   TabList,
+  Toolbar,
+  ToolbarGroup,
 } from "@fluentui/react-components";
 import type {
   DataGridProps,
@@ -86,10 +88,10 @@ export function PageHeader({
 }
 
 export function CommandBar({ children, contextualActions }: React.PropsWithChildren<{ contextualActions?: React.ReactNode }>) {
-  return <div className="pe-command-bar" role="toolbar" aria-label="Page commands">
-    <div className="pe-command-bar-main">{children}</div>
-    {contextualActions && <div className="pe-command-bar-context">{contextualActions}</div>}
-  </div>;
+  return <Toolbar className="pe-command-bar" aria-label="Page commands">
+    <ToolbarGroup className="pe-command-bar-main">{children}</ToolbarGroup>
+    {contextualActions && <ToolbarGroup className="pe-command-bar-context">{contextualActions}</ToolbarGroup>}
+  </Toolbar>;
 }
 
 export function SavedViewBar({ views, selectedValue, onSelect, label = "Saved views" }: {
@@ -98,11 +100,11 @@ export function SavedViewBar({ views, selectedValue, onSelect, label = "Saved vi
   onSelect: (value: string) => void;
   label?: string;
 }) {
-  return <nav className="pe-saved-views" aria-label={label}>
-    {views.map((view) => <Button key={view.value} appearance={selectedValue === view.value ? "primary" : "subtle"} aria-current={selectedValue === view.value ? "page" : undefined} onClick={() => onSelect(view.value)}>
+  return <TabList className="pe-saved-views" aria-label={label} selectedValue={selectedValue} onTabSelect={(_, data) => onSelect(String(data.value))}>
+    {views.map(view => <Tab key={view.value} value={view.value}>
       {view.label}{view.count === undefined ? null : <span className="pe-view-count">{view.count}</span>}
-    </Button>)}
-  </nav>;
+    </Tab>)}
+  </TabList>;
 }
 
 export function CompactFilterBar({ children, advanced, advancedOpen, onAdvancedToggle, summary, reset, label = "Filters" }: React.PropsWithChildren<{
@@ -198,9 +200,9 @@ export function OperationalDataGrid<T>({
         <DataGridRow>{({ renderHeaderCell }) => <DataGridHeaderCell>{renderHeaderCell()}</DataGridHeaderCell>}</DataGridRow>
       </DataGridHeader>
       <DataGridBody<T>>{({ item, rowId }) => <DataGridRow<T> key={rowId}>
-        {({ renderCell, columnId }) => <DataGridCell>
+        {({ renderCell, columnId }) => <DataGridCell focusMode={String(columnId) === primaryColumnId && getItemHref ? "none" : "cell"}>
           {String(columnId) === primaryColumnId && getItemHref
-            ? <Link href={getItemHref(item)} onClick={onOpenItem ? (event) => { event.preventDefault(); onOpenItem(item); } : undefined}>{renderCell(item)}</Link>
+            ? <Link href={getItemHref(item)} onClick={onOpenItem ? (event) => { if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return; event.preventDefault(); onOpenItem(item); } : undefined}>{renderCell(item)}</Link>
             : renderCell(item)}
         </DataGridCell>}
       </DataGridRow>}

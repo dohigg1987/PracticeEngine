@@ -86,3 +86,10 @@ describe("canonical commercial UI patterns", () => {
     expect(html).toContain("pe-client-identity");
   });
 });
+
+it("renders saved views with tab semantics and one selected view", () => {
+  const html = renderToStaticMarkup(<SavedViewBar views={[{ value: "all", label: "All work", count: 3 }, { value: "review", label: "Review", count: 1 }]} selectedValue="all" onSelect={() => undefined} />);
+  expect(html).toContain('role="tablist"');
+  expect((html.match(/role="tab"/g) || []).length).toBe(2);
+  expect((html.match(/aria-selected="true"/g) || []).length).toBe(1);
+});

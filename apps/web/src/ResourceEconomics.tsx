@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Badge,
   Button,
@@ -245,9 +245,11 @@ export function practiceHomeNextAction(overview: PracticeEconomicsOverview): str
 function ManagementView({ context, onNavigate, routeSearch, onOpenWork }: Omit<Props, "view">) {
   const [overview, setOverview] = useState<PracticeEconomicsOverview | null>(null), [work, setWork] = useState<PracticeWorkItem[]>([]), [resources, setResources] = useState<ResourceProfile[]>([]), [portfolio, setPortfolio] = useState<PortfolioEconomicsRow[]>([]), [selected, setSelected] = useState<WorkDetail | null>(null), [loading, setLoading] = useState(true), [error, setError] = useState("");
   const selectedId = useMemo(() => new URLSearchParams(routeSearch || "").get("selected") || "", [routeSearch]);
+  const selectedRef = useRef(selectedId);
+  selectedRef.current = selectedId;
   const load = useCallback(async () => { setLoading(true); setError(""); try { const [nextOverview, nextWork, nextResources, nextPortfolio] = await Promise.all([api.practiceEconomicsOverview(context), api.practiceWork(context), api.resourceProfiles(context), api.portfolioEconomics(context)]); setOverview(nextOverview); setWork(nextWork.items); setResources(nextResources.items); setPortfolio(nextPortfolio.items); } catch (reason) { setError(errorText(reason)); } finally { setLoading(false); } }, [context]);
   useEffect(() => { void load(); }, [load]);
-  useEffect(() => { let live = true; if (!selectedId) { setSelected(null); return () => { live = false; }; } void api.practiceWorkItem(context, selectedId).then((result) => { if (live) setSelected(result.item); }).catch((reason) => { if (live) setError(errorText(reason)); }); return () => { live = false; }; }, [context, selectedId]);
+  useEffect(() => { let live = true; setSelected(null); if (!selectedId) { return () => { live = false; }; } void api.practiceWorkItem(context, selectedId).then((result) => { if (live) setSelected(result.item); }).catch((reason) => { if (live) setError(errorText(reason)); }); return () => { live = false; }; }, [context, selectedId]);
   if (loading) return <LoadingState title="Home" description="Delivery exceptions, review demand and capacity across the practice." kind="grid" />;
   if (!overview) return <PageShell><PageHeader title="Home" description="Delivery exceptions, review demand and capacity across the practice." /><ErrorState message={error || "The operational overview is unavailable."} retry={load} secondaryAction={<Link href="/practice/work" onClick={onNavigate ? (event) => { event.preventDefault(); onNavigate("/practice/work"); } : undefined}>Open work</Link>} /></PageShell>;
   const navigateLink = (path: string) => onNavigate ? (event: React.MouseEvent<HTMLAnchorElement>) => { event.preventDefault(); onNavigate(path); } : undefined;
@@ -264,7 +266,7 @@ function ManagementView({ context, onNavigate, routeSearch, onOpenWork }: Omit<P
   ];
   const capacityExceptions = resources.filter((item) => item.utilisation_percentage >= 80 || item.overdue_work > 0);
   const economicExceptions = portfolio.filter((item) => item.commercial_value_state === "unavailable" || item.overdue_work > 0);
-  const inspector = selected ? <WorkInspector context={context} item={selected} resources={resources} onChanged={async () => { await load(); const result = await api.practiceWorkItem(context, selected.id); setSelected(result.item); }} onClose={() => onNavigate?.("/practice/home")} onOpenClient={(id) => onNavigate?.(`/practice/clients?client=${encodeURIComponent(id)}&return=${encodeURIComponent(`/practice/home?selected=${selected.id}`)}`)} onOpenWork={onOpenWork} /> : undefined;
+  const inspector = selected && selected.id === selectedId ? <WorkInspector key={`${context.tenantId}:${selected.id}`} context={context} item={selected} resources={resources} onChanged={async () => { await load(); const result = await api.practiceWorkItem(context, selected.id); if (selectedRef.current === selected.id) setSelected(result.item); }} onClose={() => onNavigate?.("/practice/home")} onOpenClient={(id) => onNavigate?.(`/practice/clients?client=${encodeURIComponent(id)}&return=${encodeURIComponent(`/practice/home?selected=${selected.id}`)}`)} onOpenWork={onOpenWork} /> : undefined;
   return <PageShell className="re-home">
     <PageHeader title="Home" description="What needs attention now." meta={<span className="re-home-next">{practiceHomeNextAction(overview)}</span>} />
     {error && <ErrorState title="Some home data may be out of date" message={error} retry={load} />}

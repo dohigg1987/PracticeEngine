@@ -88,3 +88,14 @@
 @media (forced-colors: active) {
   .pe-page-header, .pe-command-bar, .pe-operational-grid, .pe-detail-tabs, .pe-state { border-color: CanvasText; }
 }
+
+/* Overlay navigation uses Fluent focus containment and its public surface. */
+.suite-mobile-nav { width: min(320px, 100vw); }
+
+/* The overlay is portalled outside .sidebar, so its touch targets are scoped here. */
+.suite-mobile-nav .workspace-nav-item,
+.suite-mobile-nav .workspace-nav-typography,
+.suite-mobile-nav .suite-mobile-nav-close {
+  min-height: 44px;
+}
+.suite-mobile-nav .suite-mobile-nav-close { min-width: 44px; }

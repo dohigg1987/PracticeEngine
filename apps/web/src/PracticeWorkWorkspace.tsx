@@ -13,6 +13,7 @@ import {
   MessageBar,
   MessageBarBody,
   Select,
+  useRestoreFocusTarget,
 } from "@fluentui/react-components";
 import type { TableColumnDefinition, TableColumnSizingOptions } from "@fluentui/react-components";
 import { OpenRegular } from "@fluentui/react-icons";
@@ -42,6 +43,7 @@ import {
 } from "./CanonicalPatterns";
 import { formatDate } from "./displayFormat";
 import { statutoryLabel } from "./format";
+import CreatePracticeWorkDialog from "./CreatePracticeWorkDialog";
 import "./practice-work-workspace.css";
 
 const workColumnSizing: TableColumnSizingOptions = {
@@ -52,14 +54,14 @@ const workColumnSizing: TableColumnSizingOptions = {
   priority: { minWidth: 72, idealWidth: 84 },
 };
 
-export type WorkSavedView = "my" | "all" | "due-soon" | "overdue" | "waiting-client" | "review";
+export type WorkSavedView = "my" | "all" | "this-week" | "due-soon" | "overdue" | "waiting-client" | "review";
 
 export type WorkDetail = PracticeWorkItem & { stages?: PracticeWorkStage[]; reviews?: PracticeReview[] };
 
 type Props = {
   context: ApiContext;
   routeSearch?: string;
-  onNavigate?: (path: string) => void;
+  onNavigate?: (path: string, replace?: boolean) => void;
   onOpenClient?: (id: string) => void;
   onOpenLedgerly?: (engagementId: string, clientId: string) => void;
   onOpenWork?: (id: string) => void;
@@ -84,30 +86,31 @@ const filterWork = (items: PracticeWorkItem[], state: ReturnType<typeof workWork
 
 export function workWorkspaceState(search = "") {
   const parameters = new URLSearchParams(search);
-  const requestedView = parameters.get("view") || "my";
+  const requestedView = parameters.get("view") || (parameters.get("due") === "overdue" ? "overdue" : parameters.get("due") === "this-week" ? "this-week" : "all");
   return {
-    view: (["my", "all", "due-soon", "overdue", "waiting-client", "review"].includes(requestedView) ? requestedView : "my") as WorkSavedView,
+    view: (["my", "all", "this-week", "due-soon", "overdue", "waiting-client", "review"].includes(requestedView) ? requestedView : "all") as WorkSavedView,
     query: parameters.get("q") || "",
-    status: parameters.get("status") || "",
-    priority: parameters.get("priority") || "",
+    status: statusOptions.includes(parameters.get("status") as PracticeWorkStatus) ? parameters.get("status")! : "",
+    priority: ["urgent", "high", "normal", "low"].includes(parameters.get("priority") || "") ? parameters.get("priority")! : "",
     client: parameters.get("client") || "",
     service: parameters.get("service") || "",
     assignee: parameters.get("assignee") || "",
     team: parameters.get("team") || "",
-    sort: parameters.get("sort") || "due",
+    sort: ["due", "client", "title"].includes(parameters.get("sort") || "") ? parameters.get("sort")! : "due",
     selected: parameters.get("selected") || "",
   };
 }
 
 export function workViewItems(items: PracticeWorkItem[], view: WorkSavedView, now = new Date()) {
-  const dueSoonEnd = new Date(now); dueSoonEnd.setHours(23, 59, 59, 999); dueSoonEnd.setDate(dueSoonEnd.getDate() + 7);
+  const start = new Date(now); start.setHours(0, 0, 0, 0);
+  const dueSoonEnd = new Date(now); dueSoonEnd.setHours(23, 59, 59, 999); dueSoonEnd.setDate(dueSoonEnd.getDate() + (view === "this-week" ? 6 - ((now.getDay() + 6) % 7) : 7));
   return items.filter((item) => {
     if (view === "all") return true;
     if (view === "my") return Boolean(item.assigned_member_id || safeAssignmentName(item.assigned_member_name));
     if (view === "overdue") return isOverdue(item.due_date, item.status, now);
     if (view === "waiting-client") return item.status === "waiting_on_client";
     if (view === "review") return item.status === "review";
-    return Boolean(item.due_date && !isOverdue(item.due_date, item.status, now) && new Date(`${item.due_date}T23:59:59`) <= dueSoonEnd);
+    return Boolean(item.due_date && !["completed", "cancelled"].includes(item.status) && new Date(`${item.due_date}T23:59:59`) >= start && new Date(`${item.due_date}T23:59:59`) <= dueSoonEnd);
   });
 }
 
@@ -123,7 +126,7 @@ const columns: TableColumnDefinition<PracticeWorkItem>[] = [
   createTableColumn({ columnId: "due", compare: (a, b) => (a.due_date || "").localeCompare(b.due_date || ""), renderHeaderCell: () => "Due", renderCell: (item) => <span className={isOverdue(item.due_date, item.status) ? "pww-overdue" : undefined}>{date(item.due_date)}</span> }),
   createTableColumn({ columnId: "owner", compare: (a, b) => assignmentDisplay(a).localeCompare(assignmentDisplay(b)), renderHeaderCell: () => "Owner", renderCell: assignmentDisplay }),
   createTableColumn({ columnId: "status", compare: (a, b) => a.status.localeCompare(b.status), renderHeaderCell: () => "State", renderCell: (item) => <StatusTreatment value={item.status} /> }),
-  createTableColumn({ columnId: "priority", compare: (a, b) => a.priority.localeCompare(b.priority), renderHeaderCell: () => "Priority", renderCell: (item) => statutoryLabel(item.priority) }),
+  createTableColumn({ columnId: "priority", compare: (a, b) => ["urgent", "high", "normal", "low"].indexOf(a.priority) - ["urgent", "high", "normal", "low"].indexOf(b.priority), renderHeaderCell: () => "Priority", renderCell: (item) => statutoryLabel(item.priority) }),
 ];
 
 export default function PracticeWorkWorkspace({ context, routeSearch, onNavigate, onOpenClient, onOpenLedgerly, onOpenWork }: Props) {
@@ -133,26 +136,48 @@ export default function PracticeWorkWorkspace({ context, routeSearch, onNavigate
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [moreFilters, setMoreFilters] = useState(false);
+  const [addingWork, setAddingWork] = useState(false);
+  const addWorkFocusTarget = useRestoreFocusTarget();
   const [detail, setDetail] = useState<WorkDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
+  const [detailRevision, setDetailRevision] = useState(0);
+  const selectedRef = useRef(urlState.selected);
+  selectedRef.current = urlState.selected;
+  const detailRequest = useRef(0);
   const loaded = useRef(false);
+  const listRequest = useRef(0);
+  const [resourceError, setResourceError] = useState("");
   const load = useCallback(async () => {
-    if (!loaded.current) setLoading(true); setError("");
-    try {
-      const [work, people] = await Promise.all([api.practiceWork(context), api.resourceProfiles(context)]);
-      setItems(work.items); setResources(people.items); loaded.current = true;
-    } catch (reason) { setError(errorText(reason)); } finally { setLoading(false); }
+    const request = ++listRequest.current;
+    if (!loaded.current) setLoading(true);
+    setError(""); setResourceError("");
+    const [work, people] = await Promise.allSettled([api.practiceWork(context), api.resourceProfiles(context)]);
+    if (request !== listRequest.current) return;
+    if (work.status === "fulfilled") { setItems(work.value.items); loaded.current = true; }
+    else setError(errorText(work.reason));
+    if (people.status === "fulfilled") setResources(people.value.items);
+    else { setResources([]); setResourceError("Assignment options are unavailable. You can still view and update work."); }
+    setLoading(false);
   }, [context]);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(); return () => { ++listRequest.current; }; }, [load]);
   useEffect(() => {
     let live = true;
-    if (!urlState.selected) { setDetail(null); return () => { live = false; }; }
+    setDetail(null); setDetailError(""); setDetailLoading(false);
+    const request = ++detailRequest.current;
+    if (!urlState.selected) return () => { live = false; };
     setDetailLoading(true);
-    void api.practiceWorkItem(context, urlState.selected).then((result) => { if (live) setDetail(result.item); }).catch((reason) => { if (live) setError(errorText(reason)); }).finally(() => { if (live) setDetailLoading(false); });
+    void api.practiceWorkItem(context, urlState.selected)
+      .then(result => { if (live && request === detailRequest.current) {
+        if (!result.item) setDetailError("The selected work item could not be found.");
+        else setDetail(result.item);
+      } })
+      .catch(reason => { if (live && request === detailRequest.current) setDetailError(errorText(reason)); })
+      .finally(() => { if (live && request === detailRequest.current) setDetailLoading(false); });
     return () => { live = false; };
-  }, [context, urlState.selected]);
+  }, [context, urlState.selected, detailRevision]);
 
-  const updateUrl = (changes: Record<string, string>) => onNavigate?.(selectedWorkPath(routeSearch, changes));
+  const updateUrl = (changes: Record<string, string>) => onNavigate?.(selectedWorkPath(routeSearch, changes), !("selected" in changes || "view" in changes));
   const clearFilters = () => updateUrl({ q: "", status: "", priority: "", client: "", service: "", assignee: "", team: "", sort: "due" });
   const byView = useMemo(() => workViewItems(items, urlState.view), [items, urlState.view]);
   const visible = useMemo(() => {
@@ -163,15 +188,21 @@ export default function PracticeWorkWorkspace({ context, routeSearch, onNavigate
   const services = useMemo(() => [...new Map(items.map((item) => [item.client_service_id, item.service_name || "Service"])).entries()], [items]);
   const teams = useMemo(() => [...new Map(items.filter((item) => item.assigned_team_name).map((item) => [item.assigned_team_id || item.assigned_team_name!, item.assigned_team_name!])).entries()], [items]);
   const views = useMemo(() => ([
-    ["my", "My work"], ["all", "All work"], ["due-soon", "Due soon"], ["overdue", "Overdue"], ["waiting-client", "Waiting on client"], ["review", "Review"],
+    ["my", "Assigned work"], ["all", "All work"], ["this-week", "Due this week"], ["due-soon", "Due soon"], ["overdue", "Overdue"], ["waiting-client", "Waiting on client"], ["review", "Review"],
   ] as const).map(([value, label]) => ({ value, label, count: workViewItems(items, value).length })), [items]);
 
   if (loading) return <LoadingState title="Work" description="Delivery queues and actions." />;
-  const inspector = detailLoading ? <div className="pww-inspector-loading" role="status">Loading selected work…</div> : detail ? <WorkInspector
+  const inspector = detailLoading ? <div className="pww-inspector-loading" role="status">Loading selected work…</div> : detailError ? <ErrorState title="Selected work is unavailable" message={detailError} retry={() => setDetailRevision(value => value + 1)} secondaryAction={<Button onClick={() => updateUrl({ selected: "" })}>Close</Button>} /> : detail && detail.id === urlState.selected ? <WorkInspector
+    key={`${context.tenantId}:${detail.id}`}
     context={context}
     item={detail}
     resources={resources}
-    onChanged={async () => { await load(); const result = await api.practiceWorkItem(context, detail.id); setDetail(result.item); }}
+    onChanged={async () => {
+      const request = detailRequest.current;
+      await load();
+      const result = await api.practiceWorkItem(context, detail.id);
+      if (selectedRef.current === detail.id && request === detailRequest.current) setDetail(result.item);
+    }}
     onClose={() => updateUrl({ selected: "" })}
     onOpenClient={onOpenClient}
     onOpenLedgerly={onOpenLedgerly}
@@ -179,10 +210,11 @@ export default function PracticeWorkWorkspace({ context, routeSearch, onNavigate
   /> : undefined;
 
   return <PageShell className="pww-page">
-    <PageHeader title="Work" description="Delivery queues and actions." primaryAction={<Button appearance="primary" onClick={() => onNavigate?.("/practice/clients")}>Add work</Button>} />
-    <SavedViewBar views={views} selectedValue={urlState.view} onSelect={(view) => updateUrl({ view, selected: "" })} />
+    <PageHeader title="Work" description="Delivery queues and actions." primaryAction={<Button {...addWorkFocusTarget} appearance="primary" onClick={() => setAddingWork(true)}>Add work</Button>} />
+    <SavedViewBar views={views} selectedValue={urlState.view} onSelect={(view) => updateUrl({ view, due: "", selected: "" })} />
     <CommandBar><Button appearance="subtle" onClick={() => void load()}>Refresh</Button></CommandBar>
     {error && <ErrorState title="Some work data may be out of date" message={error} retry={load} />}
+    {resourceError && <MessageBar intent="warning"><MessageBarBody>{resourceError}</MessageBarBody><Button appearance="transparent" onClick={() => void load()}>Retry</Button></MessageBar>}
     <CompactFilterBar
       advancedOpen={moreFilters}
       onAdvancedToggle={() => setMoreFilters((current) => !current)}
@@ -201,8 +233,12 @@ export default function PracticeWorkWorkspace({ context, routeSearch, onNavigate
       <Field label="Priority"><Select value={urlState.priority} onChange={(_, data) => updateUrl({ priority: data.value })}><option value="">All priorities</option>{["urgent", "high", "normal", "low"].map((value) => <option key={value} value={value}>{statutoryLabel(value)}</option>)}</Select></Field>
     </CompactFilterBar>
     <MasterDetailWorkspace selected={Boolean(inspector)} inspector={inspector}>
-      <OperationalDataGrid items={visible} columns={columns} label="Practice work" getRowId={(item) => item.id} primaryColumnId="work" getItemHref={(item) => selectedWorkPath(routeSearch, { selected: item.id })} onOpenItem={(item) => updateUrl({ selected: item.id })} columnSizingOptions={workColumnSizing} empty={<EmptyState title="No work in this view" description="Change the saved view or clear filters." />} />
+      <OperationalDataGrid items={visible} columns={columns} label="Practice work" getRowId={(item) => item.id} primaryColumnId="work" getItemHref={(item) => selectedWorkPath(routeSearch, { selected: item.id })} onOpenItem={(item) => updateUrl({ selected: item.id })} columnSizingOptions={workColumnSizing} empty={error ? undefined : <EmptyState title="No work in this view" description="Change the saved view or clear filters." />} />
     </MasterDetailWorkspace>
+    {addingWork && <CreatePracticeWorkDialog context={context} onClose={() => setAddingWork(false)} onCreated={async id => {
+      setAddingWork(false); await load();
+      updateUrl({ view: "all", q: "", status: "", priority: "", client: "", service: "", assignee: "", team: "", selected: id });
+    }} />}
   </PageShell>;
 }
 
@@ -222,6 +258,7 @@ export function WorkInspector({ context, item, resources, onChanged, onClose, on
   const [dueDate, setDueDate] = useState(item.due_date || "");
   const [requestOpen, setRequestOpen] = useState(false);
   useEffect(() => setDueDate(item.due_date || ""), [item.due_date]);
+  useEffect(() => { setError(""); setFeedback(""); setRequestOpen(false); }, [item.id]);
   const mutate = async (key: string, action: () => Promise<unknown>) => { setBusy(key); setError(""); setFeedback(""); try { await action(); await onChanged(); setFeedback("Work updated."); } catch (reason) { setError(errorText(reason)); } finally { setBusy(""); } };
   const openStages = (item.stages || []).filter((stage) => !["completed", "skipped"].includes(stage.status));
   const blocker = openStages.find((stage) => stage.status === "blocked" || stage.block_reason);
