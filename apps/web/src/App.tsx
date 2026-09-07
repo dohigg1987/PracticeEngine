@@ -79,6 +79,20 @@ import {
 import type { TableColumnDefinition } from "@fluentui/react-components";
 import {
   BuildingRegular,
+  bundleIcon,
+  HomeFilled,
+  HomeRegular,
+  PeopleFilled,
+  PeopleRegular,
+  PeopleTeamFilled,
+  DocumentFilled,
+  OpenFilled,
+  ChatFilled,
+  ChatRegular,
+  DataPieFilled,
+  DataPieRegular,
+  SettingsFilled,
+  SettingsRegular,
   DismissRegular,
   DocumentRegular,
   ErrorCircleRegular,
@@ -295,7 +309,20 @@ function applicationNavigationValue(item: ApplicationNavigationItem): string {
   return item.ledgerlyView ?? (item.primary === false ? item.id : item.page);
 }
 
+const PracticeHomeIcon = bundleIcon(HomeFilled, HomeRegular);
+const PracticeClientsIcon = bundleIcon(PeopleFilled, PeopleRegular);
+const PracticeTeamIcon = bundleIcon(PeopleTeamFilled, PeopleTeamRegular);
+const PracticeWorkIcon = bundleIcon(DocumentFilled, DocumentRegular);
+const PracticeOpenIcon = bundleIcon(OpenFilled, OpenRegular);
+const PracticeChatIcon = bundleIcon(ChatFilled, ChatRegular);
+const PracticeInsightsIcon = bundleIcon(DataPieFilled, DataPieRegular);
+const PracticeSettingsIcon = bundleIcon(SettingsFilled, SettingsRegular);
+
 function applicationNavigationIcon(item: ApplicationNavigationItem) {
+  if (item.path.startsWith("/practice")) {
+    const Icon = item.id === "practice-collaboration" ? PracticeChatIcon : item.id === "practice-portfolio" ? PracticeInsightsIcon : item.icon === "home" ? PracticeHomeIcon : item.icon === "clients" ? PracticeClientsIcon : item.icon === "people" ? PracticeTeamIcon : item.icon === "open" ? PracticeOpenIcon : PracticeWorkIcon;
+    return <Icon fontSize={20} />;
+  }
   if (item.icon === "clients" || item.icon === "home") return <BuildingRegular />;
   if (item.icon === "people") return <PeopleTeamRegular />;
   if (item.icon === "open") return <OpenRegular />;
@@ -1842,7 +1869,7 @@ function AccountsWorkspace({
                     </React.Fragment>;
                   })}
                   {!pathname.startsWith(`${activeApplication.routePrefix}/settings`) && activeApplication.id === "practice" && (
-                    <NavItem className="workspace-nav-typography application-settings-link" value="practice-automation-utility" icon={<DocumentRegular />} onClick={() => navigate("/practice/automation")}>
+                    <NavItem className="workspace-nav-typography application-settings-link" value="practice-operations" icon={<PracticeWorkIcon fontSize={20} />} onClick={() => navigate("/practice/automation")}>
                       Automation
                     </NavItem>
                   )}
@@ -1850,7 +1877,7 @@ function AccountsWorkspace({
                     <NavItem
                       className={activeApplication.id === "practice" ? "workspace-nav-typography application-settings-link" : "workspace-nav-item application-settings-link"}
                       value={`${activeApplication.id}-settings`}
-                      icon={<DocumentRegular />}
+                      icon={activeApplication.id === "practice" ? <PracticeSettingsIcon fontSize={20} /> : <DocumentRegular />}
                       onClick={() => {
                         if (activeApplication.id === "practice") {
                           setWorkspacePage("practice-settings");
