@@ -65,6 +65,7 @@ import {
   Textarea,
   Toolbar,
   Tooltip,
+  useRestoreFocusTarget,
   Tree,
   TreeItem,
   TreeItemLayout,
@@ -124,12 +125,16 @@ import { RoutePanelBoundary } from "./RoutePanelBoundary";
 import {
   authClient,
   authConfigured,
+  completeSocialCallback,
+  authRedirectError,
+  clearAuthRedirectError,
   authFailureDiagnostic,
   authFailureMessage,
   AuthUser,
   demoMode,
 } from "./auth";
 import ClientPermanentFile from "./ClientPermanentFile";
+import SignInMethodsDialog from "./SignInMethodsDialog";
 import { ConfirmAction } from "./ConfirmAction";
 import {
   blockingItemsLabel,
@@ -398,6 +403,8 @@ export function App() {
   const [checkingSession, setCheckingSession] = useState(authConfigured);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [sessionMessage, setSessionMessage] = useState("");
+  const [redirectError, setRedirectError] = useState(() => authRedirectError(window.location.search));
+  const [signInMethodsOpen, setSignInMethodsOpen] = useState(() => Boolean(redirectError) || new URLSearchParams(window.location.search).get("sign_in_methods") === "1");
 
   const refreshSession = useCallback(async () => {
     if (demoMode) {
@@ -434,7 +441,17 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    refreshSession();
+    let active = true;
+    clearAuthRedirectError();
+    void completeSocialCallback()
+      .then(async () => { if (active) await refreshSession(); })
+      .catch(() => {
+        if (!active) return;
+        setUser(null);
+        setCheckingSession(false);
+        setRedirectError("Google sign-in could not establish a session. Try again.");
+      });
+    return () => { active = false; };
   }, [refreshSession]);
   useEffect(() => {
     onUnauthorized(() => {
@@ -460,18 +477,30 @@ export function App() {
   if (checkingSession) return <AuthLoading />;
   if (!user)
     return (
-      <AuthScreen message={sessionMessage} onAuthenticated={refreshSession} />
+      <AuthScreen message={sessionMessage} oauthError={redirectError} onAuthenticated={async () => { setRedirectError(""); await refreshSession(); }} />
     );
-  return <AccountsWorkspace user={user} onSignOut={signOut} />;
+  return <>
+    <AccountsWorkspace user={user} onSignOut={signOut} onManageSignIn={() => { setRedirectError(""); setSignInMethodsOpen(true); }} />
+    {!demoMode && signInMethodsOpen && <SignInMethodsDialog key={user.id} email={user.email} initialError={redirectError} onClose={() => {
+      setSignInMethodsOpen(false);
+      setRedirectError("");
+      const url = new URL(window.location.href);
+      url.searchParams.delete("sign_in_methods");
+      window.history.replaceState(window.history.state, "", url.href);
+    }} />}
+  </>;
 }
 
 function AccountsWorkspace({
   user,
   onSignOut,
+  onManageSignIn,
 }: {
   user: AuthUser;
   onSignOut: () => Promise<void>;
+  onManageSignIn: () => void;
 }) {
+  const accountFocusTarget = useRestoreFocusTarget();
   const localTestTenant = import.meta.env.DEV
     ? import.meta.env.VITE_TENANT_ID?.trim() || ""
     : "";
@@ -1500,6 +1529,7 @@ function AccountsWorkspace({
               <MenuTrigger disableButtonEnhancement>
                 <FluentButton
                   appearance="subtle"
+                  {...accountFocusTarget}
                   className="account-menu-button"
                   type="button"
                   aria-label={`Open account menu for ${user.email}`}
@@ -1524,6 +1554,7 @@ function AccountsWorkspace({
                   <MenuItem onClick={() => { setWorkspacePage("client-portal"); navigate("/practice/client-portal"); }}>
                     Open client portal
                   </MenuItem>
+                  <MenuItem onClick={onManageSignIn}>Sign-in methods</MenuItem>
                   <MenuItem onClick={onSignOut}>Sign out</MenuItem>
                 </MenuList>
               </MenuPopover>
@@ -4682,9 +4713,11 @@ function AuthLoading() {
 
 function AuthScreen({
   message,
+  oauthError,
   onAuthenticated,
 }: {
   message: string;
+  oauthError: string;
   onAuthenticated: () => Promise<void>;
 }) {
   type AuthMode = "sign-in" | "sign-up" | "reset-request" | "reset-password";
@@ -4699,6 +4732,7 @@ function AuthScreen({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [confirmation, setConfirmation] = useState(message);
+  useEffect(() => { if (oauthError) setError(oauthError); }, [oauthError]);
   const heading = mode === "sign-in"
     ? "Welcome back"
     : mode === "sign-up"
@@ -4789,6 +4823,7 @@ function AuthScreen({
       const result = await authClient.signIn.social({
         provider: "google",
         callbackURL: window.location.origin,
+        errorCallbackURL: window.location.origin,
       });
       if (result.error) setError(authFailureMessage(result.error));
     } catch (e) {

@@ -1,0 +1,83 @@
+name: Google authentication recovery
+
+on:
+  pull_request:
+    paths:
+      - 'apps/web/src/auth.ts'
+      - 'apps/web/src/auth.test.ts'
+      - 'apps/web/src/App.tsx'
+      - 'apps/web/src/SignInMethodsDialog.tsx'
+      - 'apps/web/functions/neon-auth/**'
+      - 'apps/web/e2e-auth/**'
+      - 'apps/web/playwright.auth.config.ts'
+      - '.github/workflows/google-auth-recovery.yml'
+      - 'docs/engineering/google-sign-in-recovery.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: google-auth-recovery-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  auth_checks:
+    name: Authentication recovery tests
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble
+      options: --user 1001
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck --workspace apps/web
+      - run: npm test --workspace apps/web -- src/auth.test.ts
+      - run: node --test apps/web/functions/neon-auth/*.test.mjs
+      - working-directory: apps/web
+        run: npx playwright test --config playwright.auth.config.ts
+      - run: npm run verify:integration
+      - name: Upload authentication evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: google-auth-recovery
+          path: |
+            apps/web/playwright-auth-report/
+            apps/web/test-results-auth/
+          retention-days: 14
+
+  final_commands:
+    name: ${{ matrix.command }}
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble
+      options: --user 1001
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        command: ['verify', 'verify:pilot']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run ${{ matrix.command }}
+      - name: Upload verification evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: google-auth-final-${{ strategy.job-index }}
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          if-no-files-found: ignore
+          retention-days: 14

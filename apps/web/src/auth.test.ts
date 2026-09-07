@@ -52,4 +52,62 @@ describe("Neon Auth session boundary", () => {
     const { AuthRequiredError, freshAuthToken } = await import("./auth");
     await expect(freshAuthToken()).rejects.toBeInstanceOf(AuthRequiredError);
   });
+
+  it("completes a returned social verifier once and removes it from browser history", async () => {
+    const testWindow = {
+      location: {
+        origin: "https://practiceengine-dev.pages.dev",
+        href: "https://practiceengine-dev.pages.dev/?keep=yes&neon_auth_session_verifier=redacted-test-value",
+      },
+      history: { state: null, replaceState: vi.fn() },
+    };
+    testWindow.history.replaceState.mockImplementation((_, __, href) => {
+      testWindow.location.href = String(href);
+    });
+    vi.stubGlobal("window", testWindow);
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ authenticated: true }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { completeSocialCallback } = await import("./auth");
+    await expect(completeSocialCallback()).resolves.toBe(true);
+    await expect(completeSocialCallback()).resolves.toBe(true);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://practiceengine-dev.pages.dev/neon-auth/complete-callback",
+      expect.objectContaining({ method: "POST", credentials: "include", cache: "no-store" }),
+    );
+    expect(testWindow.history.replaceState).toHaveBeenCalledWith(
+      null,
+      "",
+      "https://practiceengine-dev.pages.dev/?keep=yes",
+    );
+  });
+});
+
+describe("OAuth redirect recovery", () => {
+  it("explains account_not_linked without exposing arbitrary query text", async () => {
+    const { authRedirectError, authFailureMessage } = await import("./auth");
+    expect(authRedirectError("?error=account_not_linked")).toContain("Sign in with your email and password");
+    expect(authRedirectError("?error=account_not_linked")).toContain("Connect Google");
+    expect(authFailureMessage({ code: "ACCOUNT_NOT_LINKED", status: 400 })).toContain("Connect Google");
+    expect(authRedirectError("?error=secret-value&error_description=private")).not.toMatch(/secret-value|private/);
+    expect(authRedirectError("?keep=yes")).toBe("");
+    expect(authRedirectError("?error=constructor")).toContain("Google sign-in could not be completed");
+  });
+
+  it("clears OAuth error details while preserving navigation and callback proof", async () => {
+    const replaceState = vi.fn();
+    vi.stubGlobal("window", {
+      location: { href: "https://ledgerly-accounts.pages.dev/?error=account_not_linked&error_description=private&sign_in_methods=1&neon_auth_session_verifier=test-only#section" },
+      history: { state: { retained: true }, replaceState },
+    });
+    const { clearAuthRedirectError } = await import("./auth");
+    clearAuthRedirectError();
+    expect(replaceState).toHaveBeenCalledWith(
+      { retained: true }, "",
+      "https://ledgerly-accounts.pages.dev/?sign_in_methods=1&neon_auth_session_verifier=test-only#section",
+    );
+    vi.unstubAllGlobals();
+  });
 });
