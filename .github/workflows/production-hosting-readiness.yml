@@ -1,6 +1,8 @@
 name: Read production hosting readiness
 
 on:
+  pull_request:
+    paths: ['.github/workflows/production-hosting-readiness.yml']
   push:
     branches: ['chore/check-production-hosting']
   workflow_dispatch:
