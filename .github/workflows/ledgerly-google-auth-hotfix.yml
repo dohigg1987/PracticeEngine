@@ -28,6 +28,8 @@ jobs:
       - run: npm ci
       - run: npm run typecheck --workspace apps/web
       - run: npm test --workspace apps/web
+        env:
+          VITE_API_URL: ""
       - run: node --test scripts/cloudflare-release.test.mjs scripts/google-auth-hotfix.test.mjs apps/web/functions/neon-auth/*.test.mjs
       - working-directory: apps/web
         run: npx playwright test --config playwright.auth.config.ts
