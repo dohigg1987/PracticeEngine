@@ -104,6 +104,10 @@ test("Settings remain operable by keyboard at a narrow viewport and pass axe", a
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/settings\/branding$/);
   await expect(page.getByRole("heading", { name: "Branding", exact: true })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Application navigation" })).toBeHidden();
+  await page.keyboard.press("Escape");
+  await page.mouse.move(312, 704);
+  await expect(page.getByRole("tooltip")).toBeHidden();
   const widths = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, root: document.documentElement.scrollWidth }));
   expect(widths.root).toBeLessThanOrEqual(widths.viewport + 1);
   const results = await new AxeBuilder({ page }).analyze();
