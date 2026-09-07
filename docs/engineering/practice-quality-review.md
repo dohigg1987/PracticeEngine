@@ -30,3 +30,9 @@ Reviewed main at a288e35 and the newer development line at df70cc8. Implementati
 GitHub Actions is authoritative for this change. See the pull request checks for exact attempts, failures and results; source inspection is not a substitute for executed evidence. No live database or regulator service was used. The earlier main baseline domain/API suites passed before work switched to GitHub-only execution.
 
 All capabilities remain owned by Practice Management or their existing suite/Ledgerly owners. Existing server commands continue enforcing tenancy, authorization, entitlements and audit. There are no schema, production-data or deployment changes. Rollback is a revert of this pull request.
+
+### Executed attempts
+
+- The first remote build (a0580d0) passed strict checks, 141 web tests, 184 API tests, the Fluent/header guards and a production build. Its browser run was superseded by the permanent-file correction.
+- At 1f6447e, the 21-surface accessibility audit passed. The focused browser suite passed refresh/history, tab keyboard selection, missing-record handling and capture, and exposed a required-field locator mismatch plus the overlay drawer's inherited navigation role. These are corrected in the next revision. Existing Practice tests also used obsolete DOM value selectors; they now select the visible navigation controls.
+- The final-verification workflow runs the repository's exact `verify` and `verify:pilot` commands remotely, in addition to the diagnostic quality jobs. It is triggered by this review document or manually for future release reviews; the normal quality workflow still covers every pull request.

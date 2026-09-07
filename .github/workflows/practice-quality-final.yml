@@ -1,0 +1,49 @@
+name: Practice quality final verification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/practice-quality-final.yml'
+      - 'docs/engineering/practice-quality-review.md'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: practice-quality-final-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  final_commands:
+    name: ${{ matrix.command }}
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble
+      options: --user 1001
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        command: ['verify', 'verify:pilot']
+    env:
+      PLAYWRIGHT_WORKERS: '2'
+      PLAYWRIGHT_BROWSER_JOB_CONCURRENCY: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run ${{ matrix.command }}
+      - name: Upload final verification evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: final-${{ strategy.job-index }}
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          if-no-files-found: ignore
+          retention-days: 14

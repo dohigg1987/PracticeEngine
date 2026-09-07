@@ -1737,6 +1737,7 @@ function AccountsWorkspace({
             id="application-navigation"
             className={narrowNavigation ? "suite-mobile-nav" : "fluent-nav"}
             type={narrowNavigation ? "overlay" : "inline"}
+            role={narrowNavigation ? "dialog" : "navigation"}
             open={!narrowNavigation || mobileNavOpen}
             onOpenChange={(_, data) => setMobileNavOpen(data.open)}
             aria-label="Application navigation"

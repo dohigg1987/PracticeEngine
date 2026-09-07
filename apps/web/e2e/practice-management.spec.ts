@@ -13,7 +13,7 @@ async function openNav(page: Page) {
 test("practice work supports operational filtering", async ({ page }) => {
   await start(page);
   await openNav(page);
-  await page.locator('button[value="work"]').click();
+  await page.getByRole("navigation", { name: "Practice Management navigation" }).getByRole("button", { name: "Work", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Work", exact: true })).toBeVisible();
   await expect(page.getByRole("grid", { name: "Practice work" })).toBeVisible();
   await page.getByRole("textbox", { name: "Search" }).fill("Annual accounts");
@@ -40,16 +40,16 @@ test("CRM pipeline and onboarding stay operational at narrow width", async ({ pa
   await page.setViewportSize({ width: 390, height: 844 });
   await start(page);
   await openNav(page);
-  await page.locator('button[value="crm-prospects"]').click();
+  await page.getByRole("navigation", { name: "Practice Management navigation" }).getByRole("button", { name: "Prospects", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Prospects", exact: true })).toBeVisible();
   await expect(page.getByRole("grid", { name: "CRM prospects" })).toContainText("Cedar Advisory Group");
   await openNav(page);
-  await page.locator('button[value="crm-opportunities"]').click();
+  await page.getByRole("navigation", { name: "Practice Management navigation" }).getByRole("button", { name: "Opportunities", exact: true }).click();
   await expect(page.getByRole("grid", { name: "CRM opportunities" })).toBeVisible();
   await page.getByRole("link", { name: /Finance function and annual accounts/ }).click();
   await expect(page.getByRole("table", { name: "Opportunity proposed services" })).toBeVisible();
   await openNav(page);
-  await page.locator('button[value="onboarding"]').click();
+  await page.getByRole("navigation", { name: "Practice Management navigation" }).getByRole("button", { name: "Onboarding", exact: true }).click();
   await expect(page.getByRole("table", { name: "Onboarding work" })).toBeVisible();
   const widths = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, root: document.documentElement.scrollWidth }));
   expect(widths.root).toBeLessThanOrEqual(widths.viewport + 1);
@@ -58,7 +58,7 @@ test("CRM pipeline and onboarding stay operational at narrow width", async ({ pa
 test("prospects can be opened and edited through the product UI", async ({ page }) => {
   await start(page);
   await openNav(page);
-  await page.locator('button[value="crm-prospects"]').click();
+  await page.getByRole("navigation", { name: "Practice Management navigation" }).getByRole("button", { name: "Prospects", exact: true }).click();
   await page.getByRole("link", { name: /Cedar Advisory Group/ }).click();
   await expect(page.getByRole("heading", { name: "Prospect details" })).toBeVisible();
   await page.getByRole("textbox", { name: "Legal name" }).fill("Cedar Advisory Group Limited");
@@ -73,7 +73,7 @@ test("prospects can be opened and edited through the product UI", async ({ page 
 test("clients are created through the canonical Practice client command", async ({ page }) => {
   await start(page);
   await openNav(page);
-  await page.locator('button[value="clients"]').click();
+  await page.getByRole("navigation", { name: "Practice Management navigation" }).getByRole("button", { name: "Clients & CRM", exact: true }).click();
   await page.getByRole("button", { name: "New client" }).click();
   await page.getByRole("textbox", { name: "Legal name" }).fill("DEV Review Client Ltd");
   await page.getByRole("button", { name: "Create client" }).click();
@@ -109,7 +109,7 @@ test("practice settings exposes service and template configuration at narrow wid
 test("recurring work exposes the operational schedule table", async ({ page }) => {
   await start(page);
   await openNav(page);
-  await page.locator('button[value="work"]').click();
+  await page.getByRole("navigation", { name: "Practice Management navigation" }).getByRole("button", { name: "Work", exact: true }).click();
   await page.getByRole("tab", { name: "Recurring work" }).click();
   await expect(page.getByRole("heading", { name: "Recurring work" })).toBeVisible();
   await expect(page.getByRole("table", { name: "Recurring work schedules" })).toContainText("Northstar Community Foundation");
@@ -117,7 +117,7 @@ test("recurring work exposes the operational schedule table", async ({ page }) =
 });
 
 test("workflow detail exposes stages blockers and operational review points",async({page})=>{
-  await start(page);await openNav(page);await page.locator('button[value="work"]').click();
+  await start(page);await openNav(page);await page.getByRole("navigation", { name: "Practice Management navigation" }).getByRole("button", { name: "Work", exact: true }).click();
   await page.getByRole("link",{name:/2026 Annual Accounts/}).click();
   await page.getByRole("complementary", { name: "Selected record inspector" }).getByRole("button", { name: "Open work", exact: true }).click();
   await expect(page.getByRole("table",{name:"Operational workflow stages"})).toContainText("Partner review");
@@ -126,7 +126,7 @@ test("workflow detail exposes stages blockers and operational review points",asy
 });
 
 test("review queue and recurrence operations provide practical controls",async({page})=>{
-  await start(page);await openNav(page);await page.locator('button[value="work"]').click();
+  await start(page);await openNav(page);await page.getByRole("navigation", { name: "Practice Management navigation" }).getByRole("button", { name: "Work", exact: true }).click();
   await page.getByRole("tab",{name:"Review queue"}).click();await expect(page.getByRole("table",{name:"Practice review queue"})).toContainText("Review Partner");
   await page.getByRole("tab",{name:"Generation operations"}).click();await expect(page.getByRole("table",{name:"Recurrence execution history"})).toBeVisible();
   await page.getByRole("button",{name:"Dry run"}).click();await expect(page.getByRole("table",{name:"Recurrence execution history"})).toContainText("Dry Run");

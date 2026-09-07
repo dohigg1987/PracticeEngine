@@ -13,7 +13,7 @@ import {
 } from "./api";
 import { formatDate } from "./displayFormat";
 import { statutoryLabel } from "./format";
-import { CommandBar, ErrorState, PageHeader, PersistentClientFrame, StatusTreatment } from "./CanonicalPatterns";
+import { CommandBar, DetailTabs, ErrorState, PageHeader, PersistentClientFrame, StatusTreatment } from "./CanonicalPatterns";
 import ClientPermanentFile from "./ClientPermanentFile";
 import CreatePracticeWorkDialog from "./CreatePracticeWorkDialog";
 import ClientCollaboration from "./ClientCollaboration";
@@ -102,10 +102,10 @@ function WorkOperations(props: Props) {
   const [tab, setTab] = useState<"work" | "reviews" | "recurring" | "operations">(props.initialTab ?? "work");
   useEffect(() => setTab(props.initialTab ?? "work"), [props.initialTab]);
   const paths = { work: "/practice/work", reviews: "/practice/review", recurring: "/practice/recurring-work", operations: "/practice/automation" };
-  return <><TabList aria-label="Work sections" selectedValue={tab} onTabSelect={(_, data) => {
+  return <><DetailTabs label="Work sections" selectedValue={tab} onTabSelect={(_, data) => {
     const next = data.value as typeof tab;
     if (props.onNavigate) props.onNavigate(paths[next]); else setTab(next);
-  }}><Tab value="work">Work</Tab><Tab value="reviews">Review queue</Tab><Tab value="recurring">Recurring work</Tab><Tab value="operations">Generation operations</Tab></TabList>{tab === "work" ? <PracticeWorkWorkspace {...props} /> : tab === "reviews" ? <ReviewQueue {...props}/> : tab === "recurring" ? <RecurringWork {...props} /> : <RecurrenceOperations {...props}/>}</>;
+  }} tabs={[{ value: "work", label: "Work" }, { value: "reviews", label: "Review queue" }, { value: "recurring", label: "Recurring work" }, { value: "operations", label: "Generation operations" }]} />{tab === "work" ? <PracticeWorkWorkspace {...props} /> : tab === "reviews" ? <ReviewQueue {...props}/> : tab === "recurring" ? <RecurringWork {...props} /> : <RecurrenceOperations {...props}/>}</>;
 }
 
 function ReviewQueue({context}:Props){

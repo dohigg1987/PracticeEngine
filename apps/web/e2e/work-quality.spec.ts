@@ -26,8 +26,8 @@ test("Add work creates a record directly from the queue", async ({ page }) => {
   await page.goto("/practice/work?view=all");
   await page.getByRole("button", { name: "Add work", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Add work" });
-  await dialog.getByLabel("Client", { exact: true }).selectOption("demo-org");
-  await expect(dialog.getByLabel("Service", { exact: true })).toBeEnabled();
+  await dialog.getByRole("combobox", { name: /^Client/ }).selectOption("demo-org");
+  await expect(dialog.getByRole("combobox", { name: /^Service/ })).toBeEnabled();
   await dialog.getByLabel("Work title").fill("Quality review follow-up");
   await dialog.getByLabel("Due date").fill("2027-10-15");
   await dialog.getByRole("button", { name: "Add work", exact: true }).click();
