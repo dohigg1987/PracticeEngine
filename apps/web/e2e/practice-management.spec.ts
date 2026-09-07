@@ -15,9 +15,15 @@ async function openCrmPage(page: Page, label: "Prospects" | "Opportunities" | "O
   const nav = page.getByRole("navigation", { name: "Practice Management navigation" });
   const category = nav.getByRole("button", { name: "Clients & CRM", exact: true });
   if (await category.getAttribute("aria-expanded") !== "true") {
+    const drawer = page.getByRole("dialog", { name: "Application navigation", exact: true });
+    const narrow = await drawer.isVisible();
     await category.click();
-    // Category navigation closes the narrow overlay; reopen it to choose the child.
-    await openNav(page);
+    if (narrow) {
+      // The modal hides the launch button until its closing transition finishes.
+      await expect(drawer).toBeHidden();
+      await openNav(page);
+      await expect(drawer).toBeVisible();
+    }
   }
   await nav.getByRole("button", { name: label, exact: true }).click();
 }
