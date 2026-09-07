@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useRestoreFocusTarget, useRestoreFocusSource, Button, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, Field, Input, MessageBar, MessageBarBody, Select, Tab, TabList, Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow, Textarea } from "@fluentui/react-components";
-import { api, type ApiContext, type PracticeReview, type PracticeReviewPoint, type PracticeTask, type PracticeWorkItem, type PracticeWorkStage, type ResourceProfile } from "./api";
+import { api, type ApiContext, type PracticeReview, type PracticeReviewPoint, type PracticeTask, type PracticeWorkStage, type ResourceProfile } from "./api";
 import { EmptyState, ErrorState, LoadingState, PageHeader, PageShell, StatusTreatment } from "./CanonicalPatterns";
 import { formatDate } from "./displayFormat";
 import { statutoryLabel as label } from "./format";
 import PracticeClientRequestDialog from "./PracticeClientRequestDialog";
 import "./practice-delivery.css";
 
-export type DeliveryWork = PracticeWorkItem & { tasks?: PracticeTask[]; stages?: PracticeWorkStage[]; reviews?: PracticeReview[] };
+import { deliveryNextAction, type DeliveryWork } from "./practice-delivery";
 type Area = "tasks" | "workflow" | "reviews";
 const closed = (status: string) => ["completed", "cancelled"].includes(status);
 const cleared = (status: string) => ["completed", "skipped"].includes(status);
@@ -19,24 +19,6 @@ export const stageChoices: Record<PracticeWorkStage["status"], PracticeWorkStage
   completed: [], skipped: [],
 };
 
-export function deliveryNextAction(item: DeliveryWork): { title: string; description: string; area: Area; action: "start" | "inspect" | "complete" | "none" } {
-  if (closed(item.status)) return { title: item.status === "completed" ? "Delivery complete" : "Work cancelled", description: "This work is closed. Its tasks and review history remain available.", area: "tasks", action: "none" };
-  const tasks = item.tasks || [], stages = item.stages || [], reviews = item.reviews || [];
-  const blocked = stages.find(stage => stage.status === "blocked");
-  if (blocked) return { title: "Resolve the blocker", description: blocked.block_reason || blocked.name, area: "workflow", action: "inspect" };
-  const changes = reviews.find(review => ["changes_requested", "rejected"].includes(review.status));
-  if (changes) return { title: "Address the review feedback", description: changes.decision_reason || "Resolve the review points, then resubmit the review.", area: "reviews", action: "inspect" };
-  if (item.status === "waiting_on_client") return { title: "Waiting on your client", description: "Check their response before resuming work.", area: "tasks", action: "inspect" };
-  if (reviews.some(review => !approved(review.status))) return { title: "Review the work", description: "The reviewer needs to resolve any points and record a decision.", area: "reviews", action: "inspect" };
-  if (["not_started", "ready"].includes(item.status)) return { title: "Ready to begin", description: tasks.length ? "Check the tasks and start delivery." : "Start work, then add the tasks needed to deliver it.", area: "tasks", action: "start" };
-  const remaining = tasks.filter(task => !cleared(task.status));
-  if (remaining.length) return { title: "Continue the tasks", description: `${remaining.length} task${remaining.length === 1 ? "" : "s"} remaining. ${remaining[0]!.title}`, area: "tasks", action: "inspect" };
-  const missingReview = tasks.find(task => task.review_required && !reviews.some(review => review.practice_task_id === task.id && approved(review.status)));
-  if (missingReview) return { title: "Request the required review", description: missingReview.title, area: "reviews", action: "inspect" };
-  const stage = stages.find(entry => !cleared(entry.status));
-  if (stage) return { title: "Progress the workflow", description: stage.name, area: "workflow", action: "inspect" };
-  return { title: "Ready to complete", description: "Tasks, workflow stages and required reviews are clear. Confirm that delivery is finished.", area: "tasks", action: "complete" };
-}
 
 type DialogAction =
   | { kind: "task" } | { kind: "review"; taskId?: string } | { kind: "reschedule" }
@@ -109,11 +91,11 @@ export default function PracticeWorkDetail({ context, workItemId, onBack, onOpen
       <Field label="Work owner"><Select disabled={busy || !resources.length} value={item.assigned_member_id || ""} onChange={(_, data) => { if (data.value && data.value !== item.assigned_member_id) void mutate(() => api.reassignWork(context, item.id, { resourceId: data.value }), "Owner updated."); }}><option value="">Choose owner</option>{resources.filter(person => person.status === "active").map(person => <option value={person.id} key={person.id}>{person.display_name}</option>)}</Select></Field>
       {["waiting_internal", "waiting_on_client"].includes(item.status) && <Button disabled={busy} onClick={() => void mutate(() => api.updatePracticeWorkStatus(context, item.id, "in_progress"), "Work resumed.")}>Resume work</Button>}
     </div>}
-    <TabList className="pd-tabs" aria-label="Work details" selectedValue={area} onTabSelect={(_, data) => setArea(data.value as Area)}>
+    <div className="pd-tabs"><TabList aria-label="Work details" selectedValue={area} onTabSelect={(_, data) => setArea(data.value as Area)}>
       <Tab value="tasks">Tasks · {tasks.filter(task => cleared(task.status)).length}/{tasks.length}</Tab>
       <Tab value="workflow">Workflow · {stages.filter(stage => cleared(stage.status)).length}/{stages.length}</Tab>
       <Tab value="reviews">Reviews · {reviews.filter(review => !approved(review.status)).length} open</Tab>
-    </TabList>
+    </TabList></div>
     {area === "tasks" && <section className="pd-section" aria-label="Tasks">
       <header><div><h2>Tasks</h2><span className="pd-muted">The steps needed to deliver this work.</span></div>{!isClosed && <Button {...restoreFocusTarget} disabled={busy} onClick={() => setDialog({ kind: "task" })}>Add task</Button>}</header>
       {tasks.length ? <div className="pd-table-scroll" tabIndex={0} role="region" aria-label="Task table"><Table aria-label="Work tasks"><TableHeader><TableRow><TableHeaderCell>Task</TableHeaderCell><TableHeaderCell>Owner / due</TableHeaderCell><TableHeaderCell>Status</TableHeaderCell><TableHeaderCell>Action</TableHeaderCell></TableRow></TableHeader><TableBody>{tasks.map(task => <TableRow key={task.id}>

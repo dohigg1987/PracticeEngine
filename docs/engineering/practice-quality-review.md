@@ -45,3 +45,16 @@ All capabilities remain owned by Practice Management or their existing suite/Led
 - Client workspaces reset with tenant and client identity, so an open Add work dialog cannot carry the previous client's summary into another record.
 
 - At 798aaa0, the exact full verification completed with 188 browser tests passed, one skipped and one failed; both pilot shards reproduced only the same defect. The portalled mobile drawer lost the old sidebar's touch-target sizing and rendered navigation items at 40px. Its own public classes now enforce the existing 44px target requirement for items, categories and the close button; the focused mobile checks assert these bounds too. The 21-surface accessibility audit and nine focused work tests passed at that revision.
+
+
+## Delivery foundations follow-up
+
+The next increment replaces the duplicate work-detail UI with one delivery record. Its primary action follows tasks, workflow blockers, reviews and completion. Tasks can be created and progressed; reviews name a real task or stage and reviewer; review points require resolution before approval. Deadline changes capture the operator's reason. Closed work does not offer mutations.
+
+The API now returns flat review records, rejects cross-work review targets and duplicate active reviews, records the review and work status together, and blocks work completion while mandatory tasks remain unfinished. Real route-handler tests exercise these branches with a controlled transaction adapter; they do not claim to test a live database.
+
+Client service activation is connected to Add work, client requests select canonical portal access records, and Home can display delivery work when financial or capacity data is unavailable. Fluent v9 dialogs, fields, tabs, tables and semantic tokens provide the interaction primitives.
+
+Remote verification covers the complete task → review point → approval → completion journey, client service activation, portal recipient selection, deadline reasons, 320px reflow and keyboard focus. Browser fixtures are explicitly showcase data; authenticated live acceptance remains separate.
+
+Publication must target PracticeEngine DEV. The existing GitHub Cloudflare credential returned 403 for Worker metadata. A compiled Worker artifact is retained for deployment using an existing authorised Cloudflare session, without a local checkout or build.

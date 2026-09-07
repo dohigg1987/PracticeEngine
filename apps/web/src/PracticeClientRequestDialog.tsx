@@ -3,12 +3,7 @@ import { useRestoreFocusSource, Button, Checkbox, Dialog, DialogActions, DialogB
 import { api, type ApiContext, type ClientRequestRecipient, type CreateClientRequestInput, type PracticeWorkItem } from "./api";
 import "./practice-delivery.css";
 
-export function eligibleRequestRecipients(items: ClientRequestRecipient[], work?: PracticeWorkItem): ClientRequestRecipient[] {
-  return items.filter(item => ["active", "invited"].includes(item.status) && ["active", "invited"].includes(item.principal_status)
-    && (!item.engagement_id || item.engagement_id === work?.engagement_id)
-    && (!item.client_service_id || item.client_service_id === work?.client_service_id));
-}
-
+import { eligibleRequestRecipients } from "./practice-delivery";
 export default function PracticeClientRequestDialog({ context, clientId, work, onClose, onCreated }: {
   context: ApiContext; clientId: string; work?: PracticeWorkItem; onClose: () => void; onCreated: () => Promise<void>;
 }) {

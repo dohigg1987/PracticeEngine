@@ -38,7 +38,7 @@ import {
 import { formatDate } from "./displayFormat";
 import { statutoryLabel } from "./format";
 import CreatePracticeWorkDialog from "./CreatePracticeWorkDialog";
-import { deliveryNextAction } from "./PracticeWorkDetail";
+import { deliveryNextAction } from "./practice-delivery";
 import "./practice-work-workspace.css";
 
 const workColumnSizing: TableColumnSizingOptions = {

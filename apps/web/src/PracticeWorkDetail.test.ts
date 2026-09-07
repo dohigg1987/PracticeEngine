@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { deliveryNextAction, type DeliveryWork } from "./PracticeWorkDetail";
-import { eligibleRequestRecipients } from "./PracticeClientRequestDialog";
+import { deliveryNextAction, type DeliveryWork } from "./practice-delivery";
+import { eligibleRequestRecipients } from "./practice-delivery";
 const work: DeliveryWork = { id: "work", client_id: "client", client_service_id: "service", title: "Delivery", status: "in_progress", priority: "normal", tasks: [], reviews: [], stages: [] };
 describe("delivery guidance", () => {
   it("directs a blocked stage to workflow instead of offering completion", () => {

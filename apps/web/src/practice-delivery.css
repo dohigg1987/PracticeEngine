@@ -30,3 +30,5 @@
   .pd-next { padding: var(--spacingVerticalM) var(--spacingHorizontalM); }
   .pd-next > button { width: 100%; }
 }
+
+.pd-facts button { justify-content: flex-start; text-align: left; }
