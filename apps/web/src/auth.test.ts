@@ -89,8 +89,8 @@ describe("OAuth redirect recovery", () => {
   it("explains account_not_linked without exposing arbitrary query text", async () => {
     const { authRedirectError, authFailureMessage } = await import("./auth");
     expect(authRedirectError("?error=account_not_linked")).toContain("Sign in with your email and password");
-    expect(authRedirectError("?error=account_not_linked")).toContain("Connect Google");
-    expect(authFailureMessage({ code: "ACCOUNT_NOT_LINKED", status: 400 })).toContain("Connect Google");
+    expect(authRedirectError("?error=account_not_linked")).toContain("verify your email");
+    expect(authFailureMessage({ code: "ACCOUNT_NOT_LINKED", status: 400 })).toContain("verify your email");
     expect(authRedirectError("?error=secret-value&error_description=private")).not.toMatch(/secret-value|private/);
     expect(authRedirectError("?keep=yes")).toBe("");
     expect(authRedirectError("?error=constructor")).toContain("Google sign-in could not be completed");

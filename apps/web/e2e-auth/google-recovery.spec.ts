@@ -12,9 +12,11 @@ test.afterEach(async ({ page }, testInfo) => {
 });
 
 const testUser = { id: "11111111-1111-4111-8111-111111111111", name: "Existing account", email: "existing@example.test", emailVerified: false };
-async function mockAuth(page: Page, options: { signedIn?: boolean; connected?: boolean; listFailure?: boolean; linkError?: string } = {}) {
+async function mockAuth(page: Page, options: { signedIn?: boolean; connected?: boolean; listFailure?: boolean; linkError?: string; verified?: boolean } = {}) {
   let signedIn = Boolean(options.signedIn);
   let connected = Boolean(options.connected);
+  let verified = Boolean(options.verified);
+  const verifications: unknown[] = [];
   let listFailure = Boolean(options.listFailure);
   const links: Record<string, unknown>[] = [];
   const completions: unknown[] = [];
@@ -22,7 +24,7 @@ async function mockAuth(page: Page, options: { signedIn?: boolean; connected?: b
   await page.route("**/neon-auth/**", async route => {
     const path = new URL(route.request().url()).pathname;
     const session = signedIn ? {
-      user: testUser,
+      user: { ...testUser, emailVerified: verified },
       session: { id: "test-session", userId: testUser.id, token: "test-session-token", expiresAt: "2030-01-01T00:00:00.000Z", createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" },
     } : { user: null, session: null };
     if (path.endsWith("/get-session")) return route.fulfill({ json: session, headers: signedIn ? { "set-auth-jwt": "test-only-jwt" } : {} });
@@ -39,7 +41,21 @@ async function mockAuth(page: Page, options: { signedIn?: boolean; connected?: b
       }
       return route.fulfill({ json: [{ id: "credential-account", providerId: "credential", accountId: testUser.id, userId: testUser.id }, ...(connected ? [{ id: "google-account", providerId: "google", accountId: "test-google-id", userId: testUser.id }] : [])] });
     }
-    if (path.endsWith("/link-social")) {
+    if (path.endsWith("/send-verification-email")) {
+      expect(signedIn).toBe(true);
+      verifications.push(route.request().postDataJSON());
+      return route.fulfill({ json: { status: true } });
+    }
+    if (path.endsWith("/email-otp/verify-email")) {
+      expect(signedIn).toBe(true);
+      const body = route.request().postDataJSON();
+      expect(body.email).toBe(testUser.email);
+      if (body.otp !== "123456") return route.fulfill({ status: 400, json: { code: "INVALID_OTP", message: "Invalid verification code" } });
+      verified = true;
+      return route.fulfill({ json: { status: true, user: { ...testUser, emailVerified: true } } });
+    }
+    if (path.endsWith("/sign-in/social")) {
+      expect(verified).toBe(true);
       expect(signedIn).toBe(true);
       const body = route.request().postDataJSON();
       links.push(body);
@@ -55,15 +71,16 @@ async function mockAuth(page: Page, options: { signedIn?: boolean; connected?: b
       completions.push(route.request().postDataJSON());
       signedIn = true;
       connected = true;
+      verified = true;
       return route.fulfill({ json: { authenticated: true } });
     }
     return route.fulfill({ status: 404, json: { code: "UNEXPECTED_TEST_AUTH_ROUTE" } });
   });
-  return { links, completions };
+  return { links, completions, verifications };
 }
 
 for (const width of [320, 390, 1440]) {
-  test(`recovers account_not_linked through authenticated Google linking at ${width}px`, async ({ page }, testInfo) => {
+  test(`recovers account_not_linked through email verification and Google sign-in at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 900 });
     const calls = await mockAuth(page);
     await page.goto("/?error=account_not_linked&error_description=do-not-display");
@@ -78,28 +95,37 @@ for (const width of [320, 390, 1440]) {
     const dialog = page.getByRole("dialog", { name: "Sign-in methods" });
     await expect(dialog).toBeVisible();
     await expect(dialog.getByText(`Account: ${testUser.email}`)).toBeVisible();
-    await expect(dialog.getByRole("button", { name: "Connect Google", exact: true })).toBeEnabled();
+    await dialog.getByRole("button", { name: "Send verification code", exact: true }).click();
+    await dialog.getByRole("textbox", { name: /^Verification code/ }).fill("000000");
+    await dialog.getByRole("button", { name: "Verify email", exact: true }).click();
+    await expect(dialog.getByText("Invalid verification code")).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Continue with Google", exact: true })).toHaveCount(0);
+    await dialog.getByRole("textbox", { name: /^Verification code/ }).fill("123456");
+    await dialog.getByRole("button", { name: "Verify email", exact: true }).click();
+    await expect(dialog.getByText(/Your email is verified/)).toBeVisible();
+    expect(calls.verifications).toHaveLength(1);
     const dimensions = await page.evaluate(() => ({ available: document.documentElement.clientWidth, actual: document.documentElement.scrollWidth }));
     expect(dimensions.actual).toBeLessThanOrEqual(dimensions.available + 1);
     const scan = await new AxeBuilder({ page }).exclude("[data-tabster-dummy]").analyze();
     expect(scan.violations).toEqual([]);
     await testInfo.attach(`google-link-${width}px`, { body: await page.screenshot(), contentType: "image/png" });
-    await dialog.getByRole("button", { name: "Connect Google", exact: true }).click();
+    if (width !== 390) console.log(`AUTH_UI_IMAGE_${width}=` + (await page.screenshot({ type: "jpeg", quality: 65 })).toString("base64"));
+    await dialog.getByRole("button", { name: "Continue with Google", exact: true }).click();
     await expect.poll(() => calls.links.length).toBe(1);
     expect(calls.links[0].provider).toBe("google");
     expect(calls.links[0].errorCallbackURL).toBe(calls.links[0].callbackURL);
     expect(new URL(String(calls.links[0].callbackURL)).searchParams.get("sign_in_methods")).toBe("1");
     await expect(page.getByText("Google is connected.", { exact: false })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Connect Google", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Continue with Google", exact: true })).toHaveCount(0);
   });
 }
 
 test("account loading errors can retry without starting OAuth", async ({ page }) => {
-  const calls = await mockAuth(page, { signedIn: true, listFailure: true });
+  const calls = await mockAuth(page, { signedIn: true, listFailure: true, verified: true });
   await page.goto("/?sign_in_methods=1");
   const dialog = page.getByRole("dialog", { name: "Sign-in methods" });
   await dialog.getByRole("button", { name: "Retry", exact: true }).click();
-  await expect(dialog.getByRole("button", { name: "Connect Google", exact: true })).toBeEnabled();
+  await expect(dialog.getByRole("button", { name: "Continue with Google", exact: true })).toBeEnabled();
   expect(calls.links).toHaveLength(0);
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
@@ -127,12 +153,12 @@ for (const [code, message] of [
   ["email_doesn't_match", "Choose the Google account with the same email"],
 ]) {
   test(`a rejected Google connection remains recoverable: ${code}`, async ({ page }) => {
-    const calls = await mockAuth(page, { signedIn: true, linkError: code });
+    const calls = await mockAuth(page, { signedIn: true, linkError: code, verified: true });
     await page.goto("/?sign_in_methods=1");
-    await page.getByRole("button", { name: "Connect Google", exact: true }).click();
+    await page.getByRole("button", { name: "Continue with Google", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "Sign-in methods" });
     await expect(dialog.getByText(message, { exact: false })).toBeVisible();
-    await expect(dialog.getByRole("button", { name: "Connect Google", exact: true })).toBeEnabled();
+    await expect(dialog.getByRole("button", { name: "Continue with Google", exact: true })).toBeEnabled();
     await expect(page.getByText("Google is connected.", { exact: false })).toHaveCount(0);
     await expect(page).not.toHaveURL(/error=/);
     expect(calls.links).toHaveLength(1);

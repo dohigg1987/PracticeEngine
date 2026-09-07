@@ -143,7 +143,7 @@ export async function freshAuthToken(): Promise<string> {
 }
 
 const socialErrorMessages: Record<string, string> = {
-  account_not_linked: "This Google account is not connected to your existing account. Sign in with your email and password, then choose Connect Google in Sign-in methods. If you forgot your password, use Forgot your password.",
+  account_not_linked: "This Google account is not connected to your existing account. Sign in with your email and password, then verify your email in Sign-in methods and try Google again. If you forgot your password, use Forgot your password.",
   account_already_linked_to_different_user: "This Google account is connected to another account. Choose the Google account with the same email as your current account.",
   email_doesnt_match: "Choose the Google account with the same email as your current account.",
   "email_doesn't_match": "Choose the Google account with the same email as your current account.",
