@@ -1,5 +1,8 @@
 import type {
   AccountsVersion,
+  ClientService,
+  ClientRequestRecipient,
+  PracticeReviewPoint,
   OrganisationPermanentFile,
   PermanentFileAdviser,
   PermanentFileOfficer,
@@ -55,6 +58,11 @@ let demoPracticeTasks: PracticeTask[] = [
   { id: "pm-task-2", work_item_id: "work-accounts-2026", title: "Prepare accounts", description: "Complete Ledgerly accounts-production work", status: "in_progress", assignee_name: "Demo Partner", team_name: "Accounts", sequence: 20, due_date: "2027-08-31" },
   { id: "pm-task-3", work_item_id: "work-accounts-2026", title: "Partner review", status: "not_started", reviewer_member_id: "member-reviewer", sequence: 30, due_date: "2027-09-15" },
 ];
+let demoClientServices: ClientService[] = ["demo-org", "demo-org-2"].flatMap(clientId => demoPracticeServices.slice(0, clientId === "demo-org-2" ? 2 : 3).map(service => ({
+  id: `client-${service.id}${clientId === "demo-org-2" ? "-harbour" : ""}`, client_id: clientId, service_id: service.id, service_name: service.name,
+  status: "active" as const, start_date: "2027-01-01", frequency: service.default_frequency, specialist_module_key: service.specialist_module_key,
+})));
+const demoRequestRecipients: ClientRequestRecipient[] = [{ id: "portal-access-client-1", display_name: "Client contact", email_normalized: "client@example.test", status: "active", principal_status: "active" }];
 const demoPracticeTemplates: PracticeWorkTemplate[] = [
   { id: "template-accounts", name: "Annual accounts delivery", service_id: "service-accounts", service_name: "Annual accounts", version: 1, status: "published", tasks: [{ title: "Confirm scope", sequence: 10, mandatory: true }, { title: "Prepare accounts", sequence: 20, mandatory: true }, { title: "Partner review", sequence: 30, mandatory: true }] },
 ];
@@ -1313,6 +1321,9 @@ let demoPlatformTeams = [
 ];
 
 function practiceDemoRead(path: string): unknown | undefined {
+  const clientServicesMatch = path.match(/^\/v1\/clients\/([^/]+)\/services$/);
+  if (clientServicesMatch) return { items: structuredClone(demoClientServices.filter(item => item.client_id === clientServicesMatch[1])) };
+  if (/^\/v1\/clients\/[^/]+\/portal-access$/.test(path)) return { items: structuredClone(demoRequestRecipients) };
   if (path === "/v1/practice/resources") return { items: structuredClone(demoResources) };
   if (path.startsWith("/v1/practice/capacity?")) return { items: structuredClone(demoCapacity) };
   if (path.startsWith("/v1/practice/work-allocations?")) return { items: structuredClone(demoAllocations) };
@@ -1352,7 +1363,7 @@ function practiceDemoRead(path: string): unknown | undefined {
     const clientName = clientId === "demo-org-2" ? "Harbour Trading Ltd" : "Northstar Community Foundation";
     return { item: {
       client: { id: clientId, legal_name: clientName },
-      services: demoPracticeServices.slice(0, clientId === "demo-org-2" ? 2 : 3).map((service, index) => ({ id: `client-${service.id}`, client_id: clientId, service_id: service.id, service_name: service.name, status: "active", frequency: service.default_frequency, responsible_team_id: index ? null : "team-accounts", specialist_module_key: service.specialist_module_key })),
+      services: structuredClone(demoClientServices.filter(item => item.client_id === clientId)),
       engagements: [{ id: "practice-engagement-1", client_id: clientId, client_name: clientName, reference: "PE-2027-001", name: "2027 professional services", status: "active", acceptance_state: "accepted", start_date: "2027-01-01", responsible_owner_id: "member-demo" }],
       workItems: structuredClone(demoPracticeWork.filter((item) => item.client_id === clientId)),
       upcomingTasks: structuredClone(demoPracticeTasks.filter((item) => item.status !== "completed")),
@@ -1402,9 +1413,47 @@ export function demoRequest(path: string, init?: RequestInit): unknown {
     if (organisations) organisations.items = [...organisations.items, item];
     return { item: structuredClone(item) };
   }
+  const serviceActivation = path.match(/^\/v1\/clients\/([^/]+)\/services$/);
+  if (method === "POST" && serviceActivation) {
+    const body = JSON.parse(String(init?.body || "{}")) as { serviceId: string; startDate: string; frequency?: string };
+    const service = demoPracticeServices.find(item => item.id === body.serviceId);
+    if (!service || !body.startDate) throw new Error("Choose a service and start date");
+    const item: ClientService = { id: `client-service-${Date.now()}`, client_id: serviceActivation[1]!, service_id: service.id, service_name: service.name, status: "active", start_date: body.startDate, frequency: body.frequency };
+    demoClientServices.push(item); return { item: structuredClone(item) };
+  }
+  const addTask = path.match(/^\/v1\/practice\/work\/([^/]+)\/tasks$/);
+  if (method === "POST" && addTask) {
+    const body = JSON.parse(String(init?.body || "{}")) as { title: string; description?: string; sequence: number; dueDate?: string; assigneeMemberId?: string };
+    if (!body.title?.trim() || !Number.isInteger(body.sequence)) throw new Error("A title and sequence are required");
+    const item: PracticeTask = { id: `task-${Date.now()}`, work_item_id: addTask[1]!, title: body.title, description: body.description, sequence: body.sequence, due_date: body.dueDate, assignee_member_id: body.assigneeMemberId, status: "not_started", mandatory: true };
+    demoPracticeTasks.push(item); return { item: structuredClone(item) };
+  }
+  if (method === "POST" && path === "/v1/practice/reviews") {
+    const body = JSON.parse(String(init?.body || "{}")) as { workItemId: string; taskId?: string; stageId?: string; reviewerMemberId: string };
+    const work = demoPracticeWork.find(item => item.id === body.workItemId);
+    if (!work || !(body.taskId || body.stageId) || !body.reviewerMemberId) throw new Error("Choose work, a task or stage and a reviewer");
+    if (demoPracticeReviews.some(item => item.work_item_id === work.id && item.practice_task_id === body.taskId && item.work_stage_id === body.stageId && !["approved", "completed"].includes(item.status))) throw new Error("This task or stage already has an open review");
+    const item: PracticeReview = { id: `review-${Date.now()}`, work_item_id: work.id, work_title: work.title, client_name: work.client_name, practice_task_id: body.taskId, work_stage_id: body.stageId, reviewer_member_id: body.reviewerMemberId, reviewer_name: demoResources.find(person => person.id === body.reviewerMemberId)?.display_name, requested_at: now, status: "requested", review_points: [] };
+    demoPracticeReviews.unshift(item); work.status = "review"; return { item: structuredClone(item) };
+  }
+  const addPoint = path.match(/^\/v1\/practice\/reviews\/([^/]+)\/points$/);
+  if (method === "POST" && addPoint) {
+    const body = JSON.parse(String(init?.body || "{}")) as { description: string };
+    const review = demoPracticeReviews.find(item => item.id === addPoint[1]);
+    if (!review || !body.description?.trim()) throw new Error("Review and description required");
+    const item: PracticeReviewPoint = { id: `point-${Date.now()}`, description: body.description, status: "open" };
+    review.review_points = [...(review.review_points || []), item]; return { item: structuredClone(item) };
+  }
+  const pointStatus = path.match(/^\/v1\/practice\/review-points\/([^/]+)\/status$/);
+  if (method === "POST" && pointStatus) {
+    const body = JSON.parse(String(init?.body || "{}")) as { status: PracticeReviewPoint["status"]; resolution: string };
+    const point = demoPracticeReviews.flatMap(item => item.review_points || []).find(item => item.id === pointStatus[1]);
+    if (!point || !body.resolution?.trim()) throw new Error("A resolution is required");
+    point.status = body.status; point.resolution = body.resolution; return { item: structuredClone(point) };
+  }
   if (method === "POST" && path === "/v1/practice/work") {
     const body = JSON.parse(String(init?.body || "{}")) as Record<string, unknown>;
-    const service = demoPracticeServices.find((entry) => `client-${entry.id}` === body.clientServiceId || entry.id === body.clientServiceId);
+    const service = demoPracticeServices.find((entry) => entry.id === demoClientServices.find(item => item.id === body.clientServiceId)?.service_id);
     const clientId = String(body.clientId);
     const item: PracticeWorkItem = {
       id: `work-${Date.now()}`,
@@ -1424,6 +1473,7 @@ export function demoRequest(path: string, init?: RequestInit): unknown {
   }
   if (method === "POST" && path === "/v1/client-requests") {
     const body = JSON.parse(String(init?.body || "{}")) as Record<string, unknown>;
+    if (!Array.isArray(body.recipientAccessIds) || !body.recipientAccessIds.length || body.recipientAccessIds.some(id => !demoRequestRecipients.some(recipient => recipient.id === id))) throw new Error("A valid portal access recipient is required");
     const work = demoPracticeWork.find((entry) => entry.id === body.workItemId);
     const item: ClientRequestItem = {
       id: `client-request-${Date.now()}`,
@@ -1489,14 +1539,15 @@ export function demoRequest(path: string, init?: RequestInit): unknown {
   const opportunityStageMatch=path.match(/^\/v1\/crm\/opportunities\/([^/]+)\/stage$/);if(method==="POST"&&opportunityStageMatch){const body=JSON.parse(String(init?.body||"{}")) as {stageKey:string;outcomeReason?:string},current=demoOpportunities.find(item=>item.id===opportunityStageMatch[1]);if(current?.stage_key===body.stageKey)throw new Error("Choose a stage other than the current stage");demoOpportunities=demoOpportunities.map(item=>item.id===opportunityStageMatch[1]?{...item,stage_key:body.stageKey,status:body.stageKey==="lost"?"lost":"open",outcome_reason:body.stageKey==="lost"?body.outcomeReason:null,activities:[{id:`opportunity-stage-${Date.now()}`,summary:`Stage changed from ${item.stage_key} to ${body.stageKey}`,occurred_at:now},...(item.activities||[])]}:item);return {item:structuredClone(demoOpportunities.find(item=>item.id===opportunityStageMatch[1]))};}
   const proposalMatch=path.match(/^\/v1\/crm\/opportunities\/([^/]+)\/proposals$/);if(method==="POST"&&proposalMatch){const body=JSON.parse(String(init?.body||"{}")) as {proposalId:string;proposalVersion?:string};demoOpportunities=demoOpportunities.map(item=>item.id===proposalMatch[1]?{...item,proposal_status:"created",proposals:[...(item.proposals||[]),{id:`proposal-${Date.now()}`,proposal_id:body.proposalId,proposal_version:body.proposalVersion||"1",status:"created"}]}:item);return {item:{proposal_id:body.proposalId}};}
   const onboardingStatusMatch=path.match(/^\/v1\/onboarding\/([^/]+)\/status$/);if(method==="POST"&&onboardingStatusMatch){const body=JSON.parse(String(init?.body||"{}")) as {status:OnboardingCase["status"]};if(["ready_for_delivery","completed"].includes(body.status))throw new Error("Mandatory onboarding gates remain incomplete");demoOnboarding=demoOnboarding.map(item=>item.id===onboardingStatusMatch[1]?{...item,status:body.status}:item);return {item:structuredClone(demoOnboarding.find(item=>item.id===onboardingStatusMatch[1]))};}
-  const stageMatch=path.match(/^\/v1\/practice\/workflow-stages\/([^/]+)\/advance$/);if(method==="POST"&&stageMatch){const body=JSON.parse(String(init?.body||"{}")) as {status:PracticeWorkStage["status"]};demoWorkStages=demoWorkStages.map(stage=>stage.id===stageMatch[1]?{...stage,status:body.status}:stage);return {item:structuredClone(demoWorkStages.find(stage=>stage.id===stageMatch[1]))};}
-  const reviewMatch=path.match(/^\/v1\/practice\/reviews\/([^/]+)\/decision$/);if(method==="POST"&&reviewMatch){const body=JSON.parse(String(init?.body||"{}")) as {status:PracticeReview["status"]};demoPracticeReviews=demoPracticeReviews.map(review=>review.id===reviewMatch[1]?{...review,status:body.status}:review);return {item:structuredClone(demoPracticeReviews.find(review=>review.id===reviewMatch[1]))};}
+  const stageMatch=path.match(/^\/v1\/practice\/workflow-stages\/([^/]+)\/advance$/);if(method==="POST"&&stageMatch){const body=JSON.parse(String(init?.body||"{}")) as {status:PracticeWorkStage["status"];reason?:string};if(body.status==="blocked"&&!body.reason?.trim())throw new Error("A blocker reason is required.");demoWorkStages=demoWorkStages.map(stage=>stage.id===stageMatch[1]?{...stage,status:body.status,block_reason:body.status==="blocked"?body.reason!.trim():null}:stage);return {item:structuredClone(demoWorkStages.find(stage=>stage.id===stageMatch[1]))};}
+  const reviewMatch=path.match(/^\/v1\/practice\/reviews\/([^/]+)\/decision$/);if(method==="POST"&&reviewMatch){const body=JSON.parse(String(init?.body||"{}")) as {status:PracticeReview["status"];reason?:string};demoPracticeReviews=demoPracticeReviews.map(review=>review.id===reviewMatch[1]?{...review,status:body.status,decision_reason:body.reason}:review);return {item:structuredClone(demoPracticeReviews.find(review=>review.id===reviewMatch[1]))};}
   if(method==="POST"&&path==="/v1/practice/automation-rules"){const body=JSON.parse(String(init?.body||"{}")) as Record<string,unknown>;const item:AutomationRule={id:`automation-${Date.now()}`,name:String(body.name||"New automation"),enabled:body.enabled===true,trigger_type:String(body.triggerType||"work.created"),conditions:Array.isArray(body.conditions)?body.conditions as Array<Record<string,unknown>>:[],actions:Array.isArray(body.actions)?body.actions as Array<Record<string,unknown>>:[{type:"mark_blocked"}],priority:Number(body.priority||100),recent_executions:[]};demoAutomationRules=[...demoAutomationRules,item];return {item:structuredClone(item)};}
   const automationMatch=path.match(/^\/v1\/practice\/automation-rules\/([^/]+)$/);if(method==="PATCH"&&automationMatch){const body=JSON.parse(String(init?.body||"{}")) as {enabled?:boolean};demoAutomationRules=demoAutomationRules.map(rule=>rule.id===automationMatch[1]?{...rule,...body}:rule);return {item:structuredClone(demoAutomationRules.find(rule=>rule.id===automationMatch[1]))};}
   if(method==="POST"&&(path==="/v1/practice/recurrence-operations/dry-run"||path==="/v1/practice/recurrence-operations/replay")){const body=JSON.parse(String(init?.body||"{}")) as {from:string;to:string},replay=path.endsWith("replay"),item:RecurrenceExecution={id:`recurrence-${Date.now()}`,trigger_type:replay?"replay":"dry_run",status:"succeeded",range_from:body.from,range_to:body.to,schedules_evaluated:demoRecurringSchedules.length,work_generated:replay?1:0,blocked_entitlement:0,skipped_idempotent:1,failures:0,started_at:now,completed_at:now};demoRecurrenceExecutions=[item,...demoRecurrenceExecutions];return {item:structuredClone(item)};}
   const workStatusMatch = path.match(/^\/v1\/practice\/work\/([^/]+)\/status$/);
   if (method === "POST" && workStatusMatch) {
     const body = JSON.parse(String(init?.body || "{}")) as { status: PracticeWorkItem["status"] };
+    if (body.status === "completed" && (demoPracticeTasks.some(task => task.work_item_id === workStatusMatch[1] && task.mandatory !== false && !["completed", "skipped"].includes(task.status)) || demoWorkStages.some(stage => stage.work_item_id === workStatusMatch[1] && !["completed", "skipped"].includes(stage.status)) || demoPracticeReviews.some(review => review.work_item_id === workStatusMatch[1] && !["approved", "completed"].includes(review.status)))) throw new Error("Required tasks, workflow stages and reviews must be complete before work completion");
     demoPracticeWork = demoPracticeWork.map((item) => item.id === workStatusMatch[1] ? { ...item, status: body.status, completed_at: body.status === "completed" ? now : item.completed_at } : item);
     return { item: structuredClone(demoPracticeWork.find((item) => item.id === workStatusMatch[1])) };
   }

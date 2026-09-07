@@ -34,6 +34,14 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Compile the matching DEV backend
+        run: node node_modules/wrangler/bin/wrangler.js deploy --config apps/api/wrangler.dev.jsonc --dry-run --outdir /tmp/practice-dev-worker
+      - name: Retain the backend release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: practice-dev-worker
+          path: /tmp/practice-dev-worker/
+          retention-days: 7
       - name: Guarded production-shaped build
         run: npm run build:production --workspace apps/web
       - name: Resolve the Pages production branch
@@ -55,6 +63,11 @@ jobs:
           fi
           echo "Pages production branch is ${branch}"
           echo "PAGES_PRODUCTION_BRANCH=${branch}" >> "$GITHUB_ENV"
+      - name: Require a matching ready backend before publishing the website
+        env:
+          EXPECTED_RELEASE_SHA: ${{ github.sha }}
+          MAX_WAIT_SECONDS: "600"
+        run: node scripts/practice-dev-preflight.mjs --release
       - name: Publish to Cloudflare Pages
         working-directory: apps/web
         env:

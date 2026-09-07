@@ -19,6 +19,8 @@ test("suite branding and launcher expose only entitled applications", async ({ p
 test("application switching changes navigation and preserves practice context", async ({ page }) => {
   await page.goto("/practice/home");
   await expect(page.getByRole("complementary").getByText("Northstar Accounts Demo", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Team", exact: true })).toHaveAttribute("aria-expanded", "false");
+  await page.getByRole("button", { name: "Team", exact: true }).click();
   await expect(page.getByRole("button", { name: "Resources", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Trial balance", exact: true })).toHaveCount(0);
 
@@ -44,6 +46,11 @@ test("representative sidebar routes keep the shell and expose destination contex
     ["Capacity", "Capacity"],
     ["Portfolio economics", "Portfolio economics"],
   ] as const) {
+    const group = ["Prospects", "Opportunities", "Clients"].includes(button) ? "Clients & CRM" : ["Resources", "Capacity"].includes(button) ? "Team" : button === "Portfolio economics" ? "Insights" : null;
+    if (group) {
+      const category = page.getByRole("navigation", { name: "Practice Management navigation" }).getByRole("button", { name: group, exact: true });
+      if (await category.getAttribute("aria-expanded") !== "true") await category.click();
+    }
     await page.getByRole("button", { name: button, exact: true }).click();
     await expect(shell).toBeVisible();
     await expect(page.getByRole("heading", { name: heading, exact: true })).toBeVisible();

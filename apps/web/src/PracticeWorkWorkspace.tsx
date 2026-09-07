@@ -2,12 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   Button,
   createTableColumn,
-  Dialog,
-  DialogActions,
-  DialogBody,
-  DialogContent,
-  DialogSurface,
-  DialogTitle,
   Field,
   Input,
   MessageBar,
@@ -20,8 +14,8 @@ import { OpenRegular } from "@fluentui/react-icons";
 import {
   api,
   type ApiContext,
-  type PortalContact,
   type PracticeReview,
+  type PracticeTask,
   type PracticeWorkItem,
   type PracticeWorkStage,
   type PracticeWorkStatus,
@@ -44,6 +38,7 @@ import {
 import { formatDate } from "./displayFormat";
 import { statutoryLabel } from "./format";
 import CreatePracticeWorkDialog from "./CreatePracticeWorkDialog";
+import { deliveryNextAction } from "./practice-delivery";
 import "./practice-work-workspace.css";
 
 const workColumnSizing: TableColumnSizingOptions = {
@@ -56,7 +51,7 @@ const workColumnSizing: TableColumnSizingOptions = {
 
 export type WorkSavedView = "my" | "all" | "this-week" | "due-soon" | "overdue" | "waiting-client" | "review";
 
-export type WorkDetail = PracticeWorkItem & { stages?: PracticeWorkStage[]; reviews?: PracticeReview[] };
+export type WorkDetail = PracticeWorkItem & { tasks?: PracticeTask[]; stages?: PracticeWorkStage[]; reviews?: PracticeReview[] };
 
 type Props = {
   context: ApiContext;
@@ -242,72 +237,23 @@ export default function PracticeWorkWorkspace({ context, routeSearch, onNavigate
   </PageShell>;
 }
 
-export function WorkInspector({ context, item, resources, onChanged, onClose, onOpenClient, onOpenLedgerly, onOpenWork }: {
-  context: ApiContext;
-  item: WorkDetail;
-  resources: ResourceProfile[];
-  onChanged: () => Promise<void>;
-  onClose: () => void;
-  onOpenClient?: (id: string) => void;
-  onOpenLedgerly?: (engagementId: string, clientId: string) => void;
-  onOpenWork?: (id: string) => void;
+export function WorkInspector({ item, onClose, onOpenClient, onOpenLedgerly, onOpenWork }: {
+  context: ApiContext; item: WorkDetail; resources: ResourceProfile[]; onChanged: () => Promise<void>; onClose: () => void;
+  onOpenClient?: (id: string) => void; onOpenLedgerly?: (engagementId: string, clientId: string) => void; onOpenWork?: (id: string) => void;
 }) {
-  const [busy, setBusy] = useState("");
-  const [error, setError] = useState("");
-  const [feedback, setFeedback] = useState("");
-  const [dueDate, setDueDate] = useState(item.due_date || "");
-  const [requestOpen, setRequestOpen] = useState(false);
-  useEffect(() => setDueDate(item.due_date || ""), [item.due_date]);
-  useEffect(() => { setError(""); setFeedback(""); setRequestOpen(false); }, [item.id]);
-  const mutate = async (key: string, action: () => Promise<unknown>) => { setBusy(key); setError(""); setFeedback(""); try { await action(); await onChanged(); setFeedback("Work updated."); } catch (reason) { setError(errorText(reason)); } finally { setBusy(""); } };
-  const openStages = (item.stages || []).filter((stage) => !["completed", "skipped"].includes(stage.status));
-  const blocker = openStages.find((stage) => stage.status === "blocked" || stage.block_reason);
-  const review = (item.reviews || []).find((entry) => !["approved", "completed"].includes(entry.status));
-  const nextAction = blocker ? "Resolve blocker" : item.status === "waiting_on_client" ? "Follow up with client" : review ? "Complete review" : item.status === "ready" ? "Start work" : "Continue work";
-  return <WorkingInspector
-    title={item.title}
-    subtitle={`${item.client_name || "Client"} · ${item.service_name || "Service"}`}
-    status={<StatusTreatment value={item.status} />}
-    onClose={onClose}
-    footer={<><Button onClick={() => onOpenWork?.(item.id)}>Open work</Button>{item.specialist_module_key === "ledgerly" && item.specialist_record_reference && onOpenLedgerly && <Button icon={<OpenRegular />} onClick={() => onOpenLedgerly(item.specialist_record_reference!, item.client_id)}>Open in Ledgerly</Button>}</>}
-  >
-    {error && <MessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></MessageBar>}
-    {feedback && <MessageBar intent="success"><MessageBarBody>{feedback}</MessageBarBody></MessageBar>}
+  const next = deliveryNextAction(item);
+  const tasks = item.tasks || [];
+  return <WorkingInspector title={item.title} subtitle={`${item.client_name || "Client"} · ${item.service_name || "Service"}`}
+    status={<StatusTreatment value={item.status} />} onClose={onClose}
+    footer={<><Button appearance="primary" onClick={() => onOpenWork?.(item.id)}>Open work</Button>{item.specialist_module_key === "ledgerly" && item.specialist_record_reference && onOpenLedgerly && <Button icon={<OpenRegular />} onClick={() => onOpenLedgerly(item.specialist_record_reference!, item.client_id)}>Open in Ledgerly</Button>}</>}>
+    <div className="pd-next"><div><h2>{next.title}</h2><p>{next.description}</p></div></div>
     <dl className="pww-facts">
       <div><dt>Client</dt><dd><Button appearance="transparent" onClick={() => onOpenClient?.(item.client_id)}>{item.client_name || "Open client"}</Button></dd></div>
-      <div><dt>Service</dt><dd>{item.service_name || "Service"}</dd></div>
       <div><dt>Owner</dt><dd>{assignmentDisplay(item)}</dd></div>
-      <div><dt>Next action</dt><dd>{nextAction}</dd></div>
-      <div><dt>Blocker</dt><dd>{blocker?.block_reason || (blocker ? blocker.name : "None")}</dd></div>
-      <div><dt>Review</dt><dd>{review ? statutoryLabel(review.status) : "Not waiting"}</dd></div>
+      <div><dt>Due</dt><dd>{date(item.due_date)}</dd></div>
+      <div><dt>Tasks</dt><dd>{tasks.filter(task => ["completed", "skipped"].includes(task.status)).length} of {tasks.length} complete</dd></div>
+      <div><dt>Reviews</dt><dd>{(item.reviews || []).filter(review => !["approved", "completed"].includes(review.status)).length} open</dd></div>
     </dl>
-    <Field label="Assign"><Select value={item.assigned_member_id || ""} disabled={Boolean(busy)} onChange={(_, data) => data.value && void mutate("assign", () => api.reassignWork(context, item.id, { resourceId: data.value }))}><option value="">Unassigned</option>{resources.filter((resource) => resource.status === "active").map((resource) => <option key={resource.id} value={resource.id}>{resource.display_name} · {resource.available_hours}h available</option>)}</Select></Field>
-    <div className="pww-inline-field"><Field label="Due date"><Input type="date" value={dueDate} disabled={Boolean(busy)} onChange={(_, data) => setDueDate(data.value)} /></Field><Button disabled={!dueDate || Boolean(busy)} onClick={() => void mutate("due", () => api.overridePracticeDeadline(context, item.id, dueDate, "Rescheduled from the Work inspector"))}>Reschedule</Button></div>
-    <Field label="Status"><Select value={item.status} disabled={Boolean(busy)} onChange={(_, data) => void mutate("status", () => api.updatePracticeWorkStatus(context, item.id, data.value as PracticeWorkStatus))}>{statusOptions.map((value) => <option key={value} value={value}>{statutoryLabel(value)}</option>)}</Select></Field>
-    <div className="pww-actions">
-      <Button disabled={!openStages.length || Boolean(busy)} onClick={() => { const stage = openStages[0]; if (stage) void mutate("block", () => api.advancePracticeStage(context, stage.id, "blocked", "Blocked from the Work inspector")); }}>Mark blocked</Button>
-      <Button disabled={Boolean(busy)} onClick={() => setRequestOpen(true)}>Request from client</Button>
-      <Button disabled={item.status === "review" || Boolean(busy)} onClick={() => void mutate("review", () => api.updatePracticeWorkStatus(context, item.id, "review"))}>Send to review</Button>
-    </div>
-    {requestOpen && <ClientRequestDialog context={context} item={item} onClose={() => setRequestOpen(false)} onCreated={async () => { setRequestOpen(false); await onChanged(); }} />}
+    <p>Open the work record to manage tasks, assignment, deadlines and review decisions.</p>
   </WorkingInspector>;
-}
-
-function ClientRequestDialog({ context, item, onClose, onCreated }: { context: ApiContext; item: WorkDetail; onClose: () => void; onCreated: () => Promise<void> }) {
-  const [contacts, setContacts] = useState<PortalContact[]>([]);
-  const [recipientId, setRecipientId] = useState("");
-  const [title, setTitle] = useState(`Information needed for ${item.title}`);
-  const [dueAt, setDueAt] = useState(item.due_date || "");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  useEffect(() => { if (!item.engagement_id) return; void api.portalContacts(context, item.engagement_id).then((result) => { const available = result.items.filter((contact) => ["ACTIVE", "INVITED"].includes(contact.accessStatus)); setContacts(available); setRecipientId(available[0]?.id || ""); }).catch((reason) => setError(errorText(reason))); }, [context, item.engagement_id]);
-  async function create() { setBusy(true); setError(""); try { await api.createClientRequest(context, { clientId: item.client_id, engagementId: item.engagement_id || undefined, workItemId: item.id, recipientAccessIds: [recipientId], requestType: "document", title: title.trim(), dueAt: dueAt ? `${dueAt}T17:00:00.000Z` : undefined, send: true, waitingOnClient: true }); await onCreated(); } catch (reason) { setError(errorText(reason)); } finally { setBusy(false); } }
-  return <Dialog open><DialogSurface><DialogBody><DialogTitle>Request from client</DialogTitle><DialogContent className="pww-request-form">
-    {error && <MessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></MessageBar>}
-    {!item.engagement_id ? <p>This work has no client access context. Open the client workspace to configure portal access.</p> : <>
-      <Field label="Recipient"><Select value={recipientId} onChange={(_, data) => setRecipientId(data.value)}><option value="">Select client contact</option>{contacts.map((contact) => <option key={contact.id} value={contact.id}>{contact.displayName} · {contact.email}</option>)}</Select></Field>
-      <Field label="Request"><Input value={title} onChange={(_, data) => setTitle(data.value)} /></Field>
-      <Field label="Due"><Input type="date" value={dueAt} onChange={(_, data) => setDueAt(data.value)} /></Field>
-    </>}
-  </DialogContent><DialogActions><Button onClick={onClose}>Cancel</Button><Button appearance="primary" disabled={busy || !recipientId || !title.trim()} onClick={() => void create()}>{busy ? "Sending…" : "Send request"}</Button></DialogActions></DialogBody></DialogSurface></Dialog>;
 }

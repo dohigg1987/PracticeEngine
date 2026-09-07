@@ -50,6 +50,23 @@ describe("authenticated API boundary", () => {
     vi.stubGlobal("fetch", fetchMock);
   });
 
+  it("uses canonical client access and delivery routes with the tenant header", async () => {
+    const context = { tenantId: "practice-tenant" };
+    await api.clientRequestRecipients(context, "client/one");
+    await api.activateClientService(context, "client/one", { serviceId: "service", startDate: "2026-09-07" });
+    await api.createPracticeTask(context, "work/one", { title: "Prepare", sequence: 1, assigneeMemberId: "preparer" });
+    await api.requestPracticeReview(context, { workItemId: "work/one", taskId: "task", reviewerMemberId: "reviewer" });
+    await api.createPracticeReviewPoint(context, "review/one", "Confirm evidence");
+    await api.updatePracticeReviewPoint(context, "point/one", "addressed", "Evidence attached");
+    expect(call(0).url).toContain("/v1/clients/client%2Fone/portal-access");
+    expect(call(1).url).toContain("/v1/clients/client%2Fone/services");
+    expect(call(2).url).toContain("/v1/practice/work/work%2Fone/tasks");
+    expect(call(3).body).toEqual({ workItemId: "work/one", taskId: "task", reviewerMemberId: "reviewer" });
+    expect(call(4).url).toContain("/v1/practice/reviews/review%2Fone/points");
+    expect(call(5).body).toEqual({ status: "addressed", resolution: "Evidence attached" });
+    for (let index = 0; index < 6; index++) expect(call(index).headers["x-tenant-id"]).toBe("practice-tenant");
+  });
+
   it("uses tenant-scoped session caching only for measured navigation and stable reference reads", () => {
     expect(sessionCacheTtlForPath("/v1/practice/resources")).toBe(300_000);
     expect(sessionCacheTtlForPath("/v1/platform/teams")).toBe(300_000);

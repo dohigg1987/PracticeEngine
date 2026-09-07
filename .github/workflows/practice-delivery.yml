@@ -1,0 +1,36 @@
+name: Practice delivery checks
+on:
+  pull_request:
+    paths:
+      - 'apps/web/src/PracticeWorkDetail.tsx'
+      - 'apps/api/src/practice-management.ts'
+      - '.github/workflows/practice-delivery.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: practice-delivery-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  dev_preflight:
+    name: DEV backend preflight
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Validate DEV Worker
+        run: node node_modules/wrangler/bin/wrangler.js deploy --config apps/api/wrangler.dev.jsonc --dry-run --outdir /tmp/practice-dev-dry-run
+      - name: Upload compiled DEV Worker
+        uses: actions/upload-artifact@v4
+        with:
+          name: practice-dev-worker
+          path: /tmp/practice-dev-dry-run/
+          retention-days: 7
+      - name: Check DEV configuration and public readiness
+        run: node scripts/practice-dev-preflight.mjs

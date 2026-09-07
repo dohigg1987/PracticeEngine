@@ -1,47 +1,44 @@
-# PracticeEngine implementation quality review
+# PracticeEngine delivery foundations review
 
-Reviewed main at a288e35 and the newer development line at df70cc8. Implementation targets environment/dev-integrated to preserve its existing navigation, client workspace and CRM improvements. The historical platform/modular-practice-foundation branch is no longer present.
+This increment targets `environment/dev-integrated` and https://practiceengine-dev.pages.dev. Practice Management owns the changed capabilities; existing suite and Ledgerly boundaries remain intact.
 
-## Fixed in this change
+## Problems and resulting behavior
 
-- Full work details existed only in React state. Refresh, browser history and navigation to Review could display a different screen from the URL. Work details now use the work query parameter, preserve queue filters and selection, and reset by tenant and work identity.
-- A failed work selection retained the previous inspector's actionable record. Selection loads now clear stale details, report missing records separately, and reject superseded responses. Client delivery also checks the selected work belongs to the displayed client.
-- Due soon included completed/cancelled work and past dates. It now contains only unfinished work between today and the seven-day horizon.
-- My work actually meant any assigned work. The label is now Assigned work; All work is the default. Personal filtering requires an authenticated tenant-member identity contract.
-- Add work in the queue navigated to a client list. A shared Fluent dialog now creates work in place, supports client/service selection, and opens the created record. Engagement selection is explicit; the previous client dialog silently chose the first active engagement.
-- Saved views and command bars imitated tabs/toolbars with custom buttons/divs. They now use Fluent TabList/Tab and Toolbar/ToolbarGroup. Grid links retain modified-click behavior and avoid an extra focus stop.
-- Mobile navigation used an inline drawer positioned by CSS. It now uses Fluent overlay mode with dismissal, focus containment and an accessible close control.
-- Changing a Ledgerly engagement did not update the URL; moving between Ledgerly screens discarded deep-link context. Both now preserve the selected client and engagement.
-- Resource-list failure prevented work from loading. Assignment options now fail independently with retry while the work queue remains usable.
-- The client workspace Details area had replaced the working permanent file with a read-only summary. It now exposes the existing permanent-file editor within the client workspace. The regression test follows Services, Delivery and Details in the current navigation.
-- Home deadline links now retain the intended calendar-week boundary, and editing a filter replaces its history entry instead of adding a browser Back stop for every character.
-- The remote quality workflow did not compile a production web build or run the Fluent/header guards. Those checks now accompany the existing fast and browser gates.
+The work queue previously opened competing detail surfaces, while review buttons could change a work status without creating an operational review. The new delivery record connects tasks, workflow and reviews, presents the next available action, and requires actual review targets and reviewers. Review points can be addressed, cleared or reopened. Rescheduling and requested changes collect the operator's reason.
 
-## Remaining implementation gaps
+The server now returns flat review records, validates that a review target belongs to the same work and tenant, rejects duplicate active reviews, and updates the work status and review with their audit events in one transaction. Mandatory unfinished tasks block completion. Closed work rejects new tasks and reviews. Existing permission and override checks remain authoritative.
 
-- UI smoke tests rely heavily on development showcase data. They do not prove authenticated production behavior, real database permissions, cross-tenant denial, outbox delivery or live portal recipient access.
-- Client requests from the work inspector use legacy portal-contact identifiers as recipientAccessIds. The new collaboration endpoint expects scoped access records; this needs a verified API adapter and authenticated integration fixture before that workflow can be considered complete.
-- Review and workflow commands still supply generic blocker/change-request reasons instead of collecting specific evidence from the user.
-- Template and automation configuration is shallow: publishing/toggling existing records is present, but complete authoring and validation journeys need further work.
-- Global CSS debt remains outside the changed component patterns. Existing open PRs #2 and #11 should be assessed against this development head before integration.
+Client service activation is reachable from Services and Add work. Client requests select canonical portal client-access records, including client-wide recipients without an engagement. Requests, access records and messages load independently. Home can show delivery work when secondary financial or capacity data fails.
 
-## Verification and release
+Fluent React v9 dialogs, fields, tabs, tables and semantic tokens provide the interaction primitives. The record reflows at 320px; touch targets and keyboard focus are covered by browser checks. Earlier queue URL/history, missing-record, navigation, focus and contrast corrections remain intact.
 
-GitHub Actions is authoritative for this change. See the pull request checks for exact attempts, failures and results; source inspection is not a substitute for executed evidence. No live database or regulator service was used. The earlier main baseline domain/API suites passed before work switched to GitHub-only execution.
+## Executed evidence and limits
 
-All capabilities remain owned by Practice Management or their existing suite/Ledgerly owners. Existing server commands continue enforcing tenancy, authorization, entitlements and audit. There are no schema, production-data or deployment changes. Rollback is a revert of this pull request.
+At 9df3483, the remote non-browser checks and web build passed, the focused work/delivery browser job passed, and the 21-surface accessibility job passed. The complete task → review point → approval → completion journey, client service activation, portal recipient selection and deadline reasons were exercised.
 
-### Executed attempts
+Actual route-handler tests use a controlled transaction adapter to test mandatory task completion gates, override permission, closed work, cross-work review targets, duplicate reviews, transactional audit writes and flat review DTOs. These do not claim live database/RLS coverage. Browser journeys use showcase fixtures and do not prove authenticated live behavior, real outbox delivery or portal authorization. The exact final `verify` and `verify:pilot` commands run in GitHub Actions; the PR checks are authoritative for the final revision.
 
-- The first remote build (a0580d0) passed strict checks, 141 web tests, 184 API tests, the Fluent/header guards and a production build. Its browser run was superseded by the permanent-file correction.
-- At 1f6447e, the 21-surface accessibility audit passed. The focused browser suite passed refresh/history, tab keyboard selection, missing-record handling and capture, and exposed a required-field locator mismatch plus the overlay drawer's inherited navigation role. These are corrected in the next revision. Existing Practice tests also used obsolete DOM value selectors; they now select the visible navigation controls.
-- The final-verification workflow runs the repository's exact `verify` and `verify:pilot` commands remotely, in addition to the diagnostic quality jobs. It is triggered by this review document or manually for future release reviews; the normal quality workflow still covers every pull request.
+## Release
 
-- Remote screenshots exposed invisible neutral badges: Fluent's outline/subtle combination uses an inverted foreground. The shared treatment now uses outline/informative, with a browser contrast regression. The mobile dismissal test also exposed missing restore-focus attributes; the navigation button and drawer now use Fluent's public restore-focus hooks.
-- The broader browser run found a pre-existing Home test tied to the removed Attention required panel and Deadline select. It now exercises the current priority grid, capacity/economics links and opening work. Home's inspector also clears selection before loading, checks the selected work identity and resets on tenant changes.
-- Mobile focus restoration and neutral badge contrast passed on 2957039. The subsequent scan found a transient restored-focus tooltip outside page landmarks; tests now dismiss it through its normal Escape behavior before the page audit. Creation dialogs also declare their Fluent focus source and return target, with an Escape regression test.
-- The Settings keyboard audit now waits for the closing Fluent drawer and its tooltip to finish dismissing before scanning. Its prior failures sampled the drawer during the opacity animation, rather than the destination's settled state.
-- The full-suite inspection found four more obsolete Contacts & permanent file tab selectors in responsive and pilot coverage. These now use the client Details area, retain the original editor/reflow/accessibility assertions, and verify that the editor's Clients action returns to the client register.
-- Client workspaces reset with tenant and client identity, so an open Add work dialog cannot carry the previous client's summary into another record.
+The live DEV website had advanced while its backend remained on 6fe19a0. The existing GitHub Cloudflare credential can publish Pages but returned 403 for Worker metadata. The existing authorised Wrangler session successfully verified the actual DEV origin, R2 and Hyperdrive bindings.
 
-- At 798aaa0, the exact full verification completed with 188 browser tests passed, one skipped and one failed; both pilot shards reproduced only the same defect. The portalled mobile drawer lost the old sidebar's touch-target sizing and rendered navigation items at 40px. Its own public classes now enforce the existing 44px target requirement for items, categories and the close button; the focused mobile checks assert these bounds too. The 21-surface accessibility audit and nine focused work tests passed at that revision.
+GitHub now retains the compiled DEV Worker artifact for the source commit. Backend publication must use that artifact, preserve existing bindings and secrets, and set APP_VERSION to the release commit. Website publication waits for that exact backend version and readiness; it fails instead of publishing against an older backend. Automated Worker publication still requires the existing CI credential to receive Worker deployment scope; the website gate does not grant that scope.
+
+No checkout, dependency install, build output or new temporary files were created on the user's computer. Source edits and tests run in GitHub; remote artifacts can be handled in memory for publication. No database migration is part of this increment. Rollback requires reverting the change and publishing the corresponding backend before its website.
+
+## Remaining work
+
+- Authenticated live acceptance across real roles, tenant boundaries and scoped portal recipients remains separate from fixture coverage.
+- Client request recipient listing currently follows the server's portal-access permission contract; request-only roles may need a dedicated, appropriately authorised recipient endpoint.
+- Template/automation authoring and validation remain shallow.
+- Global styling and broader information architecture outside the delivery journey need further work.
+
+## Visual hierarchy follow-up
+
+Practice Management owns this presentation update. The work record now puts the client, status and due date in a compact header, keeps the task/review journey in the main column, and moves editable work information into a supporting desktop pane. Narrow task rows expose their status and actions without horizontal scrolling. Fluent progress, avatars, system icons, tabs, navigation and accordion components retain their public semantics.
+
+The Practice shell uses a neutral workspace canvas and one content surface. Its Fluent navigation no longer inherits legacy custom button/grid overrides, starts with the relevant group expanded, and indicates the current group. Re-selecting the current Practice route avoids duplicate browser history. Home queue counts are navigable operational summaries. The specialist application shell and authentication contracts are preserved.
+
+Visual review is performed on GitHub-generated desktop, 390px and 320px screenshots, alongside focused delivery/navigation tests, keyboard restoration, accessibility, forced-colour and text-spacing checks. The first visual pass found excess mobile cell heights and unspaced Home counts; those were corrected. The initial preview test run also exposed an ambiguous Team selector and a stale preview-only deadline assertion; selectors now address the navigation region and the saved date is checked by reopening the form. Final revision status is recorded in PR checks.
+
+No tenant, entitlement, audit, API or database contract changes are introduced by this follow-up. Rollback is the reverse of the presentation commit and its companion browser-test changes. The existing backend publication blocker still applies; the separately guarded preview uses sample data only.

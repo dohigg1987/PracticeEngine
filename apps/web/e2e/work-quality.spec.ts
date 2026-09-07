@@ -9,13 +9,14 @@ test("full work details survive refresh, history and switching work sections", a
   await expect(page.getByRole("heading", { name: "2026 Annual Accounts", exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByRole("heading", { name: "2026 Annual Accounts", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await page.getByRole("button", { name: "Back to work", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Work", exact: true })).toBeVisible();
   await expect(page.getByLabel("Search", { exact: true })).toHaveValue("annual");
   await page.goBack();
   await expect(page.getByRole("heading", { name: "2026 Annual Accounts", exact: true })).toBeVisible();
   const navigation = page.getByRole("navigation", { name: "Practice Management navigation" });
-  await navigation.getByRole("button", { name: "Work", exact: true }).click();
+  const workCategory = navigation.getByRole("button", { name: "Work", exact: true });
+  if (await workCategory.getAttribute("aria-expanded") !== "true") await workCategory.click();
   await navigation.getByRole("button", { name: "Review", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Review queue", exact: true })).toBeVisible();
   await page.reload();

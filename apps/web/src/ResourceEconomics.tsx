@@ -1,3 +1,5 @@
+import CreatePracticeWorkDialog from "./CreatePracticeWorkDialog";
+import { workViewItems } from "./PracticeWorkWorkspace";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Badge,
@@ -239,15 +241,31 @@ export const resourceAllocationPath = (resourceName: string) => `/practice/work-
 
 export function practiceHomeNextAction(overview: PracticeEconomicsOverview): string {
   const next = practiceHomeQueues(overview).find((item) => item.value > 0);
-  return next ? `${next.label}: ${next.value} item${next.value === 1 ? "" : "s"} need attention.` : "No delivery exceptions need immediate attention.";
+  return next ? `${next.label}: ${next.value} item${next.value === 1 ? " needs" : "s need"} attention.` : "No delivery exceptions need immediate attention.";
 }
 
 function ManagementView({ context, onNavigate, routeSearch, onOpenWork }: Omit<Props, "view">) {
   const [overview, setOverview] = useState<PracticeEconomicsOverview | null>(null), [work, setWork] = useState<PracticeWorkItem[]>([]), [resources, setResources] = useState<ResourceProfile[]>([]), [portfolio, setPortfolio] = useState<PortfolioEconomicsRow[]>([]), [selected, setSelected] = useState<WorkDetail | null>(null), [loading, setLoading] = useState(true), [error, setError] = useState("");
+  const [addingWork, setAddingWork] = useState(false);
+  const [secondaryError, setSecondaryError] = useState("");
   const selectedId = useMemo(() => new URLSearchParams(routeSearch || "").get("selected") || "", [routeSearch]);
   const selectedRef = useRef(selectedId);
   selectedRef.current = selectedId;
-  const load = useCallback(async () => { setLoading(true); setError(""); try { const [nextOverview, nextWork, nextResources, nextPortfolio] = await Promise.all([api.practiceEconomicsOverview(context), api.practiceWork(context), api.resourceProfiles(context), api.portfolioEconomics(context)]); setOverview(nextOverview); setWork(nextWork.items); setResources(nextResources.items); setPortfolio(nextPortfolio.items); } catch (reason) { setError(errorText(reason)); } finally { setLoading(false); } }, [context]);
+  const load = useCallback(async () => {
+    setLoading(true); setError(""); setSecondaryError("");
+    const results = await Promise.allSettled([api.practiceWork(context), api.resourceProfiles(context), api.portfolioEconomics(context)]);
+    const [nextWork, people, economics] = results;
+    if (nextWork.status === "fulfilled") {
+      const items = nextWork.value.items; setWork(items);
+      setOverview({ overdue_work: workViewItems(items, "overdue").length, due_this_week: workViewItems(items, "this-week").length,
+        waiting_on_client: workViewItems(items, "waiting-client").length, review_queue: workViewItems(items, "review").length,
+        capacity_utilisation_percentage: 0, forecast_capacity_hours: 0, economic_exceptions: 0 });
+    } else setError(errorText(nextWork.reason));
+    setResources(people.status === "fulfilled" ? people.value.items : []);
+    setPortfolio(economics.status === "fulfilled" ? economics.value.items : []);
+    if (people.status === "rejected" || economics.status === "rejected") setSecondaryError("Some capacity or economic information is unavailable. Your work queue is still available.");
+    setLoading(false);
+  }, [context]);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { let live = true; setSelected(null); if (!selectedId) { return () => { live = false; }; } void api.practiceWorkItem(context, selectedId).then((result) => { if (live) setSelected(result.item); }).catch((reason) => { if (live) setError(errorText(reason)); }); return () => { live = false; }; }, [context, selectedId]);
   if (loading) return <LoadingState title="Home" description="Delivery exceptions, review demand and capacity across the practice." kind="grid" />;
@@ -255,7 +273,7 @@ function ManagementView({ context, onNavigate, routeSearch, onOpenWork }: Omit<P
   const navigateLink = (path: string) => onNavigate ? (event: React.MouseEvent<HTMLAnchorElement>) => { event.preventDefault(); onNavigate(path); } : undefined;
   const openSelected = (id: string) => onNavigate?.(`/practice/home?selected=${encodeURIComponent(id)}`);
   const urgent = [...work].filter((item) => !["completed", "cancelled"].includes(item.status)).sort((a, b) => {
-    const rank = (item: PracticeWorkItem) => item.status === "waiting_on_client" ? 1 : item.status === "review" ? 2 : item.priority === "urgent" ? 3 : 4;
+    const rank = (item: PracticeWorkItem) => workViewItems([item], "overdue").length ? 0 : item.priority === "urgent" ? 1 : item.status === "review" ? 2 : !item.assigned_member_id && !item.assigned_member_name ? 3 : item.status === "waiting_on_client" ? 4 : 5;
     return rank(a) - rank(b) || (a.due_date || "9999").localeCompare(b.due_date || "9999");
   }).slice(0, 8);
   const priorityColumns: TableColumnDefinition<PracticeWorkItem>[] = [
@@ -268,16 +286,19 @@ function ManagementView({ context, onNavigate, routeSearch, onOpenWork }: Omit<P
   const economicExceptions = portfolio.filter((item) => item.commercial_value_state === "unavailable" || item.overdue_work > 0);
   const inspector = selected && selected.id === selectedId ? <WorkInspector key={`${context.tenantId}:${selected.id}`} context={context} item={selected} resources={resources} onChanged={async () => { await load(); const result = await api.practiceWorkItem(context, selected.id); if (selectedRef.current === selected.id) setSelected(result.item); }} onClose={() => onNavigate?.("/practice/home")} onOpenClient={(id) => onNavigate?.(`/practice/clients?client=${encodeURIComponent(id)}&return=${encodeURIComponent(`/practice/home?selected=${selected.id}`)}`)} onOpenWork={onOpenWork} /> : undefined;
   return <PageShell className="re-home">
-    <PageHeader title="Home" description="What needs attention now." meta={<span className="re-home-next">{practiceHomeNextAction(overview)}</span>} />
+    <PageHeader title="Home" description="Plan today. Keep client work moving." meta={<span className="re-home-next">{practiceHomeNextAction(overview)}</span>} primaryAction={<Button appearance="primary" onClick={() => setAddingWork(true)}>Add work</Button>} secondaryActions={<Button onClick={() => onNavigate?.("/practice/clients")}>Open clients</Button>} />
+    <nav className="re-home-queue-bar" aria-label="Delivery queues">{practiceHomeQueues(overview).map(queue => <Link className="re-home-queue-link" key={queue.label} href={queue.path} onClick={navigateLink(queue.path)}><span>{queue.label}</span><strong>{queue.value}</strong></Link>)}</nav>
+    {secondaryError && <MessageBar intent="warning"><MessageBarBody>{secondaryError}</MessageBarBody></MessageBar>}
     {error && <ErrorState title="Some home data may be out of date" message={error} retry={load} />}
     <MasterDetailWorkspace selected={Boolean(inspector)} inspector={inspector} className="re-home-workspace">
       <div className="re-home-command-centre">
-        <section className="re-home-section" aria-labelledby="home-priority-title"><header><h2 id="home-priority-title">Priority work</h2><Link href="/practice/work" onClick={navigateLink("/practice/work")}>Open Work</Link></header><OperationalDataGrid items={urgent} columns={priorityColumns} label="Home priority work" getRowId={(item) => item.id} primaryColumnId="work" getItemHref={(item) => `/practice/home?selected=${item.id}`} onOpenItem={(item) => openSelected(item.id)} empty={<EmptyState title="No work needs attention" description="There are no current delivery exceptions." />} /></section>
+        <section className="re-home-section" aria-labelledby="home-priority-title"><header><h2 id="home-priority-title">Priority work</h2><Link href="/practice/work" onClick={navigateLink("/practice/work")}>Open Work</Link></header><OperationalDataGrid items={urgent} columns={priorityColumns} label="Home priority work" getRowId={(item) => item.id} primaryColumnId="work" getItemHref={(item) => `/practice/home?selected=${item.id}`} onOpenItem={(item) => openSelected(item.id)} empty={<EmptyState title="No open work" description="Add work for an active client service to start planning delivery." />} /></section>
         <div className="re-home-exceptions">
           <section className="re-home-section" aria-labelledby="home-capacity-title"><header><h2 id="home-capacity-title">Capacity exceptions</h2><Link href="/practice/capacity" onClick={navigateLink("/practice/capacity")}>Open Team</Link></header><ul className="re-home-records">{capacityExceptions.map((item) => <li key={item.id}><span><strong>{item.display_name}</strong><small>{item.team_name || "No team"} · {hours(item.available_hours)} available</small></span><b>{Math.round(item.utilisation_percentage)}%</b></li>)}</ul></section>
           <section className="re-home-section" aria-labelledby="home-economics-title"><header><h2 id="home-economics-title">Economic exceptions</h2><Link href="/practice/portfolio-economics" onClick={navigateLink("/practice/portfolio-economics")}>Open Insights</Link></header><ul className="re-home-records">{economicExceptions.map((item) => <li key={item.id}><span><strong>{item.client_name}</strong><small>{item.service_name || "Portfolio"}</small></span><StatusTreatment value={item.commercial_value_state} /></li>)}</ul></section>
         </div>
       </div>
     </MasterDetailWorkspace>
+    {addingWork && <CreatePracticeWorkDialog context={context} onClose={() => setAddingWork(false)} onCreated={async id => { setAddingWork(false); onOpenWork?.(id); }} />}
   </PageShell>;
 }
