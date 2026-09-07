@@ -1999,6 +1999,7 @@ function AccountsWorkspace({
             </RoutePanelBoundary>
           ) : workspacePage === "clients" ? (
             <ClientsView
+              key={context.tenantId}
               context={context}
               items={organisations}
               engagements={engagements}
@@ -3020,6 +3021,7 @@ function ClientsView({
     return (
       <section className="pm-page">
         <PracticeManagement
+          key={`${context.tenantId}:${selectedOrganisationId}`}
           view="client-summary"
           context={context}
           clientId={selectedOrganisationId}
