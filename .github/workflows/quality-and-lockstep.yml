@@ -23,6 +23,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run verify:fast
+      - run: npm run test:ui-quality --workspace apps/web
+      - run: npm run test:headers --workspace apps/web
+      - run: npm run build --workspace apps/web
 
   chromium_e2e:
     name: Chromium functional E2E (shard ${{ matrix.shard }}/2)
