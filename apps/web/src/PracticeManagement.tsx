@@ -14,6 +14,7 @@ import {
 import { formatDate } from "./displayFormat";
 import { statutoryLabel } from "./format";
 import { CommandBar, ErrorState, PageHeader, PersistentClientFrame, StatusTreatment } from "./CanonicalPatterns";
+import ClientPermanentFile from "./ClientPermanentFile";
 import CreatePracticeWorkDialog from "./CreatePracticeWorkDialog";
 import ClientCollaboration from "./ClientCollaboration";
 import PracticeWorkWorkspace, { WorkInspector, type WorkDetail } from "./PracticeWorkWorkspace";
@@ -183,7 +184,7 @@ function WorkDetail({ context, workItemId = "", onBack, onOpenClient, onOpenLedg
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
-  const load = useCallback(async () => { if (!workItemId) return; setLoading(true); setError(""); try { const [work, taskData] = await Promise.all([api.practiceWorkItem(context, workItemId), api.practiceTasks(context, workItemId)]); setItem(work.item); setTasks(taskData.items.sort((a,b) => a.sequence-b.sequence));setStages((work.item.stages||[]).sort((a,b)=>a.sequence-b.sequence));setReviews(work.item.reviews||[]); } catch (e) { setError(errorText(e)); } finally { setLoading(false); } }, [context, workItemId]);
+  const load = useCallback(async () => { if (!workItemId) return; setLoading(true); setError(""); try { const [work, taskData] = await Promise.all([api.practiceWorkItem(context, workItemId), api.practiceTasks(context, workItemId)]); if (!work.item) throw new Error("Work item not found."); setItem(work.item); setTasks(taskData.items.sort((a,b) => a.sequence-b.sequence));setStages((work.item.stages||[]).sort((a,b)=>a.sequence-b.sequence));setReviews(work.item.reviews||[]); } catch (e) { setError(errorText(e)); } finally { setLoading(false); } }, [context, workItemId]);
   useEffect(() => { void load(); }, [load]);
   async function setWorkStatus(status: PracticeWorkStatus) { setBusy("work"); try { await api.updatePracticeWorkStatus(context, workItemId, status); await load(); } catch (e) { setError(errorText(e)); } finally { setBusy(""); } }
   async function setTaskStatus(id: string, status: PracticeTask["status"]) { setBusy(id); try { await api.updatePracticeTaskStatus(context, id, status); await load(); } catch (e) { setError(errorText(e)); } finally { setBusy(""); } }
@@ -251,7 +252,7 @@ function ClientSummary({ context, clientId = "", onOpenWork, onOpenLedgerly, onB
     {workspace.area === "documents" && <ClientCollaboration context={context} clientId={clientId} engagementIds={summary.engagements.map((item) => item.id)} embedded initialTab="documents" />}
     {workspace.area === "economics" && <section className="pm-client-section"><header><h2>Economics</h2></header><div className="pm-client-muted"><strong>Service economics remain source-led.</strong><span>Open Insights for portfolio values and data exceptions.</span><Button onClick={() => onNavigate?.("/practice/portfolio-economics")}>Open Insights</Button></div></section>}
     {workspace.area === "activity" && <section className="pm-client-section"><header><h2>Recent activity</h2></header><ol className="pm-client-activity">{[...summary.workItems].sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || "")).map((item) => <li key={item.id}><span><strong>{item.title}</strong><small>{item.updated_at ? date(item.updated_at) : "Current"}</small></span><Status value={item.status} /></li>)}</ol></section>}
-    {workspace.area === "details" && <section className="pm-client-section"><header><h2>Client details</h2></header><dl className="pm-facts"><div><dt>Legal name</dt><dd>{clientName}</dd></div><div><dt>Active services</dt><dd>{summary.services.filter((item) => item.status === "active").length}</dd></div><div><dt>Onboarding</dt><dd>{summary.onboarding ? label(summary.onboarding.status) : "Complete"}</dd></div><div><dt>Portal access</dt><dd>Managed in Collaboration</dd></div></dl></section>}
+    {workspace.area === "details" && <ClientPermanentFile context={context} organisationId={clientId} onBack={() => update({ area: "overview" })} onOpenEngagement={engagementId => onOpenLedgerly?.(engagementId, clientId)} />}
     {addingWork && <CreatePracticeWorkDialog context={context} summary={summary} onClose={() => setAddingWork(false)} onCreated={async (id) => { setAddingWork(false); await load(); update({ area: "delivery", selected: id }); }} />}
   </PersistentClientFrame>;
 }

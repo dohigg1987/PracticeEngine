@@ -119,3 +119,10 @@ describe("Work queue correctness regressions", () => {
     expect(workWorkspaceState("?due=overdue").view).toBe("overdue");
   });
 });
+
+it("bounds the Home due-this-week queue to Sunday rather than a rolling week", () => {
+  const now = new Date("2027-05-07T12:00:00");
+  const cases = [{ ...items[0], id: "sunday", due_date: "2027-05-09" }, { ...items[0], id: "monday", due_date: "2027-05-10" }];
+  expect(workWorkspaceState("?due=this-week").view).toBe("this-week");
+  expect(workViewItems(cases, "this-week", now).map(item => item.id)).toEqual(["sunday"]);
+});

@@ -53,14 +53,14 @@ const workColumnSizing: TableColumnSizingOptions = {
   priority: { minWidth: 72, idealWidth: 84 },
 };
 
-export type WorkSavedView = "my" | "all" | "due-soon" | "overdue" | "waiting-client" | "review";
+export type WorkSavedView = "my" | "all" | "this-week" | "due-soon" | "overdue" | "waiting-client" | "review";
 
 export type WorkDetail = PracticeWorkItem & { stages?: PracticeWorkStage[]; reviews?: PracticeReview[] };
 
 type Props = {
   context: ApiContext;
   routeSearch?: string;
-  onNavigate?: (path: string) => void;
+  onNavigate?: (path: string, replace?: boolean) => void;
   onOpenClient?: (id: string) => void;
   onOpenLedgerly?: (engagementId: string, clientId: string) => void;
   onOpenWork?: (id: string) => void;
@@ -85,9 +85,9 @@ const filterWork = (items: PracticeWorkItem[], state: ReturnType<typeof workWork
 
 export function workWorkspaceState(search = "") {
   const parameters = new URLSearchParams(search);
-  const requestedView = parameters.get("view") || (parameters.get("due") === "overdue" ? "overdue" : parameters.get("due") === "this-week" ? "due-soon" : "all");
+  const requestedView = parameters.get("view") || (parameters.get("due") === "overdue" ? "overdue" : parameters.get("due") === "this-week" ? "this-week" : "all");
   return {
-    view: (["my", "all", "due-soon", "overdue", "waiting-client", "review"].includes(requestedView) ? requestedView : "all") as WorkSavedView,
+    view: (["my", "all", "this-week", "due-soon", "overdue", "waiting-client", "review"].includes(requestedView) ? requestedView : "all") as WorkSavedView,
     query: parameters.get("q") || "",
     status: statusOptions.includes(parameters.get("status") as PracticeWorkStatus) ? parameters.get("status")! : "",
     priority: ["urgent", "high", "normal", "low"].includes(parameters.get("priority") || "") ? parameters.get("priority")! : "",
@@ -102,7 +102,7 @@ export function workWorkspaceState(search = "") {
 
 export function workViewItems(items: PracticeWorkItem[], view: WorkSavedView, now = new Date()) {
   const start = new Date(now); start.setHours(0, 0, 0, 0);
-  const dueSoonEnd = new Date(now); dueSoonEnd.setHours(23, 59, 59, 999); dueSoonEnd.setDate(dueSoonEnd.getDate() + 7);
+  const dueSoonEnd = new Date(now); dueSoonEnd.setHours(23, 59, 59, 999); dueSoonEnd.setDate(dueSoonEnd.getDate() + (view === "this-week" ? 6 - ((now.getDay() + 6) % 7) : 7));
   return items.filter((item) => {
     if (view === "all") return true;
     if (view === "my") return Boolean(item.assigned_member_id || safeAssignmentName(item.assigned_member_name));
@@ -175,7 +175,7 @@ export default function PracticeWorkWorkspace({ context, routeSearch, onNavigate
     return () => { live = false; };
   }, [context, urlState.selected, detailRevision]);
 
-  const updateUrl = (changes: Record<string, string>) => onNavigate?.(selectedWorkPath(routeSearch, changes));
+  const updateUrl = (changes: Record<string, string>) => onNavigate?.(selectedWorkPath(routeSearch, changes), !("selected" in changes || "view" in changes));
   const clearFilters = () => updateUrl({ q: "", status: "", priority: "", client: "", service: "", assignee: "", team: "", sort: "due" });
   const byView = useMemo(() => workViewItems(items, urlState.view), [items, urlState.view]);
   const visible = useMemo(() => {
@@ -186,7 +186,7 @@ export default function PracticeWorkWorkspace({ context, routeSearch, onNavigate
   const services = useMemo(() => [...new Map(items.map((item) => [item.client_service_id, item.service_name || "Service"])).entries()], [items]);
   const teams = useMemo(() => [...new Map(items.filter((item) => item.assigned_team_name).map((item) => [item.assigned_team_id || item.assigned_team_name!, item.assigned_team_name!])).entries()], [items]);
   const views = useMemo(() => ([
-    ["my", "Assigned work"], ["all", "All work"], ["due-soon", "Due soon"], ["overdue", "Overdue"], ["waiting-client", "Waiting on client"], ["review", "Review"],
+    ["my", "Assigned work"], ["all", "All work"], ["this-week", "Due this week"], ["due-soon", "Due soon"], ["overdue", "Overdue"], ["waiting-client", "Waiting on client"], ["review", "Review"],
   ] as const).map(([value, label]) => ({ value, label, count: workViewItems(items, value).length })), [items]);
 
   if (loading) return <LoadingState title="Work" description="Delivery queues and actions." />;
@@ -209,7 +209,7 @@ export default function PracticeWorkWorkspace({ context, routeSearch, onNavigate
 
   return <PageShell className="pww-page">
     <PageHeader title="Work" description="Delivery queues and actions." primaryAction={<Button appearance="primary" onClick={() => setAddingWork(true)}>Add work</Button>} />
-    <SavedViewBar views={views} selectedValue={urlState.view} onSelect={(view) => updateUrl({ view, selected: "" })} />
+    <SavedViewBar views={views} selectedValue={urlState.view} onSelect={(view) => updateUrl({ view, due: "", selected: "" })} />
     <CommandBar><Button appearance="subtle" onClick={() => void load()}>Refresh</Button></CommandBar>
     {error && <ErrorState title="Some work data may be out of date" message={error} retry={load} />}
     {resourceError && <MessageBar intent="warning"><MessageBarBody>{resourceError}</MessageBarBody><Button appearance="transparent" onClick={() => void load()}>Retry</Button></MessageBar>}

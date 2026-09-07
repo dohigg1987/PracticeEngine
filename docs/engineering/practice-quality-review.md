@@ -13,6 +13,8 @@ Reviewed main at a288e35 and the newer development line at df70cc8. Implementati
 - Mobile navigation used an inline drawer positioned by CSS. It now uses Fluent overlay mode with dismissal, focus containment and an accessible close control.
 - Changing a Ledgerly engagement did not update the URL; moving between Ledgerly screens discarded deep-link context. Both now preserve the selected client and engagement.
 - Resource-list failure prevented work from loading. Assignment options now fail independently with retry while the work queue remains usable.
+- The client workspace Details area had replaced the working permanent file with a read-only summary. It now exposes the existing permanent-file editor within the client workspace. The regression test follows Services, Delivery and Details in the current navigation.
+- Home deadline links now retain the intended calendar-week boundary, and editing a filter replaces its history entry instead of adding a browser Back stop for every character.
 - The remote quality workflow did not compile a production web build or run the Fluent/header guards. Those checks now accompany the existing fast and browser gates.
 
 ## Remaining implementation gaps

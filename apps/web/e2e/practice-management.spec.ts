@@ -18,7 +18,7 @@ test("practice work supports operational filtering", async ({ page }) => {
   await expect(page.getByRole("grid", { name: "Practice work" })).toBeVisible();
   await page.getByRole("textbox", { name: "Search" }).fill("Annual accounts");
   await expect(page.getByText("1 work item", { exact: true })).toBeVisible();
-  await expect(page.getByRole("row", { name: /Northstar.*Annual accounts.*2026 Annual Accounts/ })).toBeVisible();
+  await expect(page.getByRole("row").filter({ hasText: "2026 Annual Accounts" }).filter({ hasText: "Northstar" })).toBeVisible();
 });
 
 test("practice work status treatments remain inside their Fluent badge", async ({ page }) => {
@@ -83,10 +83,12 @@ test("clients are created through the canonical Practice client command", async 
 test("client record joins delivery overview and permanent-file context", async ({ page }) => {
   await page.goto("/practice/clients");
   await page.getByRole("button", { name: "Northstar Community Foundation" }).click();
-  await expect(page.getByRole("tab", { name: "Overview & delivery" })).toBeVisible();
+  const areas = page.getByRole("navigation", { name: "Client workspace areas" });
+  await areas.getByRole("button", { name: "Services", exact: true }).click();
   await expect(page.getByRole("table", { name: "Client services" })).toBeVisible();
+  await areas.getByRole("button", { name: "Delivery", exact: true }).click();
   await expect(page.getByRole("table", { name: "Client work" })).toContainText("2026 Annual Accounts");
-  await page.getByRole("tab", { name: "Contacts & permanent file" }).click();
+  await areas.getByRole("button", { name: "Details", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Legal and registered details" })).toBeVisible();
 });
 
@@ -116,7 +118,8 @@ test("recurring work exposes the operational schedule table", async ({ page }) =
 
 test("workflow detail exposes stages blockers and operational review points",async({page})=>{
   await start(page);await openNav(page);await page.locator('button[value="work"]').click();
-  await page.getByRole("button",{name:/2026 Annual Accounts/}).click();
+  await page.getByRole("link",{name:/2026 Annual Accounts/}).click();
+  await page.getByRole("complementary", { name: "Selected record inspector" }).getByRole("button", { name: "Open work", exact: true }).click();
   await expect(page.getByRole("table",{name:"Operational workflow stages"})).toContainText("Partner review");
   await expect(page.getByRole("table",{name:"Work tasks"})).toContainText("Review");
   await expect(page.getByRole("table",{name:"Work operational reviews"})).toContainText("Confirm the operational delivery checklist");
