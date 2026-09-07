@@ -50,18 +50,6 @@ vi.mock("@fluentui/react-components", () => {
     TreeItemLayout: Component,
   };
 });
-vi.mock("@fluentui/react-icons", () => ({
-  BuildingRegular: () => null,
-  CheckmarkCircleRegular: () => null,
-  CheckmarkRegular: () => null,
-  DocumentRegular: () => null,
-  ErrorCircleRegular: () => null,
-  NavigationRegular: () => null,
-  OpenRegular: () => null,
-  PeopleTeamRegular: () => null,
-  SearchRegular: () => null,
-}));
-
 import {
   InviteAcceptance,
   inviteTokenFromHash,
