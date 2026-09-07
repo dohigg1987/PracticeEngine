@@ -32,8 +32,5 @@ jobs:
           name: practice-dev-worker
           path: /tmp/practice-dev-dry-run/
           retention-days: 7
-      - name: Check the existing DEV deployment
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Check DEV configuration and public readiness
         run: node scripts/practice-dev-preflight.mjs
