@@ -9,9 +9,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
+      WEB_ORIGIN: https://practice-delivery-review.practiceengine-dev.pages.dev
       VITE_DEMO_MODE: "true"
-      VITE_API_URL: https://example.invalid
-      VITE_NEON_AUTH_URL: ""
+      VITE_API_URL: https://practice-delivery-review.practiceengine-dev.pages.dev
+      VITE_NEON_AUTH_URL: https://practice-delivery-review.practiceengine-dev.pages.dev
     steps:
       - uses: actions/checkout@v4
         with:
