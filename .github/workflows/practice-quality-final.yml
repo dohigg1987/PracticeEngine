@@ -26,9 +26,6 @@ jobs:
       fail-fast: false
       matrix:
         command: ['verify', 'verify:pilot']
-    env:
-      PLAYWRIGHT_WORKERS: '2'
-      PLAYWRIGHT_BROWSER_JOB_CONCURRENCY: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
