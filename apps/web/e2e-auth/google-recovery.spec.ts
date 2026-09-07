@@ -1,6 +1,16 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
+// Failure evidence contains only this suite's synthetic account and mocked responses.
+test.afterEach(async ({ page }, testInfo) => {
+  if (testInfo.status !== testInfo.expectedStatus) {
+    console.log("AUTH_FAILURE_CONTEXT", JSON.stringify({
+      url: page.url(),
+      body: (await page.locator("body").innerText().catch(() => "")).slice(0,6000),
+    }));
+  }
+});
+
 const testUser = { id: "11111111-1111-4111-8111-111111111111", name: "Existing account", email: "existing@example.test", emailVerified: false };
 async function mockAuth(page: Page, options: { signedIn?: boolean; connected?: boolean; listFailure?: boolean; linkError?: string } = {}) {
   let signedIn = Boolean(options.signedIn);
