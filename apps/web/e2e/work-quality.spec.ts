@@ -75,6 +75,28 @@ for (const width of [320, 390]) {
   });
 }
 
+test("neutral work status remains readable on the light surface", async ({ page }) => {
+  await page.goto("/practice/work?view=all");
+  const badge = page.getByRole("grid", { name: "Practice work" }).getByText("In Progress", { exact: true });
+  await expect(badge).toBeVisible();
+  const contrast = await badge.evaluate(element => {
+    const rgb = (value: string) => (value.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+    const luminance = (value: string) => rgb(value).map(channel => {
+      const scaled = channel / 255;
+      return scaled <= 0.04045 ? scaled / 12.92 : ((scaled + 0.055) / 1.055) ** 2.4;
+    }).reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index], 0);
+    let background = "rgb(255, 255, 255)";
+    for (let ancestor: Element | null = element; ancestor; ancestor = ancestor.parentElement) {
+      const candidate = getComputedStyle(ancestor).backgroundColor;
+      if (candidate !== "transparent" && !candidate.endsWith(", 0)")) { background = candidate; break; }
+    }
+    const foreground = luminance(getComputedStyle(element).color);
+    const surface = luminance(background);
+    return (Math.max(foreground, surface) + 0.05) / (Math.min(foreground, surface) + 0.05);
+  });
+  expect(contrast).toBeGreaterThanOrEqual(4.5);
+});
+
 test("capture the updated work queue and Fluent creation dialog", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/practice/work?view=all&selected=work-accounts-2026");

@@ -70,6 +70,8 @@ import {
   Textarea,
   Toolbar,
   Tooltip,
+  useRestoreFocusSource,
+  useRestoreFocusTarget,
   Tree,
   TreeItem,
   TreeItemLayout,
@@ -560,6 +562,8 @@ function AccountsWorkspace({
   const practiceWorkItemId = pathname === "/practice/work" ? new URLSearchParams(locationSearch).get("work") || "" : "";
   const practiceView = practiceWorkItemId ? "work-detail" : "work";
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const navigationFocusSource = useRestoreFocusSource();
+  const navigationFocusTarget = useRestoreFocusTarget();
   const [narrowNavigation, setNarrowNavigation] = useState(() => window.matchMedia("(max-width: 900px)").matches);
   useEffect(() => {
     const media = window.matchMedia("(max-width: 900px)");
@@ -1539,6 +1543,7 @@ function AccountsWorkspace({
       <header className="topbar">
         <Tooltip content="Open application navigation" relationship="description">
           <FluentButton
+            {...navigationFocusTarget}
             className="nav-toggle"
             appearance="subtle"
             icon={<NavigationRegular />}
@@ -1734,6 +1739,7 @@ function AccountsWorkspace({
       <div className="workspace">
         <aside className={`sidebar ${mobileNavOpen ? "mobile-open" : ""}`}>
           <NavDrawer
+            {...(narrowNavigation ? navigationFocusSource : {})}
             id="application-navigation"
             className={narrowNavigation ? "suite-mobile-nav" : "fluent-nav"}
             type={narrowNavigation ? "overlay" : "inline"}
