@@ -31,29 +31,42 @@ test("six-destination shell and Clients & CRM local navigation", async ({ page }
   await expect(page.getByRole("tab", { name: "Onboarding" })).toBeVisible();
 });
 
-test("Work saved views, deep selection and inspector actions preserve queue state", async ({ page }) => {
+test("Work saved views and delivery actions preserve queue state", async ({ page }) => {
   await ready(page, "/practice/work?view=all&q=annual&selected=work-accounts-2026", "Work");
-  await expect(page).toHaveURL(/view=all/);
-  await expect(page).toHaveURL(/q=annual/);
   const inspector = page.getByRole("complementary", { name: "Selected record inspector" });
   await expect(inspector.getByRole("heading", { name: "2026 Annual Accounts" })).toBeVisible();
   await expect(page.getByRole("grid", { name: "Practice work" })).toContainText("Northstar Community Foundation");
-  await inspector.getByLabel("Assign").selectOption("member-reviewer");
-  await expect(inspector.getByText("Work updated.")).toBeVisible();
-  await inspector.getByLabel("Due date").fill("2027-10-15");
-  await inspector.getByRole("button", { name: "Reschedule" }).click();
-  await expect(inspector.getByText("Work updated.")).toBeVisible();
-  await expect(inspector.getByLabel("Due date")).toHaveValue("2027-10-15");
-  await inspector.getByRole("button", { name: "Mark blocked" }).click();
-  await expect(inspector.getByText(/Blocked from the Work inspector|Preparation/)).toBeVisible();
-  await inspector.getByRole("button", { name: "Send to review" }).click();
-  await expect(inspector.getByLabel("Status")).toHaveValue("review");
-  await inspector.getByRole("button", { name: "Request from client" }).click();
+  await inspector.getByRole("button", { name: "Open work", exact: true }).click();
+  await expect(page).toHaveURL(/work=work-accounts-2026/);
+  await expect(page).toHaveURL(/q=annual/);
+
+  await page.getByRole("combobox", { name: "Work owner", exact: true }).selectOption("member-reviewer");
+  await expect(page.getByText("Owner updated.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Work owner", exact: true })).toHaveValue("member-reviewer");
+  await page.getByRole("button", { name: "Reschedule", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel(/^Due date/).fill("2027-10-15");
+  await dialog.getByRole("textbox", { name: /Reason \/ notes/ }).fill("Client agreed the revised delivery date.");
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText("15 Oct 2027", { exact: true })).toBeVisible();
+
+  await page.getByRole("tab", { name: /^Workflow/ }).click();
+  await page.getByRole("combobox", { name: "Progress Preparation", exact: true }).selectOption("blocked");
+  await dialog.getByRole("textbox", { name: /Reason \/ notes/ }).fill("Waiting for the supporting funding schedule.");
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByRole("table", { name: "Operational workflow stages" })).toContainText("Waiting for the supporting funding schedule.");
+  await expect(page.getByRole("region", { name: "Next action" })).toContainText("Resolve the blocker");
+  await page.getByRole("tab", { name: /^Reviews/ }).click();
+  await expect(page.getByLabel("Work operational reviews")).toContainText("Confirm the operational delivery checklist");
+
+  await page.getByRole("button", { name: "Request from client", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Request from client" })).toBeVisible();
-  await page.getByRole("button", { name: "Cancel" }).click();
-  await inspector.getByRole("button", { name: "Close" }).click();
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("button", { name: "Back to work", exact: true }).click();
   await expect(page).toHaveURL(/view=all/);
   await expect(page).toHaveURL(/q=annual/);
+  await expect(inspector.getByRole("heading", { name: "2026 Annual Accounts" })).toBeVisible();
+  await inspector.getByRole("button", { name: "Close", exact: true }).click();
   await expect(page).not.toHaveURL(/selected=/);
   await page.goBack();
   await expect(page).toHaveURL(/selected=work-accounts-2026/);
