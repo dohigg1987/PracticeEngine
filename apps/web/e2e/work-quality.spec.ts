@@ -36,6 +36,17 @@ test("Add work creates a record directly from the queue", async ({ page }) => {
   await expect(page.getByRole("grid", { name: "Practice work" })).toContainText("Quality review follow-up");
 });
 
+test("creation dialog returns keyboard focus to Add work when dismissed", async ({ page }) => {
+  await page.goto("/practice/work?view=all");
+  const trigger = page.getByRole("button", { name: "Add work", exact: true });
+  await trigger.click();
+  const dialog = page.getByRole("dialog", { name: "Add work" });
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(trigger).toBeFocused();
+});
+
 test("saved views use Fluent tab selection and keyboard navigation", async ({ page }) => {
   await page.goto("/practice/work?view=all");
   const tabs = page.getByRole("tablist", { name: "Saved views" });
@@ -70,6 +81,9 @@ for (const width of [320, 390]) {
     await expect(trigger).toHaveAttribute("aria-expanded", "false");
     const widths = await page.evaluate(() => ({ available: document.documentElement.clientWidth, actual: document.documentElement.scrollWidth }));
     expect(widths.actual).toBeLessThanOrEqual(widths.available + 1);
+    await page.keyboard.press("Escape");
+    await page.mouse.move(width - 8, 800);
+    await expect(page.getByRole("tooltip")).toBeHidden();
     const results = await new AxeBuilder({ page }).exclude("[data-tabster-dummy]").analyze();
     expect(results.violations).toEqual([]);
   });
@@ -98,6 +112,7 @@ test("neutral work status remains readable on the light surface", async ({ page 
 });
 
 test("capture the updated work queue and Fluent creation dialog", async ({ page }, testInfo) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/practice/work?view=all&selected=work-accounts-2026");
   await expect(page.getByRole("complementary", { name: "Selected record inspector" }).getByRole("heading", { name: "2026 Annual Accounts" })).toBeVisible();

@@ -3,7 +3,7 @@ import {
   Button, createTableColumn, DataGrid, DataGridBody, DataGridCell,
   DataGridHeader, DataGridHeaderCell, DataGridRow, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, DialogTrigger, Field, Input, MessageBar,
   MessageBarBody, Select, Skeleton, SkeletonItem, Tab, TabList, Table,
-  TableBody, TableCell, TableHeader, TableHeaderCell, TableRow,
+  TableBody, TableCell, TableHeader, TableHeaderCell, TableRow, useRestoreFocusTarget,
 } from "@fluentui/react-components";
 import type { TableColumnDefinition } from "@fluentui/react-components";
 import { OpenRegular } from "@fluentui/react-icons";
@@ -220,6 +220,7 @@ function ClientSummary({ context, clientId = "", onOpenWork, onOpenLedgerly, onB
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [addingWork, setAddingWork] = useState(false);
+  const addWorkFocusTarget = useRestoreFocusTarget();
   const load = useCallback(async () => { if (!clientId) return; setLoading(true); setError(""); try { const [nextSummary, people] = await Promise.all([api.practiceClientSummary(context, clientId), api.resourceProfiles(context)]); setSummary(nextSummary); setResources(people.items); } catch (e) { setError(errorText(e)); } finally { setLoading(false); } }, [context, clientId]);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { let live = true; setSelectedWork(null); if (!workspace.selected) { setSelectedWork(null); return () => { live = false; }; } void api.practiceWorkItem(context, workspace.selected).then((result) => { if (live) setSelectedWork(result.item); }).catch((reason) => { if (live) setError(errorText(reason)); }); return () => { live = false; }; }, [context, workspace.selected]);
@@ -237,7 +238,7 @@ function ClientSummary({ context, clientId = "", onOpenWork, onOpenLedgerly, onB
   const inspector = selectedWork && selectedWork.id === workspace.selected && selectedWork.client_id === clientId ? <WorkInspector key={`${context.tenantId}:${selectedWork.id}`} context={context} item={selectedWork} resources={resources} onChanged={async () => { await load(); const result = await api.practiceWorkItem(context, selectedWork.id); setSelectedWork(result.item); }} onClose={() => update({ selected: "" })} onOpenClient={() => undefined} onOpenLedgerly={onOpenLedgerly} onOpenWork={onOpenWork} /> : undefined;
   return <PersistentClientFrame
     identity={<div className="pm-client-identity"><Button appearance="subtle" size="small" onClick={workspace.returnPath ? () => onNavigate?.(workspace.returnPath) : onBack}>{workspace.returnPath ? "Back to work" : "All clients"}</Button><div><span>Client</span><h1>{clientName}</h1><p>{openWork.length} open work · {summary.services.filter((service) => service.status === "active").length} active services</p></div><span className="pm-client-status"><Status value={summary.onboarding?.status || "active"} /></span></div>}
-    commands={<CommandBar contextualActions={<><Button appearance="subtle" onClick={() => update({ area: "collaboration" })}>Request from client</Button><Button appearance="subtle" onClick={() => update({ area: "collaboration" })}>Message</Button></>}><Button appearance="primary" onClick={() => setAddingWork(true)}>Add work</Button></CommandBar>}
+    commands={<CommandBar contextualActions={<><Button appearance="subtle" onClick={() => update({ area: "collaboration" })}>Request from client</Button><Button appearance="subtle" onClick={() => update({ area: "collaboration" })}>Message</Button></>}><Button {...addWorkFocusTarget} appearance="primary" onClick={() => setAddingWork(true)}>Add work</Button></CommandBar>}
     navigation={<nav aria-label="Client workspace areas">{areas.map((area) => <Button key={area.value} appearance={workspace.area === area.value ? "primary" : "subtle"} aria-current={workspace.area === area.value ? "page" : undefined} onClick={() => update({ area: area.value, selected: "" })}>{area.label}</Button>)}</nav>}
     contextPane={inspector}
   >

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   Button, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface,
-  DialogTitle, Field, Input, MessageBar, MessageBarBody, Select, Spinner, makeStyles, tokens,
+  DialogTitle, Field, Input, MessageBar, MessageBarBody, Select, Spinner, makeStyles, tokens, useRestoreFocusSource,
 } from "@fluentui/react-components";
 import { api, type ApiContext, type Organisation, type PracticeClientSummary } from "./api";
 
@@ -18,6 +18,7 @@ const message = (error: unknown) => error instanceof Error ? error.message : "Wo
 
 export default function CreatePracticeWorkDialog({ context, summary: initialSummary, onClose, onCreated }: Props) {
   const styles = useStyles();
+  const restoreFocusSource = useRestoreFocusSource();
   const [clients, setClients] = useState<Organisation[]>([]);
   const [clientId, setClientId] = useState(initialSummary?.client.id || "");
   const [summary, setSummary] = useState(initialSummary);
@@ -71,7 +72,7 @@ export default function CreatePracticeWorkDialog({ context, summary: initialSumm
 
   const activeServices = summary?.services.filter(item => item.status === "active") || [];
   return <Dialog open onOpenChange={(_, data) => { if (!data.open && !saving.current) onClose(); }}>
-    <DialogSurface><form onSubmit={event => void create(event)}><DialogBody>
+    <DialogSurface {...restoreFocusSource}><form onSubmit={event => void create(event)}><DialogBody>
       <DialogTitle>Add work</DialogTitle>
       <DialogContent className={styles.form}>
         {error && <MessageBar intent="error"><MessageBarBody>{error}</MessageBarBody>

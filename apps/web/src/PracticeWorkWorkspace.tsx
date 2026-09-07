@@ -13,6 +13,7 @@ import {
   MessageBar,
   MessageBarBody,
   Select,
+  useRestoreFocusTarget,
 } from "@fluentui/react-components";
 import type { TableColumnDefinition, TableColumnSizingOptions } from "@fluentui/react-components";
 import { OpenRegular } from "@fluentui/react-icons";
@@ -136,6 +137,7 @@ export default function PracticeWorkWorkspace({ context, routeSearch, onNavigate
   const [error, setError] = useState("");
   const [moreFilters, setMoreFilters] = useState(false);
   const [addingWork, setAddingWork] = useState(false);
+  const addWorkFocusTarget = useRestoreFocusTarget();
   const [detail, setDetail] = useState<WorkDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
@@ -208,7 +210,7 @@ export default function PracticeWorkWorkspace({ context, routeSearch, onNavigate
   /> : undefined;
 
   return <PageShell className="pww-page">
-    <PageHeader title="Work" description="Delivery queues and actions." primaryAction={<Button appearance="primary" onClick={() => setAddingWork(true)}>Add work</Button>} />
+    <PageHeader title="Work" description="Delivery queues and actions." primaryAction={<Button {...addWorkFocusTarget} appearance="primary" onClick={() => setAddingWork(true)}>Add work</Button>} />
     <SavedViewBar views={views} selectedValue={urlState.view} onSelect={(view) => updateUrl({ view, due: "", selected: "" })} />
     <CommandBar><Button appearance="subtle" onClick={() => void load()}>Refresh</Button></CommandBar>
     {error && <ErrorState title="Some work data may be out of date" message={error} retry={load} />}

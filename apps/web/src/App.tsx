@@ -1543,7 +1543,7 @@ function AccountsWorkspace({
       <header className="topbar">
         <Tooltip content="Open application navigation" relationship="description">
           <FluentButton
-            {...navigationFocusTarget}
+            {...(narrowNavigation ? navigationFocusTarget : {})}
             className="nav-toggle"
             appearance="subtle"
             icon={<NavigationRegular />}
@@ -1960,6 +1960,7 @@ function AccountsWorkspace({
             <RoutePanelBoundary resetKey={workspacePage}>
               <Suspense fallback={<Skeleton pathname={pathname} />}>
                 <ResourceEconomics
+                  key={context.tenantId}
                   context={context}
                   view={workspacePage as "resources" | "capacity" | "allocation" | "time" | "portfolio" | "management"}
                   onNavigate={navigate}
