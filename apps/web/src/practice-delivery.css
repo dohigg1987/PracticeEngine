@@ -47,7 +47,10 @@
 .pd-task-name { display: flex; align-items: flex-start; gap: var(--spacingHorizontalS); }
 .pd-task-marker { display: inline-flex; flex: 0 0 20px; padding-top: var(--spacingVerticalXXS); color: var(--colorNeutralForeground3); font-size: var(--fontSizeBase400); }
 .pd-task-marker--done { color: var(--colorStatusSuccessForeground1); }
-.pd-task-title { width: 44%; }
+.pd-task-title { width: 42%; }
+.pd-task-owner { width: 22%; }
+.pd-task-status { width: 16%; }
+.pd-task-actions { width: 20%; }
 .pd-task-actions button { min-width: 0; }
 .pd-review { border-bottom: var(--strokeWidthThin) solid var(--colorNeutralStroke2); padding: var(--spacingVerticalL) 0; display: grid; gap: var(--spacingVerticalM); }
 .pd-review:first-child { padding-top: 0; }
@@ -85,7 +88,8 @@
   .pd-task-head { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .pd-task-table tbody { display: block; }
   .pd-task-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; padding-block: var(--spacingVerticalM); gap: var(--spacingVerticalS) var(--spacingHorizontalM); border-top: var(--strokeWidthThin) solid var(--colorNeutralStroke2); }
-  .pd-page .pd-task-row td { padding: 0; border: 0; min-width: 0; }
+  .pd-page .pd-task-row td { padding: 0; border: 0; min-width: 0; width: auto; height: auto; min-height: 0; }
+  .pd-task-actions:has(.pd-actions:empty) { display: none; }
   .pd-task-title { width: auto; grid-column: 1 / -1; }
   .pd-task-owner { padding-left: var(--spacingHorizontalXXL); }
   .pd-task-owner .pd-primary { font-size: var(--fontSizeBase200); }
@@ -93,6 +97,7 @@
   .pd-task-actions { grid-column: 1 / -1; }
   .pd-task-actions .pd-actions { justify-content: flex-end; }
   .pd-tabs [role="tab"] { padding-inline: var(--spacingHorizontalS); font-size: var(--fontSizeBase300); }
+  .pd-tabs [role="tablist"] { gap: 0; }
 }
 @media (forced-colors: active) {
   .pd-page, .pd-header, .pd-sidebar, .pd-next, .pd-tabs, .pd-review, .pd-point, .pd-task-row { border-color: CanvasText; }

@@ -92,6 +92,13 @@ test("delivery record and dialogs remain accessible at 320px and restore focus",
     expect(audit.violations.map(item => ({ id: item.id, nodes: item.nodes.map(node => node.target) }))).toEqual([]);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
   }
+  await page.emulateMedia({ forcedColors: "active" });
+  await expect(page.getByRole("tab", { name: /^Reviews/ })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
+  await page.emulateMedia({ forcedColors: "none" });
+  await page.addStyleTag({ content: ".pd-page * { line-height: 1.5; letter-spacing: .12em; word-spacing: .16em; } .pd-page p { margin-bottom: 2em; }" });
+  await expect(page.getByRole("button", { name: "Request from client", exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
 });
 
 test("delivery review images", async ({ page }) => {

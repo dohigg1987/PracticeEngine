@@ -241,7 +241,7 @@ export const resourceAllocationPath = (resourceName: string) => `/practice/work-
 
 export function practiceHomeNextAction(overview: PracticeEconomicsOverview): string {
   const next = practiceHomeQueues(overview).find((item) => item.value > 0);
-  return next ? `${next.label}: ${next.value} item${next.value === 1 ? "" : "s"} need attention.` : "No delivery exceptions need immediate attention.";
+  return next ? `${next.label}: ${next.value} item${next.value === 1 ? " needs" : "s need"} attention.` : "No delivery exceptions need immediate attention.";
 }
 
 function ManagementView({ context, onNavigate, routeSearch, onOpenWork }: Omit<Props, "view">) {

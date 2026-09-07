@@ -712,7 +712,9 @@ function AccountsWorkspace({
     performance.mark("pe:navigation:start");
     const canonical = canonicalPath(nextPath);
     const target = new URL(canonical, window.location.origin);
-    window.history[replace ? "replaceState" : "pushState"](null, "", `${target.pathname}${target.search}`);
+    const targetPath = `${target.pathname}${target.search}`;
+    const alreadyOnPracticePage = target.pathname.startsWith("/practice") && targetPath === `${window.location.pathname}${window.location.search}`;
+    if (replace || !alreadyOnPracticePage) window.history[replace ? "replaceState" : "pushState"](null, "", targetPath);
     setPathname(target.pathname);
     setLocationSearch(target.search);
     setMobileNavOpen(false);
@@ -1597,7 +1599,7 @@ function AccountsWorkspace({
             size="large"
             role="combobox"
             contentBefore={<SearchRegular aria-hidden="true" />}
-            placeholder="Search clients, engagements and sections"
+            placeholder={activeApplication?.id === "practice" ? "Search practice" : "Search clients, engagements and sections"}
             aria-label="Search workspace"
             aria-expanded={searchOpen}
             aria-controls="workspace-search-results"
@@ -1752,7 +1754,7 @@ function AccountsWorkspace({
             defaultOpenCategories={activeApplication?.id === "practice"
               ? [navigationItemForPath(pathname)?.parentId || navigationItemForPath(pathname)?.id || "practice-work"]
               : undefined}
-            selectedCategoryValue={navigationItemForPath(pathname)?.parentId ?? ""}
+            selectedCategoryValue={navigationItemForPath(pathname)?.parentId ?? (activeApplication?.id === "practice" ? navigationItemForPath(pathname)?.id ?? "" : "")}
             selectedValue={navigationItemForPath(pathname) ? applicationNavigationValue(navigationItemForPath(pathname)!) : pathname.startsWith("/settings") ? "global-settings" : activeApplication && pathname.startsWith(`${activeApplication.routePrefix}/settings`) ? `${activeApplication.id}-settings` : ""}
           >
             {narrowNavigation && <NavDrawerHeader>
