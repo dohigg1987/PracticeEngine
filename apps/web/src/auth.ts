@@ -10,6 +10,33 @@ const browserOrigin = typeof window === "undefined" ? "http://127.0.0.1" : windo
 // the application origin; Vite provides the equivalent development proxy.
 export const authTransportUrl = `${browserOrigin}/neon-auth`;
 export const authClient = !demoMode && authUrl ? createAuthClient(authTransportUrl) : null;
+const socialVerifierParameter = "neon_auth_session_verifier";
+let socialCallbackCompletion: Promise<boolean> | null = null;
+
+export function completeSocialCallback(): Promise<boolean> {
+  if (typeof window === "undefined") return Promise.resolve(false);
+  const current = new URL(window.location.href);
+  const verifier = current.searchParams.get(socialVerifierParameter);
+  if (!verifier) return socialCallbackCompletion ?? Promise.resolve(false);
+
+  current.searchParams.delete(socialVerifierParameter);
+  window.history.replaceState(window.history.state, "", current.href);
+  socialCallbackCompletion = (async () => {
+    const response = await fetch(`${authTransportUrl}/complete-callback`, {
+      method: "POST",
+      credentials: "include",
+      cache: "no-store",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ verifier }),
+    });
+    const result = await response.json().catch(() => null) as { authenticated?: boolean } | null;
+    if (!response.ok || result?.authenticated !== true) {
+      throw new AuthRequiredError("Google sign-in could not establish a session. Try again.");
+    }
+    return true;
+  })();
+  return socialCallbackCompletion;
+}
 
 export function authFailureMessage(error: unknown, development = import.meta.env.DEV): string {
   const actionable = authActionErrorMessage(error);
@@ -41,6 +68,8 @@ export function authActionErrorMessage(error: unknown): string {
     : "message" in error && typeof error.message === "string"
       ? error.message
       : "";
+
+  if (code === "ACCOUNT_NOT_LINKED" || code === "ACCOUNT_ALREADY_LINKED_TO_DIFFERENT_USER") return socialSignInError(code);
 
   if (code === "INVALID_EMAIL_OR_PASSWORD" || code === "INVALID_CREDENTIALS" || status === 401) {
     return "The email address or password is incorrect.";
@@ -105,4 +134,33 @@ export async function freshAuthToken(): Promise<string> {
   const token = session.headers.get("set-auth-jwt");
   if (!session.ok || !token) throw new AuthRequiredError();
   return token;
+}
+
+const socialErrorMessages: Record<string, string> = {
+  account_not_linked: "This Google account is not connected to your existing account. Sign in with your email and password, then verify your email in Sign-in methods and try Google again. If you forgot your password, use Forgot your password.",
+  account_already_linked_to_different_user: "This Google account is connected to another account. Choose the Google account with the same email as your current account.",
+  email_doesnt_match: "Choose the Google account with the same email as your current account.",
+  "email_doesn't_match": "Choose the Google account with the same email as your current account.",
+  access_denied: "Google sign-in was cancelled. You can try again or sign in with your email and password.",
+  state_not_found: "The Google sign-in request expired. Start again from this page.",
+  state_mismatch: "The Google sign-in request could not be verified. Start again from this page.",
+};
+
+export function socialSignInError(code: string): string {
+  const key = code.toLowerCase();
+  return Object.hasOwn(socialErrorMessages, key) ? socialErrorMessages[key] :
+    "Google sign-in could not be completed. Try again or sign in with your email and password.";
+}
+
+export function authRedirectError(search: string): string {
+  const code = new URLSearchParams(search).get("error");
+  return code ? socialSignInError(code) : "";
+}
+
+export function clearAuthRedirectError(): void {
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has("error")) return;
+  url.searchParams.delete("error");
+  url.searchParams.delete("error_description");
+  window.history.replaceState(window.history.state, "", url.href);
 }
