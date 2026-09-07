@@ -1,0 +1,27 @@
+name: Practice delivery navigation check
+on:
+  push:
+    branches: [codex/practice-delivery-navigation-check]
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble
+      options: --user 1001
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - working-directory: apps/web
+        run: npx playwright test e2e/direction-1-1.spec.ts --project=chromium --workers=1 --retries=0
+      - name: Failure details
+        if: failure()
+        working-directory: apps/web
+        run: |
+          find test-results -name error-context.md -exec cat {} \;

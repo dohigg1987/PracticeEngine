@@ -48,7 +48,10 @@ test("Work saved views and delivery actions preserve queue state", async ({ page
   await dialog.getByLabel(/^Due date/).fill("2027-10-15");
   await dialog.getByRole("textbox", { name: /Reason \/ notes/ }).fill("Client agreed the revised delivery date.");
   await dialog.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page.getByText("15 Oct 2027", { exact: true })).toBeVisible();
+  await expect(dialog).not.toBeVisible();
+  await page.getByRole("button", { name: "Reschedule", exact: true }).click();
+  await expect(dialog.getByLabel(/^Due date/)).toHaveValue("2027-10-15");
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
 
   await page.getByRole("tab", { name: /^Workflow/ }).click();
   await page.getByRole("combobox", { name: "Progress Preparation", exact: true }).selectOption("blocked");
